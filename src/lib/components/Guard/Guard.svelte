@@ -1,83 +1,126 @@
+<svelte:options accessors={true} />
+
+<script
+	lang="ts"
+	context="module"
+>
+	type Deferred = { promise: Promise<void>; resolve: () => void };
+	const deferred = () => {
+		const d: Deferred = {} as Deferred;
+		d.promise = new Promise((resolve) => {
+			d.resolve = resolve;
+		});
+		return d;
+	};
+</script>
+
 <script lang="ts">
-	import { PlayerState } from '$lib/stores/player';
-	import type { Position } from '$lib/types/position';
-	import { getDistanceFromPoints } from '$lib/utils/position';
-	import { frameLoop } from '$lib/utils/raf';
-	import { onMount } from 'svelte';
-	import { tweened } from 'svelte/motion';
-	let state: 'attack' | 'walk' | 'default';
+	import { PlayerState } from "$lib/stores/player";
+	import type { Position } from "$lib/types/position";
+	import { getDistanceFromPoints, getRealPositionFromLocalPosition } from "$lib/utils/position";
+	import { frameLoop } from "$lib/utils/raf";
+	import { onMount } from "svelte";
+	import { tweened } from "svelte/motion";
+	import type { MapItem } from "../../types/core";
+
+	export let item: MapItem;
+	export let offset: number;
+	export let section: number;
+
+	export const getPosition = () => $tPosition;
+
+	let state: "attack" | "walk" | "default";
 	let timeout: NodeJS.Timeout;
-	let rotation: number = 0;
-	let position: Position = { x: 0, y: 0, z: 0 };
 	let isTargetingPlayer = false;
-	const tPosition = tweened<typeof position>(position, { duration: 1726, delay: 100 });
+
+	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
+	const tPosition = tweened<typeof position>(
+		{ x: -position.x, z: -position.z },
+		{ duration: 1726, delay: 100 }
+	);
+
 	let start: number;
-	const loop = frameLoop.add((now) => {
-		if (!start) start = now;
-		const elapsed = now - start;
-		if (elapsed > 700) {
-			start = now;
-			const distance = getDistanceFromPoints($tPosition, {
-				x: -$PlayerState.position.x,
-				y: 0,
-				z: -$PlayerState.position.z
-			});
-			console.log({ distance });
-			if (distance < 475) {
-				isTargetingPlayer = true;
-				if (distance <= 135 && Math.random() > 0.6666) {
-					state = 'walk';
-					tPosition.update(
+	let running = false;
+
+	const queue = async (task: Deferred) => {
+		if (running) return;
+		running = true;
+		await task.promise.then(() => {
+			running = false;
+		});
+	};
+	const loop = frameLoop.add(() => {
+		const distance = getDistanceFromPoints($tPosition, {
+			x: -$PlayerState.position.x,
+			y: 0,
+			z: -$PlayerState.position.z
+		});
+
+		if (distance < 475) {
+			if (running) return;
+			const task = deferred();
+			isTargetingPlayer = true;
+			if (distance <= 235 && Math.random() > 0.6666) {
+				state = "walk";
+				tPosition
+					.update(
 						(tv, v) => {
 							// state = 'walk';
 							return { x: tv.x + Math.random() * 100, y: 0, z: tv.z + Math.random() * 100 };
 						},
 						{ duration: distance * 12 }
-					);
-				} else if (distance <= 275 && distance >= 125 && Math.random() < 0.6) {
-					state = 'walk';
-					tPosition.update(
+					)
+					.then(task.resolve);
+			} else if (distance <= 275 && distance >= 35 && Math.random() < 0.6) {
+				state = "walk";
+				tPosition
+					.update(
 						(tv, v) => {
 							// state = 'walk';
 							return { x: -$PlayerState.position.x, y: 0, z: -$PlayerState.position.z };
 						},
 						{ duration: distance * 12 }
-					);
-				} else if (distance <= 320) {
-					state = 'attack';
-					// rotation = -$PlayerState.rotation.y!;
-					console.log($tPosition);
+					)
+					.then(task.resolve);
+			} else if (distance <= 320) {
+				state = "attack";
+				// rotation = -$PlayerState.rotation.y!;
+				console.log($tPosition);
 
-					PlayerState.takeDamage('gun');
-				}
-				// isTargetingPlayer = false;
+				PlayerState.takeDamage("gun");
+				task.resolve();
 			}
+			isTargetingPlayer = false;
 		}
 	});
 	onMount(() => {
 		let count = 0;
 		timeout = setInterval(() => {
 			if (isTargetingPlayer) return;
-			state = Math.random() < 0.5 ? 'default' : 'walk';
-			if (state === 'walk') {
+			state = Math.random() < 0.5 ? "default" : "walk";
+			if (state === "walk") {
 				count += 1;
 				if (count % 2)
 					tPosition.set({
 						...$tPosition,
-						x: $tPosition.x > -$PlayerState.position.x ? $tPosition.x + 62 : $tPosition.x + 151,
-						z: $tPosition.z < -$PlayerState.position.z ? $tPosition.z + 14 : $tPosition.z + 86
+						x: $tPosition.x > $PlayerState.position.x ? $tPosition.x + 62 : $tPosition.x + 151,
+						z: $tPosition.z < $PlayerState.position.z ? $tPosition.z + 14 : $tPosition.z + 86
 					});
 				else
 					tPosition.set({
 						...$tPosition,
-						x: $tPosition.x > -$PlayerState.position.x ? $tPosition.x + 165 : $tPosition.x - 29,
-						z: $tPosition.z > -$PlayerState.position.z ? $tPosition.z - 21 : $tPosition.z + 99
+						x: $tPosition.x > $PlayerState.position.x ? $tPosition.x + 165 : $tPosition.x - 29,
+						z: $tPosition.z > $PlayerState.position.z ? $tPosition.z - 21 : $tPosition.z + 99
 					});
 			} else {
 			}
 		}, 1500);
+
 		loop.start();
-		return () => clearTimeout(timeout);
+		return () => {
+			clearTimeout(timeout);
+			loop.stop();
+		};
 	});
 </script>
 

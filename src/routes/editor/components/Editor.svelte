@@ -1,27 +1,20 @@
 <script lang="ts">
-	import Door from "$lib/components/Door.svelte";
 	import type { Position } from "$lib/types/position";
-	import type { CardinalDirection, Entity, MapItem, Model, Texture, World } from "$lib/utils/map";
 	import { objectEntries } from "$lib/utils/object";
-	import { createMapItem } from "$lib/utils/objects";
-	import { CARDINAL_DIRECTION, isValidTexture } from "$lib/utils/validation";
+	import { WALL_FACES } from "$lib/utils/validation";
 	import { getContext } from "svelte";
-	import { derived } from "svelte/store";
+	import type { TiledJSON } from "../../../lib/types/tiled";
 	import { ctxKey, type TextureContext } from "../../key";
 	import Cell from "./Cell.svelte";
-	import { CellImpl, EditorImpl } from "./Editor/EditorImpl";
 	import TexturePreview from "./Editor/TexturePreview.svelte";
-	import Level from "./Level.svelte";
+	import Level from "../../../lib/components/Level.svelte";
+	import type { MapItem, Texture, WallFace, World } from "../../../lib/types/core";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
 	let TILE_MAP: {
 		active: boolean;
-		data: Omit<MapItem, "surfaces"> & {
-			surfaces: {
-				[D in CardinalDirection]: { active: boolean; key: Texture; dir: CardinalDirection };
-			};
-		};
+		data: MapItem;
 	}[][] = [[]];
 
 	$: TILE_MAP = [...Array(64).keys()].map(() =>
@@ -29,30 +22,23 @@
 			active: false,
 			data: {
 				rotation: undefined,
-				surfaces: Object.fromEntries(
-					["front", "left", "back", "right"].map((k) => [
-						k as CardinalDirection,
-						{ active: false, key: {} as any, dir: k as CardinalDirection }
-					])
-				) as any
+				surfaces: null
 			}
 		}))
 	);
 	let metadata: { name: string; data: string } = { name: "", data: "" };
 	let selected: (typeof TILE_MAP)[number][number] & Omit<Position, "z"> = {} as any;
-	let currentWallTexture: Texture = "#";
+	let currentWallTexture: Texture = null;
 	let zoom = 1;
 	let zoomPosition: Omit<Position, "z"> = { x: 0, y: 0 };
 
 	let showMapDataList = false;
 	let showPreview = false;
 	let selectedNode: [row: number, col: number] = [0, 0];
-	let selectedEdge: [row: number, col: number, dir: CardinalDirection] = [0, 0, "front"];
+	let selectedEdge: [row: number, col: number, dir: WallFace] = [0, 0, "front"];
 	let multiSelectNodes: (typeof selectedNode)[] = [];
-	// $: console.log({ selected });
-	// $: console.log({ selectedEdge });
-	// $: console.log({ TILE_MAP });
-	function isCardinalDirection(input: unknown): input is CardinalDirection {
+
+	function isCardinalDirection(input: unknown): input is WallFace {
 		return typeof input === "string" && ["front", "left", "back", "right"].includes(input);
 	}
 
@@ -100,19 +86,10 @@
 
 	const handleCopy = async () => {
 		const rendered = await handleRender();
-		const mapped = rendered[metadata.name].map((m) =>
-			m.map((v) =>
+		const mapped = rendered[metadata.name].map((m: any[]) =>
+			m.map((v: any) =>
 				Object.fromEntries(
 					objectEntries((v as any).data).map(([k, v]) => {
-						if (k === "surfaces")
-							return [
-								k,
-								Object.fromEntries(
-									objectEntries(v as unknown as Partial<Record<CardinalDirection, Texture>>).map(
-										([k, v]) => [k, (v! as any).key]
-									)
-								)
-							];
 						return [k, v];
 					})
 				)
@@ -123,75 +100,69 @@
 	};
 
 	let files: FileList;
-	let jsonFile;
+	let jsonFile: TiledJSON;
 	const handleJSON = () => {
 		const reader = new FileReader();
+		const chunk = <T>(data: Array<T>) => {
+			const chunks = [];
+			for (let r = 0; r < data.length; r += 64) {
+				chunks.push(data.slice(r, r + 64));
+			}
+			return chunks as T[][];
+		};
+
 		reader.onloadend = () => {
-			jsonFile = reader.result;
-			console.log(JSON.parse(jsonFile));
+			const jsonString = reader.result as string;
+			jsonFile = JSON.parse(jsonString);
+			const chunked = chunk(jsonFile?.layers?.[0]?.data!);
+			console.log(jsonFile, chunked);
+
+			for (let x = 0; x < TILE_MAP.length; x++) {
+				for (let y = 0; y < TILE_MAP[x].length; y++) {
+					let col = TILE_MAP[x][y].data;
+					if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) {
+						col.surfaces = +chunked[x][y] === 0 ? null : +chunked[x][y];
+						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, surfaces: col.surfaces };
+					} else {
+						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, model: { component: "Door" } };
+					}
+				}
+			}
+			for (let x = 0; x < TILE_MAP.length; x++) {
+				for (let y = 0; y < TILE_MAP[x].length; y++) {
+					const topBottom = [
+						TILE_MAP[x - 1]?.[y].data.surfaces,
+						TILE_MAP[x + 1]?.[y].data.surfaces
+					];
+					const leftRight = [
+						TILE_MAP[x]?.[y - 1]?.data.surfaces,
+						TILE_MAP[x]?.[y + 1]?.data.surfaces
+					];
+
+					if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) continue;
+
+					TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
+
+					if (topBottom.every((o) => typeof o === "number")) {
+						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
+					}
+					if (leftRight.every((o) => typeof o === "number")) {
+						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 90, z: 0 } };
+					}
+					TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data };
+				}
+			}
+			TILE_MAP = [...TILE_MAP];
+
+			console.log(TILE_MAP);
 		};
 		reader.readAsText(files[0], "utf-8");
 	};
-	$: console.log(showMapDataList);
+
 	$: if (files && files[0]) handleJSON();
 	$: rendered = TILE_MAP.map((m) =>
-		m.map((v) =>
-			Object.fromEntries(
-				Object.entries(v.data).map(([k, v]) =>
-					k === "surfaces"
-						? [k, Object.fromEntries(Object.entries(v ?? {}).map(([k1, v1]) => [k1, v1.key]))]
-						: [k, v]
-				)
-			)
-		)
+		m.map((v) => Object.fromEntries(Object.entries(v.data).map(([k, v]) => [k, v])))
 	);
-
-	$: {
-		rendered && (async () => console.log(await handleCopy()))();
-	}
-
-	const getOppositeEdge = (edge: CardinalDirection): CardinalDirection => {
-		const directions: Record<CardinalDirection, CardinalDirection> = {
-			back: "front",
-			left: "right",
-			front: "back",
-			right: "left"
-		};
-		return directions[edge];
-	};
-
-	// Define a function to perform DFS on the tile map
-	function disableConnectedSurfaces(row: number, col: number, dir: CardinalDirection) {
-		// Get the current tile
-		const currentTile = TILE_MAP[row][col];
-
-		// Get the adjacent tile in the specified direction
-		const adjacentTile =
-			dir === "front"
-				? TILE_MAP[row - 1][col]
-				: dir === "left"
-				? TILE_MAP[row][col - 1]
-				: dir === "back"
-				? TILE_MAP[row + 1][col]
-				: TILE_MAP[row][col + 1];
-
-		// If the adjacent tile has an active surface in the opposite direction,
-		// disable it and recursively disable its connected surfaces
-		if (adjacentTile?.data.surfaces[getOppositeDirection(dir)].active) {
-			adjacentTile.data.surfaces[getOppositeDirection(dir)].active = false;
-			adjacentTile.data.surfaces[getOppositeDirection(dir)].key = undefined;
-			disableConnectedSurfaces(
-				dir === "front" ? row - 1 : dir === "left" ? row : dir === "back" ? row + 1 : row,
-				dir === "front" ? col : dir === "left" ? col - 1 : dir === "back" ? col : col + 1,
-				dir
-			);
-		}
-	}
-
-	// Define a function to get the opposite direction
-	function getOppositeDirection(dir: CardinalDirection): CardinalDirection {
-		return dir === "front" ? "back" : dir === "left" ? "right" : dir === "back" ? "front" : "left";
-	}
 </script>
 
 <main
@@ -241,6 +212,7 @@
 		<aside>
 			<ul>
 				{#each Object.keys(maps) as key}
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<li on:click={() => handleLoad(key)}>{key}</li>
 				{/each}
 			</ul>
@@ -271,6 +243,16 @@
 							TILE_MAP = [...TILE_MAP];
 						}}>Door</button
 					>
+					<button
+						on:click={() => {
+							const [row, col] = selectedNode;
+							let ref = TILE_MAP[row][col].data;
+							ref = { ...ref, model: { component: "Guard" } };
+							TILE_MAP[row][col].data.model = { component: "Guard" };
+							TILE_MAP[row][col].data = { ...ref };
+							TILE_MAP = [...TILE_MAP];
+						}}>Guard</button
+					>
 				</div>
 
 				{#each Object.entries( { front: "Front", left: "Left", back: "Back", right: "Right" } ) as [edge, label]}
@@ -279,44 +261,32 @@
 							if (isCardinalDirection(edge)) {
 								if (!multiSelectNodes.length) {
 									const [row, col] = selectedNode;
-									for (const side of CARDINAL_DIRECTION) {
-										TILE_MAP[row][col].data.surfaces[side].active =
-											!TILE_MAP[row][col].data.surfaces[side].active;
-										TILE_MAP[row][col].data.surfaces[side].key = TILE_MAP[row][col].data.surfaces[
-											side
-										].active
-											? currentWallTexture
-											: undefined;
+									for (const side of WALL_FACES) {
+										TILE_MAP[row][col].data.surfaces =
+											TILE_MAP[row][col].data.surfaces === null ? currentWallTexture : null;
 									}
 								} else {
 									// Loop through the selected tiles again and disable any connected surfaces
 									for (const [row, col] of multiSelectNodes) {
-										for (const side of CARDINAL_DIRECTION) {
-											TILE_MAP[row][col].data.surfaces[side].active =
-												!TILE_MAP[row][col].data.surfaces[side].active;
-											TILE_MAP[row][col].data.surfaces[side].key = TILE_MAP[row][col].data.surfaces[
-												side
-											].active
-												? currentWallTexture
-												: undefined;
-										}
+										TILE_MAP[row][col].data.surfaces =
+											TILE_MAP[row][col].data.surfaces === null ? currentWallTexture : null;
 									}
-									// for (const [row, col] of multiSelectNodes) {
-									// 	for (const side of CARDINAL_DIRECTION) {
-									// 		if (TILE_MAP[row- 1][col].data.surfaces[getOppositeDirection(side)].active) {
-									// 			TILE_MAP[row][col].data.surfaces[side].active = false;
-									// 			TILE_MAP[row][col].data.surfaces[side].key = undefined;
-									// 		}
-									// 		if (TILE_MAP[row][col + 1].data.surfaces[getOppositeDirection(side)].active) {
-									// 			TILE_MAP[row][col].data.surfaces[side].active = false;
-									// 			TILE_MAP[row][col].data.surfaces[side].key = undefined;
-
-									// 		}
-									// 	}
-									// }
 								}
-								TILE_MAP = [...TILE_MAP];
+								// for (const [row, col] of multiSelectNodes) {
+								// 	for (const side of CARDINAL_DIRECTION) {
+								// 		if (TILE_MAP[row- 1][col].data.surfaces[getOppositeDirection(side)].active) {
+								// 			TILE_MAP[row][col].data.surfaces[side].active = false;
+								// 			TILE_MAP[row][col].data.surfaces[side].key = undefined;
+								// 		}
+								// 		if (TILE_MAP[row][col + 1].data.surfaces[getOppositeDirection(side)].active) {
+								// 			TILE_MAP[row][col].data.surfaces[side].active = false;
+								// 			TILE_MAP[row][col].data.surfaces[side].key = undefined;
+
+								// 		}
+								// 	}
+								// }
 							}
+							TILE_MAP = [...TILE_MAP];
 						}}>{label}</button
 					>
 				{/each}
@@ -345,8 +315,7 @@
 								console.log(detail, selected);
 							}}
 							on:edge={({ detail }) => {
-								currentWallTexture =
-									TILE_MAP[selectedEdge[0]][selectedEdge[1]].data.surfaces[selectedEdge[2]].key;
+								currentWallTexture = TILE_MAP[selectedEdge[0]][selectedEdge[1]].data.surfaces;
 							}}
 						/>
 					{/each}
@@ -373,8 +342,10 @@
 		width: 100%;
 		// grid-
 		align-content: center;
-
-		grid-template-columns: repeat(auto-fill, minmax(18px, 1fr));
+		// min-height: 1rem;
+		// grid-auto-flow: column dense;
+		min-height: 16px;
+		grid-template-columns: repeat(auto-fill, minmax(16px, 1fr));
 	}
 	button {
 		min-height: 2rem;
@@ -415,14 +386,16 @@
 		will-change: transform scroll-position;
 		min-height: 100vh;
 		display: grid;
-		contain: content;
 		padding: 0 1em;
 		outline: yellow 1px solid;
 		transform-style: flat;
 		top: 50%;
 		left: 50%;
 		transform-origin: top left;
-		grid-template-rows: repeat(auto-fill, minmax(18px, 1fr));
+		// flex-direction: column;
+		// grid-auto-flow: row dense;
+		grid-template-rows: repeat(auto-fill, minmax(16px, 1fr));
+
 		color: #fff;
 	}
 </style>

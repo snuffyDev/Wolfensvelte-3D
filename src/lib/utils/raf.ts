@@ -1,41 +1,62 @@
-import { browser } from "$app/environment";
+// Set of callback fns that will run on each animation frame
+const tasks = new Set<(now: number) => void>();
 
-type Task = {
-    start: ()=>void;
-    remove: ()=>void;
-}
-const tasks = new Set<(now: number) => void>()
-// const tasks: Task[] = []
+/**
+ * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
+ * Why a single frameloop? Imagine the map, each enemy, the player, etc. all calling RAF individually... Yeah, no bueno.
+ */
 export const frameLoop = requestFrame();
 
 function requestFrame() {
-    let frame: number;
-    let running = false;
-    let lastTs: number;
-    const run = (now: number) => {
-        if (!lastTs) lastTs = now;
-        const lastLap = now - lastTs;
-        // if (frame) cancelAnimationFrame(frame)
+	let frame: number;
+	let running = false;
+	let lastTs: number;
+	const run = (now: number) => {
+		if (!lastTs) lastTs = now;
+		const lastLap = now - lastTs;
 
-        if (lastLap > 16) {
-            lastTs = now;
-            const iter = tasks.values();
-            let node: ReturnType<typeof iter.next> = iter.next();
-            while (!node.done) {
-                node.value(lastLap);
-                node = iter.next();
-            }
-        }
-        frame = requestAnimationFrame(run);
-    }
+		/** Run each callback every 32ms */
+		if (lastLap > 33.3) {
+			if (frame) cancelAnimationFrame(frame);
+			const iter = tasks.values();
+			let node: ReturnType<typeof iter.next> = iter.next();
+			while (!node.done) {
+				node.value(lastLap);
+				node = iter.next();
+			}
+			lastTs = now;
+			frame = requestAnimationFrame(run);
+		} else {
+			frame = requestAnimationFrame(run);
+		}
+	};
 
-    return {add: (cb: (now: number) => void) =>({
-        start: function ()  {tasks.add(cb); if (!running) {running = true; frame = requestAnimationFrame(run)}; return this},
-        stop: function (){tasks.delete(cb); if (tasks.size < 1) {running = false; cancelAnimationFrame(frame)}; return this}
-    }),
-    dispose: ()=> {
-        cancelAnimationFrame(frame)
-        tasks.clear()
-    }
-}
+	return {
+		/** Initialize a new callback to add the loop */
+		add: (cb: (now: number) => void) => ({
+			/** Adds the provided callback to the loop */
+			start: function () {
+				tasks.add(cb);
+				if (!running) {
+					running = true;
+					frame = requestAnimationFrame(run);
+				}
+				return this;
+			},
+			/** Removes the provided callback from the loop */
+			stop: function () {
+				tasks.delete(cb);
+				if (tasks.size < 1) {
+					running = false;
+					cancelAnimationFrame(frame);
+				}
+				return this;
+			}
+		}),
+		/** Kills all callbacks, removing them from the loop, and kills the loop globally. */
+		dispose: () => {
+			cancelAnimationFrame(frame);
+			tasks.clear();
+		}
+	};
 }

@@ -1,5 +1,8 @@
-<script context="module" lang="ts">
-	import { writable } from 'svelte/store';
+<script
+	context="module"
+	lang="ts"
+>
+	import { writable } from "svelte/store";
 
 	const element_refs = (() => {
 		const _ = new Set<{}>();
@@ -39,60 +42,42 @@
 </script>
 
 <script lang="ts">
-	import type { CardinalDirection, MapItem, Texture } from '$lib/utils/map';
-	import { isCardinalDirection } from '$lib/utils/validation';
-	import { createEventDispatcher } from 'svelte';
-	import type { CellImpl } from './Editor/EditorImpl';
-	import { objectKeys } from '$lib/utils/object';
+	import { isWallFace } from "$lib/utils/validation";
+	import { createEventDispatcher, getContext } from "svelte";
+	import { objectKeys } from "$lib/utils/object";
+	import { ctxKey, type TextureContext } from "../../key";
+	import type { MapItem, Texture } from "../../../lib/types/core";
 	const identity = {};
-	export let data: Omit<MapItem, 'surfaces'> & {
-		surfaces: {
-			[D in CardinalDirection]: { active: boolean; key: Texture; dir: CardinalDirection };
-		};
-	} = {} as any;
+	export let data: MapItem = {} as MapItem;
 	export let active: boolean = false;
 
 	let isSelected = false;
+
+	const { textures }: TextureContext = getContext(ctxKey);
+
 	const dispatch = createEventDispatcher<{
 		selected: { multi: boolean; state: boolean };
-		edge: { active: boolean; key: Texture; dir: CardinalDirection };
+		edge: Texture;
 	}>();
 
-	const clickHandler = (dir: CardinalDirection & string) => {
-		delete data.model;
-		let edge = data.surfaces[dir];
-		edge = { ...edge, active: !edge.active };
-		data = { ...data, surfaces: { ...data.surfaces, [dir]: { ...edge } } };
-		dispatch('edge', {
-			active: edge.active,
-			key: edge.key === ' ' ? '#' : edge.key,
-			dir: dir as CardinalDirection
-		});
-	};
-
-	const getCellType = (o: typeof data): 'model' | 'wall' => {
-		let types: ('model' | 'wall')[] = [];
-
+	const getCellType = (o: typeof data): "model" | "wall" => {
 		for (const key of objectKeys(o)) {
-			if (key === 'model') {
-				if (o[key]?.component) return 'model';
-			} else if (key === 'surfaces') {
-				for (const k of objectKeys(o['surfaces'])) {
-					if (o['surfaces'][k].active) return 'wall';
-				}
+			if (key === "model") {
+				if (o[key]?.component) return "model";
+			} else if (key === "surfaces") {
+				if (typeof o.surfaces === "number") return "wall";
 			}
 		}
-		return 'wall';
+		return "wall";
 	};
 
 	$: CELL_TYPE = getCellType(data);
-	// $: console.log(data, data);
 </script>
 
 <svelte:window
 	on:pointerup={() => {
 		if (is_dragging.state && element_refs.has(identity)) {
-			dispatch('selected', { multi: true, state: active });
+			dispatch("selected", { multi: true, state: active });
 			element_refs.delete(identity);
 			if (!$element_refs.size) is_dragging.state = false;
 		}
@@ -117,108 +102,68 @@
 		}
 	}}
 	on:click|stopPropagation={(event) => {
-		// console.log(event, data);
 		if (element_refs.has(identity) === false) {
 			element_refs.clear();
 			element_refs.add(identity);
 		}
-		dispatch('selected', { multi: false, state: active });
+		dispatch("selected", { multi: false, state: active });
 		event.preventDefault();
 	}}
 >
-	{#if CELL_TYPE === 'wall'}
-		{#each Object.entries(data.surfaces) as [dir, { active, key }], i}
-			<div
-				class="{['back', 'front'].includes(dir) ? 'h' : 'v'} edge {dir}"
-				class:active
-				on:contextmenu|preventDefault={() => {
-					if (isCardinalDirection(dir)) {
-						data.surfaces[dir].active = false;
-					}
-				}}
-				on:click|stopPropagation={() => {
-					if (isCardinalDirection(dir)) {
-						// console.log(dir, { active, key });
-						if (!active) {
-							data.surfaces[dir].active = true;
-						}
-						clickHandler(dir);
-					}
-				}}
-				on:dblclick={(e) => {}}
-			/>
-		{/each}
-	{:else}
-		<span>D</span>
+	{#if CELL_TYPE === "wall"}
+		<span
+			class="edge "
+			style={data.surfaces ? `--img: url(${$textures[data.surfaces].original});` : ""}
+			class:active={data.surfaces !== 0}
+		/>
+	{:else if data.model?.component}
+		<span>{data.model.component[0]}</span>
 	{/if}
 </div>
 
 <style lang="scss">
 	.active {
-		background-color: #ffffff27;
+		background-color: #4b4b4b13;
 	}
 	.cell {
 		position: relative;
-		width: 1rem;
-		height: 1rem;
-		contain: strict;
+		inset: 0;
+		height: inherit;
+		min-height: inherit;
+		display: flex;
 		pointer-events: all;
 	}
 	.edge {
 		position: absolute;
 		z-index: 50;
-		background-color: hsla(0, 0%, 100%, 0.7);
 		contain: strict;
+		min-height: 100%;
 		pointer-events: all;
-
+		isolation: isolate;
+		border: 1px hsla(0, 0%, 100%, 0.72) solid;
 		&.active {
-			background-color: rgb(231, 19, 19) !important;
+			border: none; // border: 1px hsla(0, 0%, 100%, 0.212) solid;
 		}
-		&.v {
-			// outline: #ffffff8d 0.1px solid;
-			height: 100%;
-			width: 1px;
+		&::before {
+			content: "";
 			position: absolute;
-			&::before {
-				position: absolute;
-				height: 100%;
-				width: 1px;
-				padding: 3px;
-				// inset: 0;
-				content: '';
-				// padding-inline: 4px;
-				// padding-inline: 1%;
-				// padding-inline: 4px;
-			}
+			inset: 0;
+			z-index: 20;
+			border: none !important;
 		}
-		&.h {
-			width: 100%;
-			height: 1px;
+		&.active::after {
+			content: "";
 			position: absolute;
-			// inset: 0;
-			&::before {
-				content: '';
-				width: 100%;
-				height: 1px;
-				padding: 3px;
-				// padding-block: 1%;
-				position: absolute;
-			}
+			inset: 0;
+			background-image: var(--img);
+			background-size: 100%;
+			opacity: 1;
+			z-index: 5;
 		}
+		width: 100%;
+		height: 100%;
 		&:hover {
 			background-color: #ff9d9dc2;
-		} // padding-block: 0.1px;
-	}
-	.front {
-		top: 0px;
-	}
-	.back {
-		bottom: 0px;
-	}
-	.left {
-		left: 0;
-	}
-	.right {
-		right: 0;
+		}
 	}
 </style>

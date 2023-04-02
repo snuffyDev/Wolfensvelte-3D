@@ -1,38 +1,29 @@
-# create-svelte
+# Wolfensvelte 3D
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+Yes, it's a Svelte "port" of Wolfenstein 3D.
 
-## Creating a project
+No, there's no WebGL, or canvas.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## What? Why? How?
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+> What do you mean, it's a Svelte port of Wolfenstein 3D?
 
-# create a new project in my-app
-npm create svelte@latest my-app
-```
+Well, it's Wolfenstein 3D... but entirely rendered with Svelte! [1]
 
-## Developing
+> _Why?_
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+A better question would be "why not?"
 
-```bash
-npm run dev
+But, the primary reason this project exists is because of [Svelte Hack 2023](http://hack.sveltesociety.dev/). But also because it seemed very interesting to work on!
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+> How?
 
-## Building
+A lot of alcohol, and even more CSS 3D Transforms.
 
-To create a production version of your app:
+<sup>[1] it's not Wolfenstein 3D, of course. It's not 1:1, but it's familiar enough when you play. Plus, Wolfensvelte is a cool name.
 
-```bash
-npm run build
-```
+## Overview
 
-You can preview the production build with `npm run preview`.
+Wolfensvelte 3D is a Svelte reimagining of the classic PC game Wolfenstein 3D. The entire game is made up from HTML DOM elements that have CSS 3D transforms applied to render the graphics.
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+The only tech used can be summed up as: Svelte, HTML, (S)CSS, and TypeScript/JavaScript.

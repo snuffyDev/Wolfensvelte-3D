@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { TEXTURE_KEYS, type Texture } from '$lib/utils/map';
-	import { isValidTexture } from '$lib/utils/validation';
-	import { getContext } from 'svelte';
-	import { ctxKey, type TextureContext } from '../../../key';
+	import { isValidTexture } from "$lib/utils/validation";
+	import { getContext } from "svelte";
+	import type { Texture } from "../../../../lib/types/core";
+	import { TEXTURE_KEYS } from "../../../../lib/utils/engine/textures";
+	import { ctxKey, type TextureContext } from "../../../key";
 
 	export let selected: Texture | undefined;
 	const { textures }: TextureContext = getContext(ctxKey);
@@ -14,13 +15,14 @@
 		current = items.findIndex((t) => t.key === selected);
 		current = current < 0 ? 0 : current;
 	}
-
-	// $: console.log(items, current, selected);
 </script>
 
 <select bind:value={selected}>
 	{#each items as texture, idx}
-		<option selected={texture['key'] === selected} value={texture.key}>
+		<option
+			selected={texture["key"] === selected}
+			value={texture.key}
+		>
 			{#if isValidTexture(texture.key)}
 				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div
@@ -30,7 +32,10 @@
 					}}
 					class=""
 				>
-					<img src={$textures[texture.key].original} alt="" />
+					<img
+						src={$textures[texture.key].original}
+						alt=""
+					/>
 					<p>{$textures[texture.key].name}</p>
 				</div>
 			{/if}

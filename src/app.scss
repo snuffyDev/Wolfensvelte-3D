@@ -1,8 +1,14 @@
 :root {
 	--perspective: 800px;
-	font-size: 1em;
+	font-size: 16px;
 }
-
+*::before,
+*::after,
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
 .container {
 	display: flex;
 	flex-direction: column;
@@ -21,6 +27,7 @@ body {
 	position: fixed;
 	inset: 0;
 	margin: 0;
+	transform-style: preserve-3d;
 }
 
 .surface {
@@ -35,7 +42,8 @@ body {
 	// top: 0;
 	// grid-template-columns: repeat(4, minmax(100px, 1fr));
 
-	// contain: layout style size;
+	contain: layout size style;
+	will-change: visibility;
 
 	backface-visibility: hidden;
 	transform-origin: top left;
@@ -45,12 +53,12 @@ body {
 	width: 100px;
 	height: 100px;
 
-	// transform-style: preserve-3d;
+	transform-style: preserve-3d;
 	backface-visibility: hidden;
 	image-rendering: pixelated;
 	&.front {
 		transform-origin: center;
-		transform: rotateY(0deg) translateZ(50px);
+		transform: rotateY(0deg) translateZ(100px);
 	}
 	&.right {
 		transform-origin: right;

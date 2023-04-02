@@ -7,18 +7,18 @@
 	export const DIRECTION_MAP: Record<string, number> = {
 		front: 0,
 		left: 270,
-		back: -180,
+		back: 180,
 		right: 90
 	};
 
 	import type { Position } from "$lib/types/position";
 	import { objectEntries } from "$lib/utils/object";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
-	import { isValidTexture } from "$lib/utils/validation";
+	import { WALL_FACES, isValidTexture } from "$lib/utils/validation";
 	import { getContext, onMount } from "svelte";
-	import { CurrentLevel } from "../../routes/editor/components/Level.svelte";
+	import { CurrentLevel } from "./Level.svelte";
 	import { ctxKey, type TextureContext } from "../../routes/key";
-	import type { MapItem, Texture } from "../utils/map";
+	import type { MapItem, Texture, WallFace } from "../types/core";
 </script>
 
 <script lang="ts">
@@ -47,9 +47,9 @@
 		CurrentLevel.checkCollisionWithWorld(getLocalPosition());
 
 	/** Returns an array of each wall face */
-	export const sides: ([direction: string, texture: Texture] | null)[] = Object.entries(
-		item?.surfaces ?? {}
-	).map(([k, v]) => (v !== " " ? [k, v] : null));
+	export const sides: { [dir in WallFace]: Texture } = Object.fromEntries(
+		WALL_FACES.map((dir) => [dir, item.surfaces])
+	) as any;
 
 	/** Returns an array of DOM elements for each wall face */
 	export const boundSides: HTMLDivElement[] = [];
@@ -58,27 +58,24 @@
 
 	const getZPosition = (direction: "front" | "left" | "right" | "back") => {
 		switch (direction) {
-			case "front":
-				return position.z + 50;
 			case "back":
-				return position.z - 50;
+				return -position.z - 50;
+			case "front":
+				return -position.z + 50;
 			case "left":
 			case "right":
-				return position.z - 50;
+				return -position.z - 50;
 		}
-	};
-
-	const COLORS = {
-		front: "red",
-		back: "yellow",
-		left: "limegreen",
-		right: "blue"
 	};
 </script>
 
-<div class="surface">
-	{#each objectEntries(item?.surfaces) as [direction, texture], i}
-		{#if direction && texture && typeof texture === "string"}
+<div
+	class="surface"
+	class:hidden={!isVisible}
+	style:visibility|important={isVisible ? "visible" : "hidden"}
+>
+	{#each objectEntries(sides) as [direction, texture], i}
+		{#if direction && typeof texture === "number"}
 			{@const positionZ = getZPosition(direction)}
 			{@const validatedTexture = isValidTexture(texture) ? $textures[texture]?.original : ""}
 			{@const img = ` --img: url(${validatedTexture});`}
@@ -88,7 +85,7 @@
 				data-x={-position.x}
 				data-z={positionZ}
 				data-rotation={DIRECTION_MAP[direction]}
-				style="--height: {height}px; {img} transform: translate3d({position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
+				style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
 					direction
 				]}deg); "
 			>
@@ -101,22 +98,16 @@
 <style>
 	.wall {
 		contain: layout size;
-		visibility: visible;
-		background-repeat: repeat;
-		/* background-size: 100%; */
-		/* content-visibility: auto; */
+		visibility: inherit;
 		will-change: visibility;
-		/* transform-origin: bottom left; */
-		/* transform-origin: left; */
-		position: absolute;
 		height: var(--height);
-		/* transform: var(--transform); */
+
 		background-image: var(--img);
-		/* backface-visibility: v !important; */
-		/* backface-visibility: visible !important; */
+		background-size: 100%;
+		backface-visibility: hidden !important;
 		image-rendering: pixelated;
 	}
 	.hidden {
-		visibility: hidden;
+		content-visibility: hidden;
 	}
 </style>

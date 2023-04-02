@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { PlayerState, type ButtonsPressed } from "$lib/stores/player";
+	import { PlayerState, type PlayerControls } from "$lib/stores/player";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onDestroy } from "svelte";
 
-	let buttonsPressed: ButtonsPressed = {
+	let buttonsPressed: PlayerControls = {
 		w: false,
 		shift: false,
 		s: false,
@@ -12,23 +12,21 @@
 		leftarrow: false,
 		rightarrow: false
 	};
-	let hasPointerLock = false;
-	let timePassed: number | null = null;
+
 	let cssText = ``;
 
-	const f = frameLoop.add((ts) => {
+	const f = frameLoop.add(() => {
 		const { x: a, y: b, z: c } = $PlayerState.rotation;
-		if ($PlayerState.canMove) {
-			PlayerState.update(buttonsPressed);
-		} else {
+
+		if (moving) {
 			PlayerState.update(buttonsPressed);
 		}
-		timePassed = ts;
+
 		cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
 	});
-	// $: console.log($PlayerState.velocity);
 
 	f.start();
+
 	onDestroy(() => {
 		f.stop();
 	});

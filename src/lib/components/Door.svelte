@@ -1,15 +1,20 @@
+<svelte:options accessors={true} />
+
 <script lang="ts">
 	import type { Position } from "$lib/types/position";
 	import type { MapItem } from "$lib/utils/map";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
+	import { CurrentLevel } from "./Level.svelte";
 	import { ctxKey, type TextureContext } from "../../routes/key";
+	import { compare } from "../utils/compare";
 
 	export let item: MapItem;
 	export let offset: number;
 	export let section: number;
 
+	$: item = item;
 	let state: "open" | "closed" = "closed";
 	const { textures }: TextureContext = getContext(ctxKey);
 
@@ -21,20 +26,60 @@
 		x: state === "open" ? offset + 1 : offset,
 		z: section
 	});
+	$: rotation = 0;
+	$: console.log(rotation);
+
+	$: {
+		try {
+			const isLeftRight =
+				compare(
+					$CurrentLevel?.[section]?.[offset + 1]?.surfaces,
+					(v) => typeof v === "number" && v !== 0
+				) &&
+				compare(
+					$CurrentLevel?.[section]?.[offset - 1]?.surfaces,
+					(v) => typeof v === "number" && v !== 0
+				);
+			const isTopBottom =
+				compare(
+					$CurrentLevel?.[section - 1]?.[offset]?.surfaces,
+					(v) => typeof v === "number" && v !== 0
+				) &&
+				compare(
+					$CurrentLevel?.[section + 1]?.[offset]?.surfaces,
+					(v) => typeof v === "number" && v !== 0
+				);
+			if (isLeftRight) rotation = 0;
+			else rotation = 90;
+		} catch {}
+	}
 
 	onMount(() => {
-		// const interval = setInterval(() => {
-		// 	state = state === "open" ? "closed" : "open";
-		// 	// if (state === 'open') {
-		// 	position.update((u) => ({
-		// 		x: state === "open" ? _position.x + 100 : _position.x,
-		// 		z: $position.z
-		// 	}));
-		// 	// }
-		// }, 3000);
-		// return () => {
-		// 	clearInterval(interval);
-		// };
+		const interval = setInterval(() => {
+			state = state === "open" ? "closed" : "open";
+			// if (state === 'open') {
+			position.update((u) =>
+				!rotation
+					? {
+							x: state === "open" ? _position.x + 100 : _position.x,
+							z: $position.z
+					  }
+					: { z: state === "open" ? _position.z + 100 : _position.z, x: $position.x }
+			);
+
+			let currentState = $CurrentLevel[section][offset];
+			if (!currentState.position) currentState.position = {};
+			if (state === "open") {
+				currentState.position = { x: offset + 1, z: section };
+			} else {
+				currentState.position = { x: offset, z: section };
+			}
+			$CurrentLevel[section][offset] = { ...currentState };
+			// }
+		}, 3000);
+		return () => {
+			clearInterval(interval);
+		};
 	});
 	let isMouseOver = false;
 </script>
@@ -54,20 +99,18 @@
 		isMouseOver = false;
 	}}
 	class="door {state}"
-	style="rotate: {item.rotation
-		? item.rotation.y
-		: 0}deg; --pX: {$position.x}px; --pZ: {$position.z}px;"
+	style="--pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {rotation ?? 0}deg;"
 >
 	<!---->
 	<div
 		class=" sprite"
-		style="background-image: url({$textures['m1'].original});"
+		style="background-image: url({$textures[99].original});"
 	>
 		<!---->
 	</div>
 	<div
 		class=" sprite"
-		style="background-image: url({$textures['m1'].original});"
+		style="background-image: url({$textures[99].original});"
 	>
 		<!---->
 	</div>
@@ -86,13 +129,15 @@
 		// grid-template-rows: 1fr;
 		// grid-template-columns: 16px 16px;
 		// gap: 16px;?
-		transform: translate3d(var(--pX), -50%, var(--pZ));
+		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
 		&:hover {
 			cursor: pointer;
 		}
 		backface-visibility: hidden;
 		transform-style: preserve-3d;
 		> :where(.sprite) {
+			background-size: 100%;
+			image-rendering: pixelated;
 			transform-style: preserve-3d;
 			// transition: inherit;
 			will-change: transform;
@@ -119,6 +164,7 @@
 			width: 16px;
 			height: 100%;
 			// right: 0;
+			will-change: transform;
 			// transform-origin: center;
 			background: darkcyan;
 			top: 0;
@@ -134,6 +180,7 @@
 		}
 		&::after {
 			left: -7.95px;
+			transform: rotateY(-90deg);
 			// right: 0;
 		}
 	}

@@ -14,11 +14,11 @@
 </script>
 
 <div class="hud">
-	<div class="debug">
-		{#key $PlayerState.position}
+	<!-- <div class="debug">
+ {#key $PlayerState.position}
 			pos: {JSON.stringify($PlayerState.position)}
-		{/key}
-	</div>
+		{/key} -->
+
 	<div class="stats">
 		{#each SECTIONS as [key, value]}
 			<div class="col">
