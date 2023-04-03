@@ -4,7 +4,7 @@ import { TEXTURE_KEYS } from "./engine/textures";
 export function isValidTexture(src: unknown): src is Texture {
 	return (
 		typeof src === "number" &&
-		TEXTURE_KEYS.includes(src as unknown as (typeof TEXTURE_KEYS)[number])
+		TEXTURE_KEYS.includes(+src as unknown as (typeof TEXTURE_KEYS)[number])
 	);
 }
 

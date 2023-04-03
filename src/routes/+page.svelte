@@ -1,9 +1,7 @@
 <script lang="ts">
-	import Ui from '$lib/components/UI.svelte';
-	import { E1M1 } from '$lib/utils/map';
-	import Level from '../lib/components/Level.svelte';
-
-	console.log(E1M1);
+	import Ui from "$lib/components/UI.svelte";
+	import { E1M1 } from "$lib/utils/map";
+	import Level from "../lib/components/Level.svelte";
 </script>
 
 <Level level={E1M1} />

@@ -50,7 +50,7 @@
 					(v) => typeof v === "number" && v !== 0
 				);
 			if (isLeftRight) rotation = 0;
-			else rotation = 90;
+			else if (isTopBottom) rotation = 90;
 		} catch {}
 	}
 
@@ -123,6 +123,7 @@
 		height: 100px;
 		top: 0;
 		left: 0;
+		right: 0;
 		contain: layout size style;
 		// display: grid;
 		will-change: transform;

@@ -79,6 +79,7 @@
 			{@const positionZ = getZPosition(direction)}
 			{@const validatedTexture = isValidTexture(texture) ? $textures[texture]?.original : ""}
 			{@const img = ` --img: url(${validatedTexture});`}
+			<!-- {@debug img, validatedTexture} -->
 			<div
 				class="wall {direction}"
 				bind:this={boundSides[i]}
@@ -106,8 +107,6 @@
 		background-size: 100%;
 		backface-visibility: hidden !important;
 		image-rendering: pixelated;
-	}
-	.hidden {
-		content-visibility: hidden;
+		opacity: 1;
 	}
 </style>

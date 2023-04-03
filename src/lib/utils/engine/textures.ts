@@ -36,4 +36,4 @@ const TEXTURES = Object.fromEntries(
 	)
 ) as { [k: number]: { name: number; original: Promise<string> } };
 
-export const TEXTURE_KEYS = objectKeys<typeof TEXTURES>(TEXTURES);
+export const TEXTURE_KEYS = objectKeys<typeof TEXTURES>(TEXTURES).map((k) => +k);

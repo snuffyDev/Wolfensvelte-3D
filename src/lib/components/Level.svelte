@@ -16,7 +16,7 @@
 		return {
 			subscribe,
 			set: (level: World) => {
-				world = [...level];
+				world = Object.assign(world, level);
 
 				set(world);
 			},
@@ -58,6 +58,7 @@
 	import type { Position, Position2D } from "$lib/types/position";
 	import type { World } from "../types/core";
 	import { compare } from "../utils/compare";
+	import { getAngleBetween, isAngleBetween, normalizeAngle } from "../utils/angle";
 
 	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
@@ -70,7 +71,8 @@
 		[]
 	) as InstanceType<typeof Wall>[];
 
-	const models: InstanceType<typeof Door | typeof Guard>[] = [];
+	const models: InstanceType<typeof Door>[] = [];
+	const enemies: InstanceType<typeof Guard>[] = [];
 
 	function update() {
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
@@ -78,7 +80,8 @@
 		for (const wall of walls) {
 			if (!wall) continue;
 
-			const pos = wall.getPosition();
+			const pos = wall.getPosition?.();
+			if (!pos) continue;
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
@@ -93,6 +96,35 @@
 		}
 
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+	}
+
+	function isVisible(obj: Guard, fov: number = 30) {
+		const angle = getAngleBetween($PlayerState.position, obj.getPosition());
+
+		const viewAngle = normalizeAngle(-$PlayerState.rotation.y + 96);
+
+		const left = normalizeAngle(viewAngle - fov / 2);
+
+		const right = normalizeAngle(viewAngle + fov / 2);
+
+		return isAngleBetween(angle, left, right);
+	}
+	function handlePlayerShoot() {
+		const { rotation, position } = $PlayerState;
+		const enemiesToAttack = enemies
+			.filter((e) => {
+				const v = isVisible(e, 35);
+				if (e.getState() === "dead") return;
+				if (!v) return;
+				return v;
+			})
+			.sort(
+				(a, b) =>
+					getDistanceFromPoints(b.getPosition(), position) -
+					getDistanceFromPoints(a.getPosition(), position)
+			);
+		enemiesToAttack[0].setState("dead");
+		console.log(enemiesToAttack);
 	}
 
 	onMount(() => {
@@ -115,7 +147,7 @@
 
 <div id="scene">
 	{#if mode !== "generating"}
-		<Player>
+		<Player on:shoot={handlePlayerShoot}>
 			<div
 				class="world"
 				id="world"
@@ -123,14 +155,24 @@
 				{#each $CurrentLevel as group, section}
 					{#each group as item, offset}
 						{#if item.model?.component}
-							<svelte:component
-								this={MODEL_MAP[item.model.component]}
-								{offset}
-								{section}
-								bind:this={models[models.length]}
-								bind:item
-							/>
-						{:else if item.surfaces}
+							{#if item.model.component === "Guard"}
+								<svelte:component
+									this={MODEL_MAP[item.model.component]}
+									{offset}
+									{section}
+									bind:this={enemies[enemies.length]}
+									bind:item
+								/>
+							{:else}
+								<svelte:component
+									this={MODEL_MAP[item.model.component]}
+									{offset}
+									{section}
+									bind:this={models[models.length]}
+									bind:item
+								/>
+							{/if}
+						{:else if item.surfaces !== null}
 							<Wall
 								bind:this={walls[walls.length]}
 								{item}
@@ -146,7 +188,11 @@
 	{/if}
 </div>
 
-<style lang="scss">
+<style
+	lang="scss"
+	global
+	x
+>
 	#scene {
 		width: 100%;
 		height: 100%;
@@ -172,7 +218,7 @@
 		// inset: 0;
 		// bottom: 0;
 		top: 0;
-		transform: scale3d(64, 3, 64) translateY(-300px) rotateX(90deg);
+		transform: scale3d(64, 1, 64) translateY(-300px) rotateX(90deg);
 		backface-visibility: hidden;
 	}
 
@@ -182,6 +228,8 @@
 		padding: 0;
 		backface-visibility: hidden;
 		width: 100%;
+		position: fixed;
+
 		height: 100%;
 	}
 
@@ -208,10 +256,10 @@
 
 	#camera,
 	#world {
-		position: absolute;
+		position: fixed;
 		top: 50% !important;
 		left: 50% !important;
-		// transform-origin: center;
+		/* // transform-origin: center; */
 		// inset: 0;
 
 		backface-visibility: hidden;
@@ -225,8 +273,7 @@
 		left: 50%;
 		top: 50%;
 		backface-visibility: hidden !important;
-		// background-size: ;
-		/* For the instruction text */
+
 		font-family: sans-serif;
 		font-size: 3em;
 		text-align: center;

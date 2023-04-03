@@ -26,6 +26,7 @@ body {
 	background-color: rgb(52, 52, 52);
 	position: fixed;
 	inset: 0;
+	overflow: hidden;
 	margin: 0;
 	transform-style: preserve-3d;
 }
@@ -34,7 +35,7 @@ body {
 	// display: grid;
 	// place-content: center;
 	transform-style: preserve-3d;
-	// contain: layout size style;
+	contain: layout size style;
 	position: absolute;
 	width: 100px;
 	height: 100px;
@@ -44,14 +45,24 @@ body {
 
 	contain: layout size style;
 	will-change: visibility;
-
 	backface-visibility: hidden;
 	transform-origin: top left;
+	// z-index: 50;
 }
+
+.hidden {
+	// display: none;
+	content-visibility: hidden;
+	visibility: hidden;
+}
+
 .wall {
 	position: absolute;
 	width: 100px;
 	height: 100px;
+	will-change: visibility;
+	// isolation: auto;
+	// overflow: hidden;
 
 	transform-style: preserve-3d;
 	backface-visibility: hidden;
@@ -77,6 +88,7 @@ body {
 	transform-style: preserve-3d;
 }
 .floor {
-	position: absolute;
-	backface-visibility: visible;
+	position: fixed;
+	overflow: hidden;
+	backface-visibility: hidden;
 }

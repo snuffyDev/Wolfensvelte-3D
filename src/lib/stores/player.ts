@@ -2,6 +2,7 @@ import type { Position, Position2D } from "$lib/types/position";
 import { writable } from "svelte/store";
 import { CurrentLevel } from "../components/Level.svelte";
 import { getLocalPositionFromRealPosition } from "../utils/position";
+import { frameLoop } from "../utils/raf";
 
 export const PlayerState = _playerState();
 
@@ -25,7 +26,7 @@ export interface IPlayerState {
 }
 
 const CONSTANTS = {
-	speed: 8.5
+	speed: 6.5
 } as const;
 
 function _playerState() {
@@ -83,9 +84,9 @@ function _playerState() {
 			};
 
 			const localTarget = getLocalPositionFromRealPosition(toMove);
-			const localCurrent = getLocalPositionFromRealPosition(current);
+			// const localCurrent = getLocalPositionFromRealPosition(current);
 			if (!CurrentLevel.checkCollisionWithWorld(localTarget)) {
-				console.log({ localCurrent, localTarget });
+				// console.log({ localCurrent, localTarget });
 				state.position.x = +toMove.x;
 				state.position.z = +toMove.z;
 			}
@@ -127,10 +128,12 @@ function _playerState() {
 		},
 		rotate(direction: "left" | "right") {
 			const { rotation } = state;
-			const angleToRotateTo = direction === "left" ? -3.5 : 3.5;
+			const angleToRotateTo = direction === "left" ? -2.65 : 2.65;
 
 			rotation.y += angleToRotateTo;
 			rotation.y = rotation.y % 360;
 		}
 	};
 }
+
+export { _playerState as AIBaseStore };

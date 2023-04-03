@@ -11,23 +11,22 @@ function requestFrame() {
 	let frame: number;
 	let running = false;
 	let lastTs: number;
-	const run = (now: number) => {
-		if (!lastTs) lastTs = now;
-		const lastLap = now - lastTs;
-
-		/** Run each callback every 32ms */
-		if (lastLap > 33.3) {
-			if (frame) cancelAnimationFrame(frame);
-			const iter = tasks.values();
-			let node: ReturnType<typeof iter.next> = iter.next();
-			while (!node.done) {
-				node.value(lastLap);
-				node = iter.next();
+	const run = async () => {
+		let then = performance.now();
+		const interval = 1000 / 30;
+		let delta = 0;
+		while (running) {
+			const now = await new Promise(requestAnimationFrame);
+			if (now - then < interval - delta) {
+				continue;
 			}
-			lastTs = now;
-			frame = requestAnimationFrame(run);
-		} else {
-			frame = requestAnimationFrame(run);
+			delta = Math.min(interval, delta + now - then - interval);
+			then = now;
+			// render code
+
+			for (const task of tasks.values()) {
+				task(now);
+			}
 		}
 	};
 

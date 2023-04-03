@@ -5,6 +5,6 @@ export default defineConfig({
 	assetsInclude: ["**/*.png"],
 	build: {},
 	experimental: {},
-	esbuild: { drop: ["debugger", "console"] },
+	// esbuild: { drop: ["debugger", "console"] },
 	plugins: [sveltekit()]
 });

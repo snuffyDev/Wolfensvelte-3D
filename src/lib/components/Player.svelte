@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { PlayerState, type PlayerControls } from "$lib/stores/player";
 	import { frameLoop } from "$lib/utils/raf";
-	import { onDestroy } from "svelte";
+	import { createEventDispatcher, onDestroy } from "svelte";
 
+	const dispatch = createEventDispatcher<{ shoot: void }>();
 	let buttonsPressed: PlayerControls = {
 		w: false,
 		shift: false,
@@ -18,9 +19,9 @@
 	const f = frameLoop.add(() => {
 		const { x: a, y: b, z: c } = $PlayerState.rotation;
 
-		if (moving) {
-			PlayerState.update(buttonsPressed);
-		}
+		// if (moving) {
+		PlayerState.update(buttonsPressed);
+		// }
 
 		cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
 	});
@@ -87,6 +88,10 @@
 			case "a":
 				moving = true;
 				b.a = true;
+				break;
+			case " ":
+			case "space":
+				dispatch("shoot");
 				break;
 			case "d":
 				moving = true;
@@ -238,11 +243,15 @@
 		position: absolute;
 		perspective: var(--perspective);
 		inset: 0;
+		transform: translateZ(0);
 		// transform: translate3d(, -50%, -640px);
-		width: 100%;
-		contain: size;
+		contain: content size layout;
 		transform-style: preserve-3d;
 		will-change: transform;
-		height: 100%;
+	}
+
+	#camera {
+		will-change: transform;
+		// contain: layout;
 	}
 </style>

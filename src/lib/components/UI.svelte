@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { dev } from "$app/environment";
 	import { PlayerState } from "$lib/stores/player";
 
 	let SECTIONS = [
@@ -14,10 +15,13 @@
 </script>
 
 <div class="hud">
-	<!-- <div class="debug">
- {#key $PlayerState.position}
-			pos: {JSON.stringify($PlayerState.position)}
-		{/key} -->
+	{#if dev}
+		<div class="debug">
+			{#key $PlayerState.position}
+				pos: {JSON.stringify($PlayerState.position)}
+			{/key}
+		</div>
+	{/if}
 
 	<div class="stats">
 		{#each SECTIONS as [key, value]}
