@@ -4,6 +4,8 @@ Yes, it's a Svelte "port" of Wolfenstein 3D.
 
 No, there's no WebGL, or canvas.
 
+Live Site: https://wolfensvelte-3d.vercel.app/
+
 ## What? Why? How?
 
 > What do you mean, it's a Svelte port of Wolfenstein 3D?
