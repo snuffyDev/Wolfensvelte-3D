@@ -7,44 +7,47 @@
 		["Score", 0],
 		["Lives", 3],
 		["Player", "@"],
-		["Health", 100],
+		["Health", $PlayerState.health],
 		["Ammo", 8],
 		["", ""],
 		["Gun", "[insert gun here]"]
 	];
 </script>
 
-<div class="hud">
-	{#if dev}
-		<div class="debug">
-			{#key $PlayerState.position}
-				pos: {JSON.stringify($PlayerState.position)}
-			{/key}
-		</div>
-	{/if}
-
-	<div class="stats">
-		{#each SECTIONS as [key, value]}
-			<div class="col">
-				<b>{key}</b>
-				<span>{value}</span>
-			</div>
-		{/each}
+{#if dev}
+	<div class="debug">
+		{#key $PlayerState.position}
+			pos: {JSON.stringify($PlayerState.position)}
+		{/key}
 	</div>
-	<div />
+{/if}
+<div class="hud">
+	<div class="stats">
+		<div class="col">
+			<b>Health</b>
+			<span>{$PlayerState.health}</span>
+		</div>
+		<div class="col">
+			<b>Level</b>
+			<span>{1}</span>
+		</div>
+	</div>
+	<!-- <div /> -->
 	<!-- </div> -->
 </div>
 
 <style lang="scss">
 	.stats {
 		margin: 0 auto;
-		display: grid;
-		grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 0.1fr 2fr;
+		// display: grid;
+		// grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 0.1fr 2fr;
+		display: flex;
 		max-width: 80dvh;
 		width: 100%;
 		// ju-items: center;
 		gap: 0.5em;
-		justify-content: space-around;
+		margin: 0 auto;
+		justify-items: space-around;
 		> :not(:first-child) {
 			margin-left: 0.5em;
 		}
@@ -54,19 +57,21 @@
 		}
 		> :nth-last-child(2) {
 			margin: 0em;
-			width: 0;
+			// width: 0;
 		}
 	}
 	.col {
-		display: grid;
-		grid-template-rows: 0.5fr 0.5fr;
+		display: inline-flex;
+		flex-direction: column;
+		// grid-template-rows: 1fr 2fr;
 		font-size: 1em;
-		max-width: 100%;
-		// width: 100%;
+		// max-width: 100%;
+		width: 100%;
+		font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
 		&:not(:nth-last-child(2)) {
-			width: 100%;
-			background: #00009e;
+			// width: 100%;
 		}
+		background: #00009e;
 		// text-align: center;
 		font-size: 0.7em;
 
@@ -74,16 +79,16 @@
 		place-items: center;
 	}
 	.hud {
-		position: fixed;
+		position: absolute;
 		left: 0;
 		right: 0;
 		bottom: 0;
 		text-align: center;
 		display: grid;
-		grid-template-columns: 0.1fr 3fr 0.1fr;
-		// align-items: center;
+		grid-template-columns: 1fr;
+		align-items: center;
 		// font-size: 0.1rem;
-
+		justify-content: center;
 		// grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
 		// grid-auto-flow: row dense;
 		// place-content: center;
@@ -102,6 +107,7 @@
 		top: 2.25rem;
 		z-index: 10000;
 		left: 0;
+		color: #fff;
 		width: auto;
 		height: 3rem;
 	}

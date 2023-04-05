@@ -1,8 +1,11 @@
 import type { Position, Position2D } from "$lib/types/position";
 import { writable } from "svelte/store";
 import { CurrentLevel } from "../components/Level.svelte";
-import { getLocalPositionFromRealPosition } from "../utils/position";
+import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "../utils/position";
 import { frameLoop } from "../utils/raf";
+import Guard, { rand } from "../components/Guard/Guard.svelte";
+import { GameObjects } from "$lib/utils/manager";
+import { isVisibleToPlayer } from "$lib/utils/angle";
 
 export const PlayerState = _playerState();
 
@@ -20,13 +23,13 @@ export type Weapons = "pistol" | "knife" | "shotgun";
 
 export interface IPlayerState {
 	health: number;
-	weapons: Record<Weapons, { ammo: number | null; acquired: boolean }>;
+	weapons: Partial<Record<Weapons, { ammo: number | null; acquired: boolean }>>;
 	rotation: Position;
 	position: Position;
 }
 
 const CONSTANTS = {
-	speed: 6.5
+	speed: 12
 } as const;
 
 function _playerState() {
@@ -48,8 +51,12 @@ function _playerState() {
 		get() {
 			return state;
 		},
-		takeDamage(source: "gun") {
-			state.health -= 8;
+		takeDamage(n?: number | undefined) {
+			if (typeof n !== "number") {
+				n = Math.min(11, Math.max(14, rand.rnd() / 6));
+			}
+			state.health -= n;
+			update((u) => ({ ...u, health: state.health }));
 		},
 		update: function (input: PlayerControls) {
 			const moves: Position2D[] = [];
@@ -128,10 +135,16 @@ function _playerState() {
 		},
 		rotate(direction: "left" | "right") {
 			const { rotation } = state;
-			const angleToRotateTo = direction === "left" ? -2.65 : 2.65;
+			const angleToRotateTo = direction === "left" ? -0.875 * Math.PI : 0.875 * Math.PI;
 
 			rotation.y += angleToRotateTo;
 			rotation.y = rotation.y % 360;
+		},
+
+		// ACTIONS
+		async attack(e: Guard) {
+			e.setState("hurt");
+			if (e) await e?.takeDamage();
 		}
 	};
 }

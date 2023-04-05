@@ -1,10 +1,14 @@
 :root {
-	--perspective: 800px;
+	--perspective: 1000px;
 	font-size: 16px;
+	user-select: none;
 }
 *::before,
 *::after,
 * {
+	&:not(button) {
+		all: unset;
+	}
 	box-sizing: border-box;
 	margin: 0;
 	padding: 0;

@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { PlayerState, type PlayerControls } from "$lib/stores/player";
+	import { isVisibleToPlayer } from "$lib/utils/angle";
+	import { GameObjects } from "$lib/utils/manager";
+	import { getDistanceFromPoints } from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
-	import { createEventDispatcher, onDestroy } from "svelte";
+	import { createEventDispatcher, onDestroy, tick } from "svelte";
+	import type Guard from "./Guard/Guard.svelte";
 
 	const dispatch = createEventDispatcher<{ shoot: void }>();
+	let state: "shoot" | "idle" = "idle";
 	let buttonsPressed: PlayerControls = {
 		w: false,
 		shift: false,
@@ -35,6 +40,30 @@
 	async function requestPointerLock(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 		await target.requestPointerLock();
+	}
+
+	async function findClosestEnemy() {
+		await tick();
+		const { position } = $PlayerState;
+		const enemiesInRange: Guard[] = [];
+
+		for (const e of GameObjects.enemies) {
+			const distance = getDistanceFromPoints(e.getPosition(), { x: -position.x, z: -position.z });
+			if (isVisibleToPlayer(e, 30) && distance < 750 && e.getState() !== "dead") {
+				enemiesInRange.push(e);
+			}
+		}
+		// console.log(enemiesInRange);
+		const closest = enemiesInRange.sort(
+			(a, b) =>
+				getDistanceFromPoints(b[1].getPosition(), position) -
+				getDistanceFromPoints(a[1].getPosition(), position)
+		);
+		// console.log("CLOSEST", closest);
+
+		const c = closest.shift();
+
+		await PlayerState.attack(c!);
 	}
 
 	let x: number = 0;
@@ -91,7 +120,12 @@
 				break;
 			case " ":
 			case "space":
-				dispatch("shoot");
+				state = "shoot";
+
+				try {
+					dispatch("shoot");
+				} catch {}
+
 				break;
 			case "d":
 				moving = true;
@@ -146,7 +180,13 @@
 	use:handleMouseMove
 	on:click={requestPointerLock}
 />
-<div class="player-gun {moving ? 'moving' : 'paused'}" />
+<div
+	class="player-gun {state}"
+	on:animationstart|capture={findClosestEnemy}
+	on:animationend|capture={() => {
+		state = "idle";
+	}}
+/>
 <!-- <div class="ray" style={cssText} /> -->
 <div
 	class="player camera"
@@ -182,27 +222,16 @@
 	.player-hitbox {
 		border: 23px solid red;
 	}
-	.paused {
-		animation-play-state: unset !important;
 
-		&::after {
-			animation-play-state: unset !important;
-			transform: translateX(-80%);
-			transition: transform cubic-bezier(0.77, 0, 0.175, 1) 1000ms;
-		}
-	}
 	.player-gun {
 		position: absolute;
-		height: 23em;
-		width: 19em;
-
+		// top: 0;
 		bottom: 0;
 		margin: 0 auto;
-		max-width: 19em;
 		z-index: 1;
 		left: 0;
+		max-width: 24.125rem;
 		right: 0;
-		overflow: hidden;
 
 		transform: translate(0px, 0px);
 		transition: transform cubic-bezier(0.77, 0, 0.175, 1) 1000ms;
@@ -214,18 +243,38 @@
 	.player-gun::after {
 		content: "";
 		position: absolute;
-		width: 500%;
-		height: 100%;
-		background: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/51773/wolf-gun.gif) 0% 0% / cover
-			repeat-x;
+		width: 24.125rem;
+		height: 24.125rem;
+		// inset: 0;
+		bottom: 0;
+		background: url(../sprites/PISTOL.png) left center no-repeat;
+		background-size: 400%;
+		// background-position-x: 0px;
 		transition: inherit;
-		transform: translateX(-80%);
+		// transform: translateX(-80%);
 		transition-delay: 0s;
-		animation-play-state: running;
+
 		// animation: unset;
 	}
 	.moving {
-		animation: walk 1s cubic-bezier(0.77, 0, 0.175, 1) both alternate-reverse;
+		// animation: walk 1s cubic-bezier(0.77, 0, 0.175, 1) both infinite alternate-reverse;
+	}
+	.shoot {
+		&::after {
+			animation: shooting steps(1) 0.6125s;
+
+			@keyframes shooting {
+				20% {
+					background-position-x: 33%;
+				}
+				40% {
+					background-position-x: 66%;
+				}
+				60% {
+					background-position-x: 99%;
+				}
+			}
+		}
 	}
 	@keyframes walk {
 		from {

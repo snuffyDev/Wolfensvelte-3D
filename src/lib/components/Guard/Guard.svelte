@@ -51,8 +51,10 @@
 		return d;
 	};
 
-	const rand = rng();
+	export const rand = rng();
 	rand.init(true);
+
+	const sleep = (ms: number = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
 	const distanceToPosition = (a: Position2D, b: Position2D) => {
 		const distance = getDistanceFromPoints(a, b);
@@ -61,61 +63,46 @@
 
 		return [x, z] as const;
 	};
-	const getPathToPlayerPosition = (
-		ourTarget: ReturnType<typeof AIBaseStore>,
-		ourTween: Tweened<Position2D>
-	) => {
-		let running = false;
-		return async (playerPosition: Position2D, ourPosition: Position2D) => {
-			// if (running) return;
-			// running = true;
-			const distance = getDistanceFromPoints(playerPosition, {
-				...ourPosition,
-				x: -ourPosition.x,
-				z: -ourPosition.z
-			});
 
-			// if (playerPostiion.x > ourPosition.x) {
-			// console.warn(playerPosition.x, ourPosition.x, get(ourTarget), distance);
-			// ourPosition;
-			// ourTarget.rotate("");
-			let idx = 0;
-			const [x, y] = distanceToPosition(playerPosition, {
-				...ourPosition,
-				x: -ourPosition.x,
-				z: -ourPosition.z
-			});
-			// console.warn({ x, y });
-			const moveTo = {
-				x: -1 * (rand.rnd() / 2.5 + ourPosition.x + playerPosition.x - x),
-				z: -1 * (rand.rnd() / 2.5 + ourPosition.z + playerPosition.z - y)
-			};
-			const defer = deferred();
-			// if (-playerPosition.x < ourPosition.x) {
-			// 	console.error("NICE");
-			// } else {
-			// 	ourTarget.moveTo({
-			// 		x: 1 + distance * 0.01,
-			// 		z: (-playerPosition.z < ourPosition.z ? -1 : 1) + distance / 100
-			// 	});
-			// }
+	function between(min: number, max: number) {
+		return Math.floor(Math.random() * (max - min + 1) + min);
+	}
+	function isVisible(
+		playerPosition: Position2D,
+		currentPosition: Position2D,
+		playerRotation: number,
+		fov: number = 30
+	) {
+		const angle = getAngleBetweenPoints(playerPosition, currentPosition);
 
-			// ourTarget.moveForward()
+		const viewAngle = normalizeAngle(playerRotation + 90);
 
-			ourTarget.moveTo(moveTo);
-			const result = ourTarget.get().position;
-			ourTween
-				.update((t) => ({ x: t.x, z: t.z }), { duration: 0 })
-				.then(() => {
-					defer.resolve();
-					ourTween.set({ x: result.x, z: result.z }, { duration: distance * 5 });
-					// const result = ourTarget.get().position;
-				});
-			defer.promise.finally(() => {
-				running = false;
-			});
+		const left = normalizeAngle(viewAngle - fov / 2);
+
+		const right = normalizeAngle(viewAngle + fov / 2);
+
+		return isAngleBetween(angle, left, right);
+	}
+
+	function getPositionFromDistance(a: Position2D, b: Position2D) {
+		const distance = getDistanceFromPoints(a, {
+			...b,
+			x: -b.x,
+			z: -b.z
+		});
+
+		const [x, y] = distanceToPosition(a, {
+			...b,
+			x: -b.x,
+			z: -b.z
+		});
+		// console.warn({ x, y });
+		const moveTo = {
+			x: -1 * (rand.rnd() / 2.5 + a.x + b.x - x),
+			z: -1 * (rand.rnd() / 2.5 + a.z + b.z - y)
 		};
-	};
+		return moveTo;
+	}
 </script>
 
 <script lang="ts">
@@ -127,126 +114,112 @@
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
-	import { onMount } from "svelte";
-	import { tweened, type Tweened } from "svelte/motion";
+	import { onMount, tick } from "svelte";
 	import { get } from "svelte/store";
 	import type { MapItem } from "../../types/core";
+	import {
+		getAngleBetweenPoints,
+		isAngleBetween,
+		isVisibleToPlayer,
+		normalizeAngle
+	} from "../../utils/angle";
+	import { enemyState } from "./state";
 
 	export let item: MapItem;
 	export let offset: number;
 	export let section: number;
-	let state: "attack" | "walk" | "default" | "dead" = "default";
 
-	export const getPosition = () => $self.position;
-	export const setState = (targetState: "dead") => (state = targetState);
-	export const getState = () => state;
+	const localPosition = getRealPositionFromLocalPosition({ x: offset, z: section });
+	const state = enemyState({
+		position: { x: -localPosition.x, z: -localPosition.z },
+		state: "idle"
+	});
+	const tween = state.tween;
 
-	let timeout: NodeJS.Timeout;
-	let isTargetingPlayer = false;
-
-	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
-	const self = AIBaseStore();
-
-	const tPosition = tweened<typeof position>(
-		{ x: -position.x, y: 0, z: -position.z },
-		{ duration: 1726, delay: 0 }
-	);
-	$self.position = { ...$tPosition, y: 0 };
-	$: $self.rotation.y = $PlayerState.rotation.y - 90;
-	const pathFinder = getPathToPlayerPosition(self, tPosition);
-
-	let start: number;
-	let running = false;
-
-	const queue = async (task: Deferred) => {
-		if (running) return;
-		running = true;
-		await task.promise.then(() => {
-			running = false;
-		});
+	export const getPosition = () => $tween;
+	export const setState = state.setState;
+	export const getState = () => $state.state;
+	export const takeDamage = async () => {
+		if (Math.random() < 0.65) state.setState("hurt");
+		// await tick();
+		await state.giveDamage();
+		if ($state.health <= 0) {
+			tween.cancel();
+			stateLoop.stop();
+		}
 	};
+	let previousAnimationState: typeof $state.state;
 
-	const loop = frameLoop.add(async () => {
-		const distance = getDistanceFromPoints($self.position, {
-			x: -$PlayerState.position.x,
-			y: 0,
-			z: -$PlayerState.position.z
-		});
+	$: if ($state) $state.rotation.y = $PlayerState.rotation.y - 90;
 
-		if (distance < 475) {
-			if (state === "dead") return;
-			if (running) return;
-			running = true;
-			const task = deferred();
-			isTargetingPlayer = true;
-			const random = rand.rnd() / 4;
-			console.log(random);
-			if (distance <= 335 && Math.random() < 0.5) {
-				state = "walk";
-				pathFinder($PlayerState.position, $self.position)
-					.then(task.resolve)
-					.then(() => console.log($self.position))
-					.then(() => (running = false));
+	let startFrame: number;
+	let busy = false;
+	const stateLoop = frameLoop.add(async (now) => {
+		if (!startFrame) startFrame = now;
+		if (busy) return;
+		if ($state.state === "dead") return stateLoop.stop();
+		const elapsed = now - startFrame;
+
+		if (elapsed > 1000) {
+			if (busy) return;
+			await tick();
+			busy = true;
+			startFrame = now;
+
+			const distance = getDistanceFromPoints(
+				{ x: -$PlayerState.position.x, z: -$PlayerState.position.z },
+				$state.position
+			);
+			if (isVisibleToPlayer(getPosition(), 30)) {
+				if (distance > 450 && distance < 800 && Math.random() < 0.3) {
+					previousAnimationState = "walk";
+					await tick();
+					state.setState("walk");
+					return state
+						.moveTo(getPositionFromDistance($PlayerState.position, $state.position))
+						.finally(() => (busy = false));
+				} else if (distance >= 125 && distance < 720) {
+					previousAnimationState = "attack";
+					state.setState("attack");
+					await tick();
+					busy = false;
+					return;
+				} else {
+					previousAnimationState = "idle";
+					state.setState("idle");
+				}
 			} else {
-				state = "attack";
-				// rotation = -$PlayerState.rotation.y!;
-				console.log($self.position);
-
-				PlayerState.takeDamage("gun");
-				new Promise((resolve) => {
-					setTimeout(() => {
-						resolve();
-					}, 1000);
-				}).then(() => {
-					running = false;
-				});
+				previousAnimationState = "idle";
+				state.setState("idle");
 			}
-			// running = false;
-			isTargetingPlayer = false;
+			busy = false;
 		}
 	});
 
 	onMount(() => {
-		let count = 0;
-		timeout = setInterval(() => {
-			if (state === "dead") {
-				clearInterval(timeout);
-				state === "dead";
-				return;
-			}
-			if (isTargetingPlayer) return;
-			state = Math.random() < 0.5 ? "default" : "walk";
-			if (state === "walk") {
-				// count += 1;
-				// if (count % 2)
-				// 	tPosition.set({
-				// 		...$tPosition,
-				// 		x: $tPosition.x > $PlayerState.position.x ? $tPosition.x + 62 : $tPosition.x + 151,
-				// 		z: $tPosition.z < $PlayerState.position.z ? $tPosition.z + 14 : $tPosition.z + 86
-				// 	});
-				// else
-				// 	tPosition.set({
-				// 		...$tPosition,
-				// 		x: $tPosition.x > $PlayerState.position.x ? $tPosition.x + 165 : $tPosition.x - 29,
-				// 		z: $tPosition.z > $PlayerState.position.z ? $tPosition.z - 21 : $tPosition.z + 99
-				// 	});
-			} else {
-			}
-		}, 1500);
-
-		loop.start();
+		stateLoop.start();
 		return () => {
-			clearTimeout(timeout);
-			loop.stop();
+			stateLoop.stop();
 		};
 	});
-	$: state === "dead" && loop.stop();
+	$: $state && $state.state === "dead" && stateLoop.stop();
 </script>
 
 <div
-	class="sprite enemy guard {state}"
-	style="transform: translate3d({$tPosition.x}px, -50%, {$tPosition.z}px) rotateY({-$PlayerState
-		.rotation.y}deg);"
+	on:animationstart={() => {
+		if ($state.state === "hurt" && previousAnimationState !== "hurt") {
+			previousAnimationState = "hurt";
+			// busy = true;
+		}
+	}}
+	on:animationend={() => {
+		if (previousAnimationState === "hurt") {
+			busy = false;
+		}
+	}}
+	class="sprite enemy guard {$state.state}"
+	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$PlayerState.rotation
+		.y}deg);"
 />
 
 <style lang="scss">
@@ -271,7 +244,7 @@
 		background-size: 1262.5px;
 		image-rendering: pixelated;
 		// background-origin: center;
-		&.default {
+		&.idle {
 			background-position-x: 0px;
 		}
 		&.walk {
@@ -294,6 +267,7 @@
 		&.dead {
 			background-position: 84%;
 			animation: dead steps(1) 1s;
+			// background-color: red;
 			// animation-delay: 1000ms;
 			@keyframes dead {
 				0% {
@@ -308,6 +282,16 @@
 
 				60% {
 					background-position: 68%;
+				}
+			}
+		}
+
+		&.hurt {
+			animation: hurt steps(1) 0.1s;
+			background-position: 74%;
+			@keyframes hurt {
+				50% {
+					background-position: 74% !important;
 				}
 			}
 		}

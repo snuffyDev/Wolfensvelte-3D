@@ -16,7 +16,7 @@
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { WALL_FACES, isValidTexture } from "$lib/utils/validation";
 	import { getContext, onMount } from "svelte";
-	import { CurrentLevel } from "./Level.svelte";
+	import { CurrentLevel, type InternalWorld } from "./Level.svelte";
 	import { ctxKey, type TextureContext } from "../../routes/key";
 	import type { MapItem, Texture, WallFace } from "../types/core";
 </script>

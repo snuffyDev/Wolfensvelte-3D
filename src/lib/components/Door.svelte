@@ -55,28 +55,34 @@
 	}
 
 	onMount(() => {
-		const interval = setInterval(() => {
-			state = state === "open" ? "closed" : "open";
-			// if (state === 'open') {
-			position.update((u) =>
-				!rotation
-					? {
-							x: state === "open" ? _position.x + 100 : _position.x,
-							z: $position.z
-					  }
-					: { z: state === "open" ? _position.z + 100 : _position.z, x: $position.x }
-			);
+		let interval;
+		interval = setInterval(
+			function cb() {
+				state = state === "open" ? "closed" : "open";
+				// if (state === 'open') {
+				position.update((u) =>
+					!rotation
+						? {
+								x: state === "open" ? _position.x + 100 : _position.x,
+								z: $position.z
+						  }
+						: { z: state === "open" ? _position.z + 100 : _position.z, x: $position.x }
+				);
 
-			let currentState = $CurrentLevel[section][offset];
-			if (!currentState.position) currentState.position = {};
-			if (state === "open") {
-				currentState.position = { x: offset + 1, z: section };
-			} else {
-				currentState.position = { x: offset, z: section };
-			}
-			$CurrentLevel[section][offset] = { ...currentState };
-			// }
-		}, 3000);
+				let currentState = $CurrentLevel[section][offset];
+				if (!currentState.position) currentState.position = {};
+				if (state === "open") {
+					currentState.position = { x: offset + 1, z: section };
+				} else {
+					currentState.position = { x: offset, z: section };
+				}
+				$CurrentLevel[section][offset] = { ...currentState };
+				// }
+				clearInterval(interval);
+				interval = setInterval(cb, state === "closed" ? 1500 : 6000);
+			},
+			state === "closed" ? 1500 : 6000
+		);
 		return () => {
 			clearInterval(interval);
 		};

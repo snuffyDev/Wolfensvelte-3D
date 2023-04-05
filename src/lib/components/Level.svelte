@@ -10,20 +10,20 @@
 	export const CurrentLevel = _levelStore();
 
 	function _levelStore() {
-		let world: World = [];
+		let tilemap: World = [];
 		const { subscribe, set, update } = writable<World>([]);
 
 		return {
 			subscribe,
 			set: (level: World) => {
-				world = Object.assign(world, level);
+				tilemap = Object.assign(tilemap, level);
 
-				set(world);
+				set(tilemap);
 			},
 			update,
 			checkCollisionWithWorld(position: Position | Position2D) {
 				try {
-					const wall = world[position!.z][position!.x];
+					const wall = tilemap[position!.z][position!.x];
 
 					if (wall.position) {
 						return (
@@ -51,14 +51,20 @@
 	import { writable } from "svelte/store";
 
 	import Door from "$lib/components/Door.svelte";
-	import Guard from "$lib/components/Guard/Guard.svelte";
+	import Guard, { rand } from "$lib/components/Guard/Guard.svelte";
 	import Player from "$lib/components/Player.svelte";
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { World } from "../types/core";
+	import type { Entity, MapItem, Texture, World } from "../types/core";
 	import { compare } from "../utils/compare";
-	import { getAngleBetween, isAngleBetween, normalizeAngle } from "../utils/angle";
+	import {
+		getAngleBetweenPoints,
+		isAngleBetween,
+		isVisibleToPlayer,
+		normalizeAngle
+	} from "../utils/angle";
+	import { GameObjects } from "$lib/utils/manager";
 
 	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
@@ -67,71 +73,83 @@
 
 	const gameLoop = frameLoop.add(update);
 
-	const walls: InstanceType<typeof Wall>[] = Array.from({ length: level.length }).fill(
-		[]
-	) as InstanceType<typeof Wall>[];
-
-	const models: InstanceType<typeof Door>[] = [];
-	const enemies: InstanceType<typeof Guard>[] = [];
-
 	function update() {
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
 
-		for (const wall of walls) {
+		for (const wall of GameObjects.walls) {
 			if (!wall) continue;
 
 			const pos = wall.getPosition?.();
 			if (!pos) continue;
+			const visible = isVisibleToPlayer(wall, 90);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
 			);
-
-			if (distance >= 1850 && wall.getVisibility() !== false) {
+			if (visible === false || distance >= 1600) {
 				wall.setVisibility(false);
 				continue;
-			} else if (wall.getVisibility() === false && distance < 1850) {
-				wall.setVisibility(true);
 			}
+
+			wall.setVisibility(true);
 		}
 
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
 	}
 
-	function isVisible(obj: Guard, fov: number = 30) {
-		const angle = getAngleBetween($PlayerState.position, obj.getPosition());
+	function findConnectedRenderableMapItems(world: World): MapItem[][] {
+		const connectedMapItems: MapItem[][] = [];
+		const visited: Set<string> = new Set();
 
-		const viewAngle = normalizeAngle(-$PlayerState.rotation.y + 96);
+		// Define a recursive DFS helper function
+		function dfs(x: number, y: number, currentItems: MapItem[]): void {
+			const item = world[x][y];
+			if (!visited.has(`${x},${y}`) && item?.surfaces) {
+				visited.add(`${x},${y}`);
+				currentItems.push(item);
 
-		const left = normalizeAngle(viewAngle - fov / 2);
+				// Recursively explore neighboring tiles
+				if (x > 0) dfs(x - 1, y, currentItems);
+				if (x < world.length - 1) dfs(x + 1, y, currentItems);
+				if (y > 0) dfs(x, y - 1, currentItems);
+				if (y < world[x].length - 1) dfs(x, y + 1, currentItems);
+			}
+		}
 
-		const right = normalizeAngle(viewAngle + fov / 2);
-
-		return isAngleBetween(angle, left, right);
+		// Iterate over all tiles in the world
+		for (let x = 0; x < world.length; x++) {
+			const row: MapItem[] = [];
+			for (let y = 0; y < world[x].length; y++) {
+				if (
+					!visited.has(`${x},${y}`) &&
+					(typeof world[x][y].model === "object" || world[x][y].surfaces)
+				) {
+					const currentItems: MapItem[] = [];
+					dfs(x, y, currentItems);
+				}
+				if (
+					world[x][y] &&
+					(typeof world[x][y].model === "object" || world[x][y].surfaces !== null)
+				) {
+					row.push(world[x][y]);
+				} else {
+					row.push({ surfaces: null, rotation: undefined });
+				}
+			}
+			connectedMapItems.push(row.filter((item) => item));
+		}
+		connectedMapItems;
+		return connectedMapItems;
 	}
-	function handlePlayerShoot() {
-		const { rotation, position } = $PlayerState;
-		const enemiesToAttack = enemies
-			.filter((e) => {
-				const v = isVisible(e, 35);
-				if (e.getState() === "dead") return;
-				if (!v) return;
-				return v;
-			})
-			.sort(
-				(a, b) =>
-					getDistanceFromPoints(b.getPosition(), position) -
-					getDistanceFromPoints(a.getPosition(), position)
-			);
-		enemiesToAttack[0].setState("dead");
-		console.log(enemiesToAttack);
-	}
-
 	onMount(() => {
 		worldRef = document.getElementById("world")!;
 		CurrentLevel.set(level);
+		console.log($CurrentLevel);
 
 		gameLoop.start();
+		setTimeout(() => {
+			console.log(worldRef.childNodes.length);
+		}, 7500);
 		return () => {
 			gameLoop.stop();
 			frameLoop.dispose();
@@ -142,12 +160,13 @@
 <svelte:window
 	on:keydown={(e) => {
 		if (e.ctrlKey && e.key.toLowerCase() === "w") e.preventDefault();
+		// if (e.key === " ") console.log(Math.min(34, Math.max(12, rand.rnd() / 8)));
 	}}
 />
 
 <div id="scene">
 	{#if mode !== "generating"}
-		<Player on:shoot={handlePlayerShoot}>
+		<Player>
 			<div
 				class="world"
 				id="world"
@@ -160,7 +179,7 @@
 									this={MODEL_MAP[item.model.component]}
 									{offset}
 									{section}
-									bind:this={enemies[enemies.length]}
+									bind:this={GameObjects.enemies[GameObjects.enemies.length]}
 									bind:item
 								/>
 							{:else}
@@ -168,13 +187,13 @@
 									this={MODEL_MAP[item.model.component]}
 									{offset}
 									{section}
-									bind:this={models[models.length]}
+									bind:this={GameObjects.models[GameObjects.models.length]}
 									bind:item
 								/>
 							{/if}
-						{:else if item.surfaces !== null}
+						{:else if item.surfaces}
 							<Wall
-								bind:this={walls[walls.length]}
+								bind:this={GameObjects.walls[GameObjects.walls.length]}
 								{item}
 								{section}
 								{offset}
@@ -195,7 +214,7 @@
 >
 	#scene {
 		width: 100%;
-		height: 100%;
+		/* height: 100%; */
 		perspective: calc(var(--perspective));
 		inset: 0;
 		overflow: hidden;
@@ -245,7 +264,7 @@
 	}
 	#scene {
 		width: 100%;
-		height: 100%;
+		/* height: 100%; */
 		perspective: var(--perspective);
 		overflow: hidden;
 		backface-visibility: hidden;
@@ -256,11 +275,11 @@
 
 	#camera,
 	#world {
-		position: fixed;
+		position: absolute;
 		top: 50% !important;
 		left: 50% !important;
 		/* // transform-origin: center; */
-		// inset: 0;
+		inset: 0;
 
 		backface-visibility: hidden;
 		will-change: transform;
@@ -270,7 +289,7 @@
 	}
 	.wall,
 	.floor {
-		left: 50%;
+		/* left: 50%; */
 		top: 50%;
 		backface-visibility: hidden !important;
 

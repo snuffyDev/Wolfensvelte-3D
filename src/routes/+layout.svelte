@@ -8,7 +8,6 @@
 	import { ctxKey, type TextureContext } from "./key";
 	import "./../app.scss";
 	const textureStore = writable<Awaited<ReturnType<typeof textureData>>>({});
-
 	let loaded = false;
 
 	onMount(async () => {
@@ -22,7 +21,7 @@
 	// $: if ($textureStore)
 
 	setContext(ctxKey, { textures: textureStore } as TextureContext);
-
+	let play = false;
 	// console.log(E1M1);
 </script>
 

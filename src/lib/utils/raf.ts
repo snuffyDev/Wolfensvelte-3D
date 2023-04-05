@@ -1,5 +1,5 @@
 // Set of callback fns that will run on each animation frame
-const tasks = new Set<(now: number) => void>();
+const tasks = new Set<(now: number) => Promise<void> | void>();
 
 /**
  * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
@@ -23,10 +23,8 @@ function requestFrame() {
 			delta = Math.min(interval, delta + now - then - interval);
 			then = now;
 			// render code
-
-			for (const task of tasks.values()) {
-				task(now);
-			}
+			const it = [...tasks.values()];
+			Promise.all(it.map(async (v) => await v(now)));
 		}
 	};
 
