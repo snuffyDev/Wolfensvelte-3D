@@ -49,7 +49,7 @@
 
 		for (const e of GameObjects.enemies) {
 			const distance = getDistanceFromPoints(e.getPosition(), { x: -position.x, z: -position.z });
-			if (isVisibleToPlayer(e, 30) && distance < 750 && e.getState() !== "dead") {
+			if (isVisibleToPlayer(e, 45) && distance < 750 && e.getState() !== "dead") {
 				enemiesInRange.push(e);
 			}
 		}

@@ -2,7 +2,11 @@ import { get, writable } from "svelte/store";
 import { PlayerState, type IPlayerState } from "../../stores/player";
 import type { Position, Position2D } from "../../types/position";
 import { tweened } from "svelte/motion";
-import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "../../utils/position";
+import {
+	getDistanceFromPoints,
+	getLocalPositionFromRealPosition,
+	getRealPositionFromLocalPosition
+} from "../../utils/position";
 import { CurrentLevel } from "../Level.svelte";
 import { rand } from "./Guard.svelte";
 import { tick } from "svelte";
@@ -29,8 +33,8 @@ export function enemyState(init?: Partial<EnemyState>) {
 	const { subscribe, update, set } = writable<EnemyState>(state);
 
 	const tween = tweened<Position2D>({ x: state.position.x, z: state.position.z });
-	const { subscribe: tSubscribe, update: tUpdate, set: tSet } = tween;
-	function syncTweenAndPosition([value, opts]: Parameters<typeof tSet>) {}
+	const { subscribe: tSubscribe, set: tSet } = tween;
+
 	return {
 		subscribe,
 		set,
@@ -48,30 +52,35 @@ export function enemyState(init?: Partial<EnemyState>) {
 				z: position.z + current.z
 			};
 
-			const localTarget = getLocalPositionFromRealPosition(toMove);
 
-			if (!CurrentLevel.checkCollisionWithWorld(localTarget)) {
+			const playerPosition = getLocalPositionFromRealPosition(PlayerState.get().position);
+			const ourPosition = getLocalPositionFromRealPosition(state.position);
+
+			const paths = findPath(ourPosition, playerPosition);
+			console.log(ourPosition, playerPosition, paths);
+			if (!Array.isArray(paths)) return;
+			for (const path of paths) {
 				state.state = "walk";
-
-				// console.log({ localCurrent, localTarget });
-				// console.log({ localCurrent, localTarget });
-				console.log({ toMove, state: state.position });
-				const tX = +toMove.x;
-				const tZ = +toMove.z;
+				const realPosition = getRealPositionFromLocalPosition(path);
+				const tX = 1 - realPosition.x;
+				const tZ = 1 - realPosition.z;
 
 				const distance = getDistanceFromPoints(current, toMove);
-				return tSet({ x: tX, z: tZ }, { duration: distance * 3 }).then(() => {
+				await tSet({ x: tX, z: tZ }, { duration: distance }).then(() => {
 					state.state = "idle";
+					state.position = { x: tX, z: tZ };
 					update((u) => ({ ...u, position: { x: tX, z: tZ } }));
 				});
 			}
 		},
 		async giveDamage(n?: number) {
 			update((u) => ({ ...u, state: "hurt" }));
+
 			if (typeof n !== "number") {
 				n = Math.min(12, Math.max(28, rand.rnd() / 8));
 			}
 			update((u) => ({ ...u, state: "hurt" }));
+
 			state.health -= n;
 
 			if (state.health <= 0) {
@@ -93,4 +102,75 @@ export function enemyState(init?: Partial<EnemyState>) {
 			}
 		}
 	};
+}
+
+type Path = Array<Position2D>;
+
+function findPath(start: Position2D, end: Position2D): Path | null {
+	const queue: Array<Position2D> = [start];
+	const visited: Array<string> = [getKey(start)];
+
+	// A dictionary to store the previous position of each visited position
+	const previous: { [key: string]: Position2D } = {};
+
+	while (queue.length > 0) {
+		const current = queue.shift()!;
+		if (current.x === end.x && current.z === end.z) {
+			return getPath(previous, start, end);
+		}
+		const neighbors = getNeighbors(current);
+		for (const neighbor of neighbors) {
+			const key = getKey(neighbor);
+			if (!visited.includes(key)) {
+				visited.push(key);
+				previous[key] = current;
+				queue.push(neighbor);
+			}
+		}
+	}
+	return null;
+}
+
+function getKey(position: Position2D): string {
+	return `${position.x},${position.z}`;
+}
+
+function getPath(
+	previous: { [key: string]: Position2D },
+	start: Position2D,
+	end: Position2D
+): Path {
+	const path: Path = [];
+	let current = end;
+	while (!(current.x === start.x && current.z === start.z)) {
+		path.unshift(current);
+		current = previous[getKey(current)];
+	}
+	path.unshift(start);
+	return path;
+}
+
+function getNeighbors(position: Position2D): Array<Position2D> {
+	const neighbors = [];
+	const x = position.x;
+	const z = position.z;
+
+	if (x > 0 && !isBlocked(x - 1, z)) {
+		neighbors.push({ x: x - 1, z: z });
+	}
+	if (z > 0 && !isBlocked(x, z - 1)) {
+		neighbors.push({ x: x, z: z - 1 });
+	}
+	if (x < 64 - 1 && !isBlocked(x + 1, z)) {
+		neighbors.push({ x: x + 1, z: z });
+	}
+	if (z < 64 - 1 && !isBlocked(x, z + 1)) {
+		neighbors.push({ x: x, z: z + 1 });
+	}
+
+	return neighbors;
+}
+
+function isBlocked(x: number, z: number): boolean {
+	return !!CurrentLevel.checkCollisionWithWorld({ x, z });
 }

@@ -22,7 +22,7 @@ export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Posit
  */
 export function getLocalPositionFromRealPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: Math.ceil(x / 100),
-		z: Math.ceil((z - 50) / 100)
+		x: Math.abs(Math.ceil(x / 100)),
+		z: Math.abs(Math.ceil((z - 50) / 100))
 	};
 }

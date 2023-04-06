@@ -81,12 +81,12 @@
 
 			const pos = wall.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(wall, 90);
+			const visible = isVisibleToPlayer(wall, 30);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
 			);
-			if (visible === false || distance >= 1600) {
+			if (visible !== true || distance >= 1750) {
 				wall.setVisibility(false);
 				continue;
 			}

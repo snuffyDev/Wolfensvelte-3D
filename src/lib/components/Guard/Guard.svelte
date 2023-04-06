@@ -57,10 +57,13 @@
 	const sleep = (ms: number = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
 	const distanceToPosition = (a: Position2D, b: Position2D) => {
-		const distance = getDistanceFromPoints(a, b);
+		const distance = getDistanceFromPoints(a, { x: b.x, z: b.z });
 
-		const { x, z } = getLocalPositionFromRealPosition({ x: a.x + distance, z: a.z + distance });
-
+		const { x, z } = getLocalPositionFromRealPosition({
+			x: b.x - distance,
+			z: b.z - distance
+		});
+		console.log(distance);
 		return [x, z] as const;
 	};
 
@@ -85,22 +88,19 @@
 	}
 
 	function getPositionFromDistance(a: Position2D, b: Position2D) {
+		console.log(b);
 		const distance = getDistanceFromPoints(a, {
 			...b,
-			x: -b.x,
-			z: -b.z
+			x: 1 - Math.abs(b.x),
+			z: 1 - Math.abs(b.z)
 		});
-
-		const [x, y] = distanceToPosition(a, {
-			...b,
-			x: -b.x,
-			z: -b.z
+		const [x, y] = distanceToPosition(b, {
+			...a,
+			x: -a.x,
+			z: -a.z
 		});
-		// console.warn({ x, y });
-		const moveTo = {
-			x: -1 * (rand.rnd() / 2.5 + a.x + b.x - x),
-			z: -1 * (rand.rnd() / 2.5 + a.z + b.z - y)
-		};
+		const moveTo = { x: 1 - (a.x + b.x + x) + x * 2, z: 1 - (a.z + b.z + y) + y * 2 };
+		console.warn(moveTo, { x, y });
 		return moveTo;
 	}
 </script>
@@ -154,6 +154,8 @@
 
 	let startFrame: number;
 	let busy = false;
+
+	let playerLastSeenAt: number;
 	const stateLoop = frameLoop.add(async (now) => {
 		if (!startFrame) startFrame = now;
 		if (busy) return;
@@ -166,12 +168,23 @@
 			busy = true;
 			startFrame = now;
 
+			const lastSeen = playerLastSeenAt;
 			const distance = getDistanceFromPoints(
 				{ x: -$PlayerState.position.x, z: -$PlayerState.position.z },
 				$state.position
 			);
-			if (isVisibleToPlayer(getPosition(), 30)) {
-				if (distance > 450 && distance < 800 && Math.random() < 0.3) {
+			const lastSeenDelta = Math.abs(lastSeen - distance);
+			const seen = isVisibleToPlayer(getPosition(), 45);
+			// if (isVisible && ) {
+			// 	previousAnimationState = "walk";
+			// 	await tick();
+			// 	state.setState("walk");
+			// 	return state
+			// 		.moveTo(getPositionFromDistance($PlayerState.position, $state.position))
+			// 		.finally(() => (busy = false));
+			// }
+			if (seen) {
+				if (distance > 250 && distance < 750 && Math.random() < 0.5) {
 					previousAnimationState = "walk";
 					await tick();
 					state.setState("walk");

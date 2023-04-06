@@ -1,11 +1,13 @@
 :root {
 	--perspective: 1000px;
+	// transform-style: flat;
 	font-size: 16px;
 	user-select: none;
 }
 *::before,
 *::after,
 * {
+	perspective-origin: center !important;
 	&:not(button) {
 		all: unset;
 	}

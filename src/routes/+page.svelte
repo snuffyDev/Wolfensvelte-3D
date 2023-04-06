@@ -6,6 +6,7 @@
 	import Level from "../lib/components/Level.svelte";
 	import E1M1Music from "../lib/music/E1M1.mp3?url";
 	import MenuMusic from "../lib/music/menu.mp3?url";
+	import { dev } from "$app/environment";
 	let menuMusicPlayer: HTMLAudioElement;
 	onMount(() => {
 		menuMusicPlayer = new Audio(new URL(MenuMusic, import.meta.url).toString());
@@ -23,7 +24,7 @@
 		menuMusicPlayer.play();
 	}}
 />
-{#if $play}
+{#if $play || dev}
 	<div class="game-container">
 		<div class="level">
 			<Level level={E1M1} />
