@@ -8,7 +8,7 @@ export type WallFace = "front" | "left" | "back" | "right";
 // Alias for Texture
 export type Surface = Texture;
 
-export type Model = { component: "Guard" | "Door" };
+export type Model = { component: "Guard" | "Door" | "Object"; texture?: number };
 
 export type Entity = {
 	position?: Position2D | undefined;

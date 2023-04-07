@@ -20,6 +20,7 @@
 <svelte:body
 	on:pointerdown={() => {
 		if (hasAudioPerms) return;
+		if (dev) return;
 		hasAudioPerms = true;
 		menuMusicPlayer.play();
 	}}

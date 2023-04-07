@@ -42,19 +42,9 @@
 			rnd
 		};
 	};
-	type Deferred = { promise: Promise<void>; resolve: () => void };
-	const deferred = () => {
-		const d: Deferred = {} as Deferred;
-		d.promise = new Promise((resolve) => {
-			d.resolve = resolve;
-		});
-		return d;
-	};
 
 	export const rand = rng();
 	rand.init(true);
-
-	const sleep = (ms: number = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
 	const distanceToPosition = (a: Position2D, b: Position2D) => {
 		const distance = getDistanceFromPoints(a, { x: b.x, z: b.z });
@@ -67,47 +57,21 @@
 		return [x, z] as const;
 	};
 
-	function between(min: number, max: number) {
-		return Math.floor(Math.random() * (max - min + 1) + min);
-	}
-	function isVisible(
-		playerPosition: Position2D,
-		currentPosition: Position2D,
-		playerRotation: number,
-		fov: number = 30
-	) {
-		const angle = getAngleBetweenPoints(playerPosition, currentPosition);
-
-		const viewAngle = normalizeAngle(playerRotation + 90);
-
-		const left = normalizeAngle(viewAngle - fov / 2);
-
-		const right = normalizeAngle(viewAngle + fov / 2);
-
-		return isAngleBetween(angle, left, right);
-	}
-
 	function getPositionFromDistance(a: Position2D, b: Position2D) {
-		console.log(b);
-		const distance = getDistanceFromPoints(a, {
-			...b,
-			x: 1 - Math.abs(b.x),
-			z: 1 - Math.abs(b.z)
-		});
 		const [x, y] = distanceToPosition(b, {
 			...a,
 			x: -a.x,
 			z: -a.z
 		});
 		const moveTo = { x: 1 - (a.x + b.x + x) + x * 2, z: 1 - (a.z + b.z + y) + y * 2 };
-		console.warn(moveTo, { x, y });
+
 		return moveTo;
 	}
 </script>
 
 <script lang="ts">
-	import { AIBaseStore, PlayerState } from "$lib/stores/player";
-	import type { Position, Position2D } from "$lib/types/position";
+	import { PlayerState } from "$lib/stores/player";
+	import type { Position2D } from "$lib/types/position";
 	import {
 		getDistanceFromPoints,
 		getLocalPositionFromRealPosition,
@@ -115,21 +79,19 @@
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onMount, tick } from "svelte";
-	import { get } from "svelte/store";
 	import type { MapItem } from "../../types/core";
-	import {
-		getAngleBetweenPoints,
-		isAngleBetween,
-		isVisibleToPlayer,
-		normalizeAngle
-	} from "../../utils/angle";
+	import { isVisibleToPlayer } from "../../utils/angle";
 	import { enemyState } from "./state";
+	import HaltSound from "$lib/sounds/guard_halt.WAV?url";
+	import ShootSound from "$lib/sounds/guard_shoot.WAV?url";
+	import { AudioManager } from "$lib/helpers/audio";
 
 	export let item: MapItem;
 	export let offset: number;
 	export let section: number;
 
 	const localPosition = getRealPositionFromLocalPosition({ x: offset, z: section });
+
 	const state = enemyState({
 		position: { x: -localPosition.x, z: -localPosition.z },
 		state: "idle"
@@ -141,7 +103,6 @@
 	export const getState = () => $state.state;
 	export const takeDamage = async () => {
 		if (Math.random() < 0.65) state.setState("hurt");
-		// await tick();
 		await state.giveDamage();
 		if ($state.health <= 0) {
 			tween.cancel();
@@ -149,13 +110,17 @@
 		}
 	};
 	let previousAnimationState: typeof $state.state;
-
+	const audioManager = new AudioManager({
+		halt: new URL(HaltSound, import.meta.url).toString(),
+		shoot: new URL(ShootSound, import.meta.url).toString()
+	});
 	$: if ($state) $state.rotation.y = $PlayerState.rotation.y - 90;
 
 	let startFrame: number;
 	let busy = false;
 
 	let playerLastSeenAt: number;
+	let playerJustSeen = false;
 	const stateLoop = frameLoop.add(async (now) => {
 		if (!startFrame) startFrame = now;
 		if (busy) return;
@@ -173,25 +138,27 @@
 				{ x: -$PlayerState.position.x, z: -$PlayerState.position.z },
 				$state.position
 			);
-			const lastSeenDelta = Math.abs(lastSeen - distance);
+
 			const seen = isVisibleToPlayer(getPosition(), 45);
-			// if (isVisible && ) {
-			// 	previousAnimationState = "walk";
-			// 	await tick();
-			// 	state.setState("walk");
-			// 	return state
-			// 		.moveTo(getPositionFromDistance($PlayerState.position, $state.position))
-			// 		.finally(() => (busy = false));
-			// }
 			if (seen) {
 				if (distance > 250 && distance < 750 && Math.random() < 0.5) {
+					if (!playerJustSeen) {
+						playerJustSeen = true;
+						audioManager.play("halt");
+					}
+
 					previousAnimationState = "walk";
 					await tick();
-					state.setState("walk");
 					return state
-						.moveTo(getPositionFromDistance($PlayerState.position, $state.position))
+						.moveTo(
+							getPositionFromDistance(
+								{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
+								$state.position
+							)
+						)
 						.finally(() => (busy = false));
-				} else if (distance >= 125 && distance < 720) {
+				} else if (distance >= 125 && distance < 720 && Math.random() > 0.3) {
+					audioManager.play("shoot");
 					previousAnimationState = "attack";
 					state.setState("attack");
 					await tick();

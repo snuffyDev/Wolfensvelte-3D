@@ -23,6 +23,7 @@ export type Weapons = "pistol" | "knife" | "shotgun";
 
 export interface IPlayerState {
 	health: number;
+	score: number;
 	weapons: Partial<Record<Weapons, { ammo: number | null; acquired: boolean }>>;
 	rotation: Position;
 	position: Position;
@@ -40,7 +41,8 @@ function _playerState() {
 			pistol: { acquired: true, ammo: 8 },
 			shotgun: { acquired: false, ammo: null }
 		},
-		position: { x: 3215, z: 5801, y: 0 },
+		score: 0,
+		position: { x: 2950, z: 4711, y: 0 },
 		rotation: { x: 0, y: -90, z: 0 }
 	};
 	const { subscribe, set, update } = writable<IPlayerState>(state);
@@ -57,6 +59,10 @@ function _playerState() {
 			}
 			state.health -= n;
 			update((u) => ({ ...u, health: state.health }));
+		},
+		givePoints(points: number) {
+			state.score += points;
+			update((u) => ({ ...u, score: state.score }));
 		},
 		update: function (input: PlayerControls) {
 			const moves: Position2D[] = [];
@@ -97,6 +103,12 @@ function _playerState() {
 				state.position.x = +toMove.x;
 				state.position.z = +toMove.z;
 			}
+			update((u) => {
+				return {
+					...u,
+					...state
+				};
+			});
 		},
 		moveForward(): Position2D {
 			const { rotation } = state;
@@ -135,10 +147,14 @@ function _playerState() {
 		},
 		rotate(direction: "left" | "right") {
 			const { rotation } = state;
-			const angleToRotateTo = direction === "left" ? -0.875 * Math.PI : 0.875 * Math.PI;
+			const angleToRotateTo =
+				direction === "left"
+					? (-0.725 * CONSTANTS.speed) / Math.PI
+					: (0.725 * CONSTANTS.speed) / Math.PI;
 
 			rotation.y += angleToRotateTo;
 			rotation.y = rotation.y % 360;
+			update((u) => ({ ...u, rotation: state.rotation }));
 		},
 
 		// ACTIONS

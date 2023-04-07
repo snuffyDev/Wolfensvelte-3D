@@ -24,12 +24,16 @@
 <div class="hud">
 	<div class="stats">
 		<div class="col">
-			<b>Health</b>
-			<span>{$PlayerState.health}</span>
-		</div>
-		<div class="col">
 			<b>Level</b>
 			<span>{1}</span>
+		</div>
+		<div class="col">
+			<b>Score</b>
+			<span>{$PlayerState.score}</span>
+		</div>
+		<div class="col">
+			<b>Health</b>
+			<span>{$PlayerState.health}</span>
 		</div>
 	</div>
 	<!-- <div /> -->

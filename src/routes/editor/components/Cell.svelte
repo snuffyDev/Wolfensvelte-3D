@@ -60,15 +60,16 @@
 		edge: Texture;
 	}>();
 
-	const getCellType = (o: typeof data): "model" | "wall" => {
+	const getCellType = (o: typeof data): "model" | "wall" | "other" => {
 		for (const key of objectKeys(o)) {
 			if (key === "model") {
+				if (o[key]?.texture) return "other";
 				if (o[key]?.component) return "model";
 			} else if (key === "surfaces") {
 				if (typeof o.surfaces === "number") return "wall";
 			}
 		}
-		return "wall";
+		return "other";
 	};
 
 	$: CELL_TYPE = getCellType(data);
@@ -110,7 +111,13 @@
 		event.preventDefault();
 	}}
 >
-	{#if CELL_TYPE === "wall"}
+	{#if data.model?.texture}
+		<span
+			class="edge "
+			class:active={true}
+			style={data.model?.texture ? `--img: url(${$textures[data.model.texture].original});` : ""}
+		/>
+	{:else if CELL_TYPE === "wall"}
 		<span
 			class="edge "
 			style={data.surfaces ? `--img: url(${$textures[data.surfaces].original});` : ""}

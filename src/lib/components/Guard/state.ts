@@ -53,12 +53,13 @@ export function enemyState(init?: Partial<EnemyState>) {
 			};
 
 
-			const playerPosition = getLocalPositionFromRealPosition(PlayerState.get().position);
+			const playerPosition = getLocalPositionFromRealPosition(toMove);
 			const ourPosition = getLocalPositionFromRealPosition(state.position);
 
 			const paths = findPath(ourPosition, playerPosition);
-			console.log(ourPosition, playerPosition, paths);
 			if (!Array.isArray(paths)) return;
+			state.state = "walk";
+			update((u) => ({ ...u, state: state.state }));
 			for (const path of paths) {
 				state.state = "walk";
 				const realPosition = getRealPositionFromLocalPosition(path);
@@ -66,18 +67,19 @@ export function enemyState(init?: Partial<EnemyState>) {
 				const tZ = 1 - realPosition.z;
 
 				const distance = getDistanceFromPoints(current, toMove);
-				await tSet({ x: tX, z: tZ }, { duration: distance }).then(() => {
-					state.state = "idle";
+				await tSet({ x: tX, z: tZ }, { duration: distance * 1.325 }).then(() => {
 					state.position = { x: tX, z: tZ };
 					update((u) => ({ ...u, position: { x: tX, z: tZ } }));
 				});
 			}
+			state.state = "idle";
+			update((u) => ({ ...u, state: state.state }));
 		},
 		async giveDamage(n?: number) {
 			update((u) => ({ ...u, state: "hurt" }));
 
 			if (typeof n !== "number") {
-				n = Math.min(12, Math.max(28, rand.rnd() / 8));
+				n = Math.min(22, Math.max(36, rand.rnd() / 8));
 			}
 			update((u) => ({ ...u, state: "hurt" }));
 
@@ -85,6 +87,7 @@ export function enemyState(init?: Partial<EnemyState>) {
 
 			if (state.health <= 0) {
 				state.state = "dead";
+				PlayerState.givePoints(100);
 			}
 			update((u) => ({ ...u, health: state.health, state: state.state }));
 		},
@@ -94,7 +97,7 @@ export function enemyState(init?: Partial<EnemyState>) {
 				update((u) => ({ ...u, state: state.state }));
 			});
 			if (state.state === "attack") {
-				if (Math.random() < 0.5) {
+				if (Math.random() < 0.45) {
 					tick().then(() => {
 						PlayerState.takeDamage();
 					});

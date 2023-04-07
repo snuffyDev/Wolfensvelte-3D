@@ -6,6 +6,8 @@
 	import { frameLoop } from "$lib/utils/raf";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 	import type Guard from "./Guard/Guard.svelte";
+	import { AudioManager } from "$lib/helpers/audio";
+	import PistolURL from "$lib/sounds/pistol.WAV?url";
 
 	const dispatch = createEventDispatcher<{ shoot: void }>();
 	let state: "shoot" | "idle" = "idle";
@@ -18,6 +20,9 @@
 		leftarrow: false,
 		rightarrow: false
 	};
+	let x: number = 0;
+
+	const audioManager = new AudioManager({ pistol: new URL(PistolURL, import.meta.url).toString() });
 
 	let cssText = ``;
 
@@ -48,25 +53,27 @@
 		const enemiesInRange: Guard[] = [];
 
 		for (const e of GameObjects.enemies) {
-			const distance = getDistanceFromPoints(e.getPosition(), { x: -position.x, z: -position.z });
-			if (isVisibleToPlayer(e, 45) && distance < 750 && e.getState() !== "dead") {
+			const distance = getDistanceFromPoints(e.getPosition(), {
+				x: -position.x,
+				z: -position.z
+			});
+			if (isVisibleToPlayer(e.getPosition(), 45) && distance < 750 && e.getState() !== "dead") {
 				enemiesInRange.push(e);
 			}
 		}
 		// console.log(enemiesInRange);
 		const closest = enemiesInRange.sort(
 			(a, b) =>
-				getDistanceFromPoints(b[1].getPosition(), position) -
-				getDistanceFromPoints(a[1].getPosition(), position)
+				getDistanceFromPoints(b.getPosition(), position) -
+				getDistanceFromPoints(a.getPosition(), position)
 		);
-		// console.log("CLOSEST", closest);
 
 		const c = closest.shift();
 
+		audioManager.play("pistol");
 		await PlayerState.attack(c!);
 	}
 
-	let x: number = 0;
 	function handleMouseMove(node: HTMLElement) {
 		function handleMove(event: MouseEvent) {
 			x = event.movementX;

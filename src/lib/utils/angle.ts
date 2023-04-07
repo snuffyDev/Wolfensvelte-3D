@@ -1,5 +1,3 @@
-// TODO: move some functions from Level.svelte to here
-
 import { PlayerState } from "$lib/stores/player";
 import type { Position, Position2D } from "../types/position";
 

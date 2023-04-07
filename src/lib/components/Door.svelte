@@ -16,16 +16,21 @@
 
 	$: item = item;
 	let state: "open" | "closed" = "closed";
+	let visibility = true;
 	const { textures }: TextureContext = getContext(ctxKey);
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);
+
+	export const getVisibility = () => visibility;
+	export const setVisibility = (visible: boolean) => (visibility = visible);
 
 	export const getPosition = () => $position;
 	export const getLocalPosition = (): Omit<Position, "y"> => ({
 		x: state === "open" ? offset + 1 : offset,
 		z: section
 	});
+
 	$: rotation = 0;
 	$: console.log(rotation);
 
@@ -105,7 +110,9 @@
 		isMouseOver = false;
 	}}
 	class="door {state}"
-	style="--pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {rotation ?? 0}deg;"
+	style="visibility: {visibility
+		? 'visible'
+		: 'hidden'};  --pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {rotation ?? 0}deg;"
 >
 	<!---->
 	<div

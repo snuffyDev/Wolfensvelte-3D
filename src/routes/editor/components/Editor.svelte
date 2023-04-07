@@ -9,6 +9,7 @@
 	import TexturePreview from "./Editor/TexturePreview.svelte";
 	import Level from "../../../lib/components/Level.svelte";
 	import type { MapItem, Texture, WallFace, World } from "../../../lib/types/core";
+	import { specialObjectIds as specialObjects } from "$lib/utils/engine/objects";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
@@ -101,6 +102,7 @@
 
 	let files: FileList;
 	let jsonFile: TiledJSON;
+	specialObjects;
 	const handleJSON = () => {
 		const reader = new FileReader();
 		const chunk = <T>(data: Array<T>) => {
@@ -120,7 +122,12 @@
 			for (let x = 0; x < TILE_MAP.length; x++) {
 				for (let y = 0; y < TILE_MAP[x].length; y++) {
 					let col = TILE_MAP[x][y].data;
-					if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) {
+					if (specialObjects.includes(+chunked[x][y])) {
+						TILE_MAP[x][y].data = {
+							...TILE_MAP[x][y].data,
+							model: { component: "Object", texture: +chunked[x][y] }
+						};
+					} else if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) {
 						col.surfaces = +chunked[x][y] === 0 ? null : +chunked[x][y];
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, surfaces: col.surfaces };
 					} else {
@@ -140,6 +147,7 @@
 					];
 
 					if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) continue;
+					if (specialObjects.includes(+chunked[x][y])) continue;
 
 					TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
 

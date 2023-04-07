@@ -3,7 +3,7 @@ import { promises } from 'fs';
 
 const { readdir, rename } = promises;
 
-const DIRECTORY = 'src/lib/textures';
+const DIRECTORY = 'src/lib/sprites/objects';
 
 async function getFiles(dir) {
   const dirents = await readdir(dir, { withFileTypes: true });

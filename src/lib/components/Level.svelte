@@ -4,7 +4,8 @@
 >
 	const MODEL_MAP = {
 		Guard: Guard,
-		Door: Door
+		Door: Door,
+		Object: MapObject
 	} as const;
 
 	export const CurrentLevel = _levelStore();
@@ -25,9 +26,11 @@
 				try {
 					const wall = tilemap[position!.z][position!.x];
 
+					if (wall.model?.texture && noClipObjectIds.includes(wall.model?.texture as number))
+						return false;
 					if (wall.position) {
 						return (
-							!!wall.model?.component &&
+							wall.model?.component !== "Object" &&
 							wall.position.x === position.x &&
 							wall.position.z === position.z
 						);
@@ -50,6 +53,7 @@
 	import { PlayerState } from "$lib/stores/player";
 	import { writable } from "svelte/store";
 
+	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
 	import Guard, { rand } from "$lib/components/Guard/Guard.svelte";
 	import Player from "$lib/components/Player.svelte";
@@ -65,6 +69,7 @@
 		normalizeAngle
 	} from "../utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
+	import { noClipObjectIds } from "$lib/utils/engine/objects";
 
 	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
@@ -76,12 +81,29 @@
 	function update() {
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
 
+		for (const model of GameObjects.models) {
+			if (!model) continue;
+
+			const pos = model.getPosition?.();
+			if (!pos) continue;
+			const visible = isVisibleToPlayer(model, 90);
+			const distance = getDistanceFromPoints(
+				{ x: pos.x - 50, z: pos.z },
+				{ x, y, z } /* playerPosition */
+			);
+			if (visible !== true || distance >= 1750) {
+				model.setVisibility(false);
+				continue;
+			}
+
+			model.setVisibility(true);
+		}
 		for (const wall of GameObjects.walls) {
 			if (!wall) continue;
 
 			const pos = wall.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(wall, 30);
+			const visible = isVisibleToPlayer(wall, 90);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
