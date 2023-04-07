@@ -20,7 +20,9 @@ export function isVisibleToPlayer<
 	T extends { getPosition: () => Position | Position2D } | Position2D
 >(obj: T, fov = 30) {
 	const playerState = PlayerState.get();
+
 	let position: Position2D;
+
 	if ("getPosition" in obj) {
 		position = obj.getPosition();
 	} else {
@@ -33,9 +35,9 @@ export function isVisibleToPlayer<
 
 	const right = normalizeAngle(playerViewAngle + fov / 2);
 
-	// console.log({ playerViewAngle, left, right });
 	return isAngleBetween(angleBetween, left, right);
 }
+
 export function isAngleBetween(mid: number, start: number, end: number): boolean {
 	const formattedEnd = end - start < 0 ? end - start + 360 : end - start;
 	const formattedMid = mid - start < 0 ? mid - start + 360 : mid - start;
