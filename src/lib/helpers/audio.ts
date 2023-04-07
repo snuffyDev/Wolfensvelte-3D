@@ -4,7 +4,9 @@ export class AudioManager<T extends Record<string, string>> {
 	constructor(dict: T) {
 		this.ref = new Map();
 		for (const key in dict) {
-			this.ref.set(key, new Audio(dict[key]));
+			const audio = new Audio(dict[key]);
+			audio.volume = 0.7;
+			this.ref.set(key, audio);
 		}
 	}
 

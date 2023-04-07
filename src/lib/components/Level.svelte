@@ -1,3 +1,5 @@
+<svelte:options immutable={true} />
+
 <script
 	context="module"
 	lang="ts"
@@ -28,6 +30,7 @@
 
 					if (wall.model?.texture && noClipObjectIds.includes(wall.model?.texture as number))
 						return false;
+					if (wall.model?.texture) return true;
 					if (wall.position) {
 						return (
 							wall.model?.component !== "Object" &&
@@ -35,6 +38,7 @@
 							wall.position.z === position.z
 						);
 					}
+					if (wall.model?.component === "Guard") return true;
 
 					return compare(wall.surfaces, (t) => isValidTexture(t) !== false);
 				} catch (e) {
@@ -86,12 +90,12 @@
 
 			const pos = model.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(model, 90);
+			const visible = isVisibleToPlayer(model, 30);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
 			);
-			if (visible !== true || distance >= 1750) {
+			if (visible !== true || distance >= 1650) {
 				model.setVisibility(false);
 				continue;
 			}
@@ -103,7 +107,7 @@
 
 			const pos = wall.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(wall, 90);
+			const visible = isVisibleToPlayer(wall, 30);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */

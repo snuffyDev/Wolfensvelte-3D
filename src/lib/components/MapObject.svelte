@@ -6,6 +6,7 @@
 	import type { Entity } from "$lib/types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { PlayerState } from "$lib/stores/player";
+	import { isVisibleToPlayer } from "$lib/utils/angle";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
@@ -27,7 +28,8 @@
 	export const getLocalPosition = () => ({ x: offset, z: section });
 
 	$: texture = item.model?.texture;
-	$: rotation = -$PlayerState.rotation.y;
+	let rotation: number;
+	$: if (isVisibleToPlayer(position, 30)) rotation = -$PlayerState.rotation.y;
 </script>
 
 {#if texture}
@@ -42,10 +44,11 @@
 
 <style lang="scss">
 	.sprite {
-		height: 100px;
-		width: 100px;
+		height: 64px;
+		width: 64px;
 		position: absolute;
 		top: 0;
+		will-change: visibility, transform;
 		left: 0;
 		bottom: 0;
 		background-image: var(--img);

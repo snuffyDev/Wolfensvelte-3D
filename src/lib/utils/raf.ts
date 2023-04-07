@@ -1,5 +1,6 @@
 // Set of callback fns that will run on each animation frame
 const tasks = new Set<(now: number) => Promise<void> | void>();
+const asyncTasks = new Set<(now: number) => Promise<void>>();
 
 /**
  * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
@@ -13,7 +14,7 @@ function requestFrame() {
 	let lastTs: number;
 	const run = async () => {
 		let then = performance.now();
-		const interval = 1000 / 30;
+		const interval = 1000 / 24;
 		let delta = 0;
 		while (running) {
 			const now = await new Promise(requestAnimationFrame);
@@ -23,8 +24,13 @@ function requestFrame() {
 			delta = Math.min(interval, delta + now - then - interval);
 			then = now;
 			// render code
-			const it = [...tasks.values()];
-			Promise.all(it.map(async (v) => await v(now)));
+			const asyncTasks = [];
+
+			for (const it of tasks.values()) {
+				const r = it(now);
+				if (r?.then) asyncTasks.push(r);
+			}
+			await Promise.race(asyncTasks);
 		}
 	};
 
@@ -52,8 +58,8 @@ function requestFrame() {
 		}),
 		/** Kills all callbacks, removing them from the loop, and kills the loop globally. */
 		dispose: () => {
-			cancelAnimationFrame(frame);
 			tasks.clear();
+			cancelAnimationFrame(frame);
 		}
 	};
 }

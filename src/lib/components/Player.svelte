@@ -1,13 +1,48 @@
+<script
+	context="module"
+	lang="ts"
+>
+	export function testLineOfSight(world: World, start: Position2D, end: Position2D): boolean {
+		const dx = end.x - start.x;
+		const dz = end.z - start.z;
+		const distance = Math.sqrt(dx * dx + dz * dz);
+		const stepX = dx / distance;
+		const stepZ = dz / distance;
+
+		let x = start.x;
+		let z = start.z;
+		for (let i = 0; i < distance; i++) {
+			// Round x and z to the nearest integer to get the coordinates of the tile
+			const tileX = Math.round(x);
+			const tileZ = Math.round(z);
+
+			// Check if the tile at (tileX, tileZ) contains a MapItem
+			if (world[tileZ][tileX].model?.component === "Door" || world[tileZ][tileX].surfaces != null) {
+				return false;
+			}
+
+			x += stepX;
+			z += stepZ;
+		}
+
+		return true;
+	}
+</script>
+
 <script lang="ts">
 	import { PlayerState, type PlayerControls } from "$lib/stores/player";
 	import { isVisibleToPlayer } from "$lib/utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
-	import { getDistanceFromPoints } from "$lib/utils/position";
+	import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 	import type Guard from "./Guard/Guard.svelte";
 	import { AudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
+	import { findPath } from "./Guard/state";
+	import type { MapItem, World } from "$lib/types/core";
+	import type { Position2D } from "$lib/types/position";
+	import { CurrentLevel } from "./Level.svelte";
 
 	const dispatch = createEventDispatcher<{ shoot: void }>();
 	let state: "shoot" | "idle" = "idle";
@@ -53,25 +88,41 @@
 		const enemiesInRange: Guard[] = [];
 
 		for (const e of GameObjects.enemies) {
-			const distance = getDistanceFromPoints(e.getPosition(), {
+			const distance = getDistanceFromPoints(e?.getPosition(), {
 				x: -position.x,
 				z: -position.z
 			});
-			if (isVisibleToPlayer(e.getPosition(), 45) && distance < 750 && e.getState() !== "dead") {
+			if (isVisibleToPlayer(e?.getPosition(), 30) && distance < 750 && e?.getState() !== "dead") {
 				enemiesInRange.push(e);
 			}
 		}
-		// console.log(enemiesInRange);
+		audioManager.play("pistol");
+		if (!enemiesInRange.length) return;
+
 		const closest = enemiesInRange.sort(
 			(a, b) =>
-				getDistanceFromPoints(b.getPosition(), position) -
-				getDistanceFromPoints(a.getPosition(), position)
+				getDistanceFromPoints(a?.getPosition(), {
+					x: -position.x,
+					z: -position.z
+				}) -
+				getDistanceFromPoints(b?.getPosition(), {
+					x: -position.x,
+					z: -position.z
+				})
 		);
-
-		const c = closest.shift();
-
-		audioManager.play("pistol");
-		await PlayerState.attack(c!);
+		const c = [...closest].shift()!;
+		// console.log(closest);
+		const playerPos = getLocalPositionFromRealPosition({
+			x: position.x,
+			z: position.z
+		});
+		const enemPos = getLocalPositionFromRealPosition(c?.getPosition());
+		// console.log({ playerPos, enemPos });
+		const canShoot = testLineOfSight($CurrentLevel, playerPos, enemPos);
+		// console.log(canShoot);
+		if (canShoot) {
+			await PlayerState.attack(c!);
+		}
 	}
 
 	function handleMouseMove(node: HTMLElement) {
@@ -296,12 +347,12 @@
 	}
 	#camera,
 	#world {
-		position: absolute;
+		position: fixed;
 		perspective: var(--perspective);
 		inset: 0;
 		transform: translateZ(0);
 		// transform: translate3d(, -50%, -640px);
-		contain: content size layout;
+		// contain: content size layout;
 		transform-style: preserve-3d;
 		will-change: transform;
 	}

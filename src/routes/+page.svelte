@@ -7,6 +7,8 @@
 	import E1M1Music from "../lib/music/E1M1.mp3?url";
 	import MenuMusic from "../lib/music/menu.mp3?url";
 	import { dev } from "$app/environment";
+	import MenuImg from "../lib/sprites/menu/wolf_menu.BMP?url";
+
 	let menuMusicPlayer: HTMLAudioElement;
 	onMount(() => {
 		menuMusicPlayer = new Audio(new URL(MenuMusic, import.meta.url).toString());
@@ -35,10 +37,10 @@
 		</div>
 	</div>
 {/if}
-{#if !hasAudioPerms}
+{#if !hasAudioPerms && !dev}
 	<div
 		class="center"
-		style="color: white;"
+		style="color: white; background-color: black;max-width:40vw; max-height:30vh; width:100%;height:100%;"
 	>
 		<h1>Please click anywhere to allow audio</h1>
 		<h2 style="font-weight: 700;"><b>Controls</b></h2>
@@ -47,7 +49,10 @@
 		<p>Space to shoot</p>
 	</div>
 {:else}
-	<div class="center">
+	<div
+		class="center"
+		style="background-image: url({`${MenuImg}`});"
+	>
 		<button
 			on:click|once={() => {
 				const audio = new Audio(new URL(E1M1Music, import.meta.url).toString());
@@ -70,11 +75,13 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 0.95em;
-		position: aboslute;
+		position: absolute;
 		height: 100%;
 		width: 100%;
 		justify-content: center;
 		place-items: center;
+		background-repeat: no-repeat;
+		background-size: 100%;
 	}
 	button {
 		font-size: 1.3em;
@@ -83,22 +90,22 @@
 	}
 	.game-container {
 		display: grid;
-		position: relative;
+		// position: relative;
 		min-height: 100%;
-		will-change: none;
+		// will-change: none;
 
-		max-width: 100%;
-		width: 100%;
+		// max-width: 100%;
+		// width: 100%;/
 		grid-template-rows: 1fr 4em;
 	}
 	.level {
 		will-change: transform;
 		transform: translateZ(0px);
 		transform-style: preserve-3d;
-		overflow: hidden;
 		backface-visibility: hidden;
-		contain: content strict;
 		position: relative;
+		overflow: visible;
+		inset: 0;
 	}
 	.ui {
 		position: relative;

@@ -11,8 +11,8 @@ export const getDistanceFromPoints = (p1: Position | Position2D, p2: Position | 
  */
 export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: x * 100,
-		z: z * 100
+		x: x * 64,
+		z: z * 64
 	};
 }
 
@@ -22,7 +22,7 @@ export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Posit
  */
 export function getLocalPositionFromRealPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: Math.abs(Math.ceil(x / 100)),
-		z: Math.abs(Math.ceil((z - 50) / 100))
+		x: Math.abs(Math.ceil(x / 64)),
+		z: Math.abs(Math.ceil((z - 32) / 64))
 	};
 }

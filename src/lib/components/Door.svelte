@@ -68,10 +68,10 @@
 				position.update((u) =>
 					!rotation
 						? {
-								x: state === "open" ? _position.x + 100 : _position.x,
+								x: state === "open" ? _position.x + 64 : _position.x,
 								z: $position.z
 						  }
-						: { z: state === "open" ? _position.z + 100 : _position.z, x: $position.x }
+						: { z: state === "open" ? _position.z + 64 : _position.z, x: $position.x }
 				);
 
 				let currentState = $CurrentLevel[section][offset];
@@ -132,21 +132,15 @@
 <style lang="scss">
 	.door {
 		position: absolute;
-		width: 100px;
-		height: 100px;
+		width: 64px;
+		height: 64px;
 		top: 0;
 		left: 0;
 		right: 0;
 		contain: layout size style;
-		// display: grid;
-		will-change: transform;
-		// grid-template-rows: 1fr;
-		// grid-template-columns: 16px 16px;
-		// gap: 16px;?
+		will-change: transform, visibility;
 		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
-		&:hover {
-			cursor: pointer;
-		}
+
 		backface-visibility: hidden;
 		transform-style: preserve-3d;
 		> :where(.sprite) {
@@ -154,15 +148,14 @@
 			image-rendering: pixelated;
 			transform-style: preserve-3d;
 			// transition: inherit;
-			will-change: transform;
 			// backface-visibility: hidden;
 			transform: translate3d(0, 0%, -8px);
 			&:nth-child(2) {
-				transform: translateZ(0.5em);
+				transform: translateZ(8px);
 			}
 			// background-color: slategray;
-			width: 6.25rem;
-			height: 6.25rem;
+			width: 64px;
+			height: 64px;
 			position: inherit;
 			top: 0%;
 			//
@@ -175,7 +168,7 @@
 			position: inherit;
 
 			// inset: 0;
-			width: 16px;
+			width: 8px;
 			height: 100%;
 			// right: 0;
 			will-change: transform;
@@ -189,11 +182,11 @@
 			transform: rotateY(90deg);
 		}
 		&::before {
-			right: -7.95px;
+			right: -1.95px;
 			// left: 0;
 		}
 		&::after {
-			left: -7.95px;
+			left: -1.95px;
 			transform: rotateY(-90deg);
 			// right: 0;
 		}

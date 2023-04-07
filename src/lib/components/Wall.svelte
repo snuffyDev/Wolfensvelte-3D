@@ -1,4 +1,7 @@
-<svelte:options accessors={true} />
+<svelte:options
+	immutable={true}
+	accessors={true}
+/>
 
 <script
 	context="module"
@@ -24,7 +27,7 @@
 <script lang="ts">
 	export let offset = 0;
 	export let section = 0;
-	export let height = 100;
+	export let height = 64;
 	export let item: MapItem;
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
@@ -59,12 +62,12 @@
 	const getZPosition = (direction: "front" | "left" | "right" | "back") => {
 		switch (direction) {
 			case "back":
-				return -position.z - 50;
+				return -position.z - 32;
 			case "front":
-				return -position.z + 50;
+				return -position.z + 32;
 			case "left":
 			case "right":
-				return -position.z - 50;
+				return -position.z - 32;
 		}
 	};
 </script>
@@ -98,13 +101,11 @@
 
 <style>
 	.wall {
-		contain: layout size;
 		visibility: inherit;
-		will-change: visibility;
 		height: var(--height);
-
+		will-change: visibility;
 		background-image: var(--img);
-		background-size: 100%;
+		background-size: 64px;
 		backface-visibility: hidden !important;
 		image-rendering: pixelated;
 		opacity: 1;

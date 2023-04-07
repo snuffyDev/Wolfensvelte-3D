@@ -85,15 +85,17 @@
 	import HaltSound from "$lib/sounds/guard_halt.WAV?url";
 	import ShootSound from "$lib/sounds/guard_shoot.WAV?url";
 	import { AudioManager } from "$lib/helpers/audio";
+	import { CurrentLevel } from "../Level.svelte";
+	import { testLineOfSight } from "../Player.svelte";
 
 	export let item: MapItem;
 	export let offset: number;
 	export let section: number;
 
-	const localPosition = getRealPositionFromLocalPosition({ x: offset, z: section });
+	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
 	const state = enemyState({
-		position: { x: -localPosition.x, z: -localPosition.z },
+		position: { x: -position.x, z: -position.z },
 		state: "idle"
 	});
 	const tween = state.tween;
@@ -127,26 +129,34 @@
 		if ($state.state === "dead") return stateLoop.stop();
 		const elapsed = now - startFrame;
 
-		if (elapsed > 1000) {
+		if (elapsed > 1000 + rand.rnd()) {
 			if (busy) return;
+
 			await tick();
 			busy = true;
 			startFrame = now;
 
 			const lastSeen = playerLastSeenAt;
 			const distance = getDistanceFromPoints(
-				{ x: -$PlayerState.position.x, z: -$PlayerState.position.z },
+				{ x: 1 - $PlayerState.position.x, z: 1 - $PlayerState.position.z },
 				$state.position
 			);
 
 			const seen = isVisibleToPlayer(getPosition(), 45);
 			if (seen) {
-				if (distance > 250 && distance < 750 && Math.random() < 0.5) {
-					if (!playerJustSeen) {
-						playerJustSeen = true;
-						audioManager.play("halt");
-					}
+				const playerPosition = getLocalPositionFromRealPosition({
+					x: 1 - $PlayerState.position.x,
+					z: 1 - $PlayerState.position.z
+				});
+				const ourPosition = getLocalPositionFromRealPosition(getPosition());
 
+				if (!testLineOfSight($CurrentLevel, ourPosition, playerPosition)) return;
+				if (!playerJustSeen) {
+					playerJustSeen = true;
+					audioManager.play("halt");
+				}
+
+				if (distance > 250 && distance < 750 && Math.random() < 0.5) {
 					previousAnimationState = "walk";
 					await tick();
 					return state
@@ -165,10 +175,12 @@
 					busy = false;
 					return;
 				} else {
+					if (distance > 1000) playerJustSeen = false;
 					previousAnimationState = "idle";
 					state.setState("idle");
 				}
 			} else {
+				if (distance > 1000) playerJustSeen = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
 			}
@@ -210,20 +222,19 @@
 		position: absolute;
 
 		backface-visibility: hidden;
-		// transform: translateY(-50%);
-		// image-rendering: crisp-edges;
 		top: 0%;
 		// bottom: 0;
-		top: 0;
+		top: 0px;
 		background-repeat: no-repeat !important;
 	}
 	.sprite.enemy.guard {
-		height: 100px;
-		width: 75px;
-		background: url(./guard.png) left center;
-		background-size: 1262.5px;
+		height: 64px;
+		width: 64px;
+		background: url(./guard.png);
+		background-size: 832px;
 		image-rendering: pixelated;
 		// background-origin: center;
+		will-change: transform;
 		&.idle {
 			background-position-x: 0px;
 		}
@@ -231,16 +242,16 @@
 			animation: walk 1.1s steps(1) infinite;
 			@keyframes walk {
 				0% {
-					background-position-x: 8%;
+					background-position-x: -64px;
 				}
 				25% {
-					background-position: 16%;
+					background-position: -128px;
 				}
 				50% {
-					background-position: 24%;
+					background-position: -192px;
 				}
 				75% {
-					background-position: 33%;
+					background-position: -256px;
 				}
 			}
 		}
@@ -268,21 +279,22 @@
 
 		&.hurt {
 			animation: hurt steps(1) 0.1s;
-			background-position: 74%;
+			background-position: -576px !important;
 			@keyframes hurt {
 				50% {
-					background-position: 74% !important;
+					background-position: -576px;
 				}
 			}
 		}
 		&.attack {
-			animation: attack 1.1s steps(1) infinite;
+			animation: attack 1.1s steps(1);
+			// background-position: 128px;
 			@keyframes attack {
 				0% {
-					background-position: 92%;
+					background-position: -704px;
 				}
 				50% {
-					background-position: 100%;
+					background-position: -768px;
 				}
 			}
 		}

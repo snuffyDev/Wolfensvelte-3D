@@ -30,7 +30,7 @@ export interface IPlayerState {
 }
 
 const CONSTANTS = {
-	speed: 12
+	speed: 10
 } as const;
 
 function _playerState() {
@@ -42,8 +42,8 @@ function _playerState() {
 			shotgun: { acquired: false, ammo: null }
 		},
 		score: 0,
-		position: { x: 2950, z: 4711, y: 0 },
-		rotation: { x: 0, y: -90, z: 0 }
+		position: { x: 1794, z: 3008, y: 0 },
+		rotation: { x: 0, y: 270, z: 0 }
 	};
 	const { subscribe, set, update } = writable<IPlayerState>(state);
 
@@ -149,8 +149,8 @@ function _playerState() {
 			const { rotation } = state;
 			const angleToRotateTo =
 				direction === "left"
-					? (-0.725 * CONSTANTS.speed) / Math.PI
-					: (0.725 * CONSTANTS.speed) / Math.PI;
+					? Math.sin(-0.825 * Math.PI) * CONSTANTS.speed
+					: Math.sin(0.825 * Math.PI) * CONSTANTS.speed;
 
 			rotation.y += angleToRotateTo;
 			rotation.y = rotation.y % 360;

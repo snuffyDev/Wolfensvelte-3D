@@ -52,7 +52,6 @@ export function enemyState(init?: Partial<EnemyState>) {
 				z: position.z + current.z
 			};
 
-
 			const playerPosition = getLocalPositionFromRealPosition(toMove);
 			const ourPosition = getLocalPositionFromRealPosition(state.position);
 
@@ -62,12 +61,14 @@ export function enemyState(init?: Partial<EnemyState>) {
 			update((u) => ({ ...u, state: state.state }));
 			for (const path of paths) {
 				state.state = "walk";
+				const current = state.position;
+				if (CurrentLevel.checkCollisionWithWorld(path)) continue;
 				const realPosition = getRealPositionFromLocalPosition(path);
 				const tX = 1 - realPosition.x;
 				const tZ = 1 - realPosition.z;
 
 				const distance = getDistanceFromPoints(current, toMove);
-				await tSet({ x: tX, z: tZ }, { duration: distance * 1.325 }).then(() => {
+				await tSet({ x: tX, z: tZ }, { duration: distance * 2.325 }).then(() => {
 					state.position = { x: tX, z: tZ };
 					update((u) => ({ ...u, position: { x: tX, z: tZ } }));
 				});
@@ -79,9 +80,8 @@ export function enemyState(init?: Partial<EnemyState>) {
 			update((u) => ({ ...u, state: "hurt" }));
 
 			if (typeof n !== "number") {
-				n = Math.min(22, Math.max(36, rand.rnd() / 8));
+				n = Math.min(30, Math.max(38, rand.rnd() / 8));
 			}
-			update((u) => ({ ...u, state: "hurt" }));
 
 			state.health -= n;
 
@@ -109,7 +109,7 @@ export function enemyState(init?: Partial<EnemyState>) {
 
 type Path = Array<Position2D>;
 
-function findPath(start: Position2D, end: Position2D): Path | null {
+export function findPath(start: Position2D, end: Position2D): Path | null {
 	const queue: Array<Position2D> = [start];
 	const visited: Array<string> = [getKey(start)];
 
