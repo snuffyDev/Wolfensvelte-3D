@@ -134,21 +134,25 @@
 	}
 	.game-container {
 		display: grid;
-		position: relative;
+		position: absolute;
+		overflow: hidden;
 		min-height: 100%;
+		// will-change: transform;
 		// will-change: none;
-		// contain: layout;
-		// max-width: 100%;
-		// width: 100%;/
-		grid-template-rows: 1fr 4em;
+		contain: content;
+		max-width: 100%;
+		width: 100%;
+		// /grid-template-rows: 1fr 4em;
 	}
 	.level {
 		will-change: transform;
-		transform: translateZ(0px);
+		contain: content;
+
+		// transform: translateZ(0px);
 		transform-style: preserve-3d;
 		backface-visibility: hidden;
 		position: absolute;
-		overflow: visible;
+		overflow: hidden;
 		inset: 0;
 	}
 	.ui {

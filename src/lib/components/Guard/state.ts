@@ -62,11 +62,11 @@ export function enemyState(init?: Partial<EnemyState>) {
 
 			state.state = "walk";
 			update((u) => ({ ...u, state: state.state }));
+			console.log(paths);
 			for (const path of paths) {
+				console.log(path);
 				state.state = "walk";
 				update((u) => ({ ...u, state: state.state }));
-
-				const current = state.position;
 
 				// Current path point is blocked by something, skip to next just in case.
 				if (CurrentLevel.checkCollisionWithWorld(path)) continue;
@@ -76,13 +76,13 @@ export function enemyState(init?: Partial<EnemyState>) {
 				const tX = 1 - realPosition.x;
 				const tZ = 1 - realPosition.z;
 
-				const distance = getDistanceFromPoints(current, { x: tX, z: tZ });
-
 				await tSet({ x: tX, z: tZ }, { duration: 768 }).then(() => {
 					state.position = { x: tX, z: tZ };
 					update((u) => ({ ...u, position: { x: tX, z: tZ } }));
 				});
 			}
+			state.state = "idle";
+			update((u) => ({ ...u, ...state }));
 		},
 		async giveDamage(n?: number) {
 			const previousState = state.state;
@@ -98,6 +98,7 @@ export function enemyState(init?: Partial<EnemyState>) {
 				state.state = "dead";
 				PlayerState.givePoints(100);
 			}
+			await tick();
 			update((u) => ({ ...u, health: state.health, state: previousState }));
 		},
 		setState(targetState: EnemyState["state"]) {

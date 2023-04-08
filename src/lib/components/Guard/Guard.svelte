@@ -20,7 +20,7 @@
 			x: -a.x,
 			z: -a.z
 		});
-		const moveTo = { x: 1 - (a.x + b.x + x) + x * 2, z: 1 - (a.z + b.z + y) + y * 2 };
+		const moveTo = { x: 1 - (a.x + b.x + x) + x, z: 1 - (a.z + b.z + y) + y };
 
 		return moveTo;
 	}
@@ -90,10 +90,9 @@
 		if ($state.state === "dead") return stateLoop.stop();
 		const elapsed = now - startFrame;
 
-		if (elapsed > 1000 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
+		if (elapsed > 850 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
 			if (busy) return;
 
-			await tick();
 			busy = true;
 			startFrame = now;
 
@@ -120,17 +119,17 @@
 					audioManager.play("halt");
 				}
 
-				if (distance > 250 && distance < 750 && rand.randomInRange(0.5, 1.5) > 0.45) {
-					previousAnimationState = "walk";
+				if (distance > 250 && distance < 850 && rand.randomInRange(0.5, 1.5) > 0.45) {
 					await tick();
-					await state.moveTo(
+					previousAnimationState = "walk";
+					state.moveTo(
 						getPositionFromDistance(
 							{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
 							$state.position
 						)
 					);
 					busy = false;
-				} else if (distance >= 125 && distance < 720 && Math.random() < 0.4) {
+				} else if (distance >= 85 && distance < 720 && Math.random() < 0.2) {
 					await tween.cancel();
 					await tick();
 
@@ -138,9 +137,7 @@
 					previousAnimationState = "attack";
 					state.setState("attack");
 
-					await tick();
-					busy = false;
-					return;
+					// return;
 				} else {
 					await tick();
 					if (distance > 1000) playerJustSeen = false;
@@ -152,9 +149,10 @@
 				if (distance > 1000) playerJustSeen = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
+				busy = false;
 			}
-			busy = false;
 		}
+		busy = false;
 	});
 
 	onMount(() => {

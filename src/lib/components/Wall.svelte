@@ -101,9 +101,8 @@
 
 <style>
 	.wall {
-		visibility: inherit;
 		height: var(--height);
-		will-change: visibility;
+		contain: content;
 		background-image: var(--img);
 		/* top: 0%; */
 		background-size: 64px;

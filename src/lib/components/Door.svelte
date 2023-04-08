@@ -142,9 +142,9 @@
 			transform-style: preserve-3d;
 			// transition: inherit;
 			// backface-visibility: hidden;
-			transform: translate3d(0, 0%, -4px);
+			transform: translate3d(0, 0%, -8px);
 			&:nth-child(2) {
-				transform: translateZ(4px);
+				transform: translateZ(8px);
 			}
 			// background-color: slategray;
 			width: 64px;
@@ -161,10 +161,10 @@
 			position: inherit;
 
 			// inset: 0;
-			width: 8px;
+			width: 16px;
 			height: 100%;
 			// right: 0;
-			will-change: transform;
+			// will-change: transform;
 			// transform-origin: center;
 			background: darkcyan;
 			top: 0;

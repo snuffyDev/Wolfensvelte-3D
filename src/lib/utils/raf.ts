@@ -7,32 +7,34 @@ const asyncTasks = new Set<(now: number) => Promise<void>>();
  * Why a single frameloop? Imagine the map, each enemy, the player, etc. all calling RAF individually... Yeah, no bueno.
  */
 export const frameLoop = requestFrame();
-const yieldMicrotask = () => new Promise<void>((r) => queueMicrotask(r));
+
 function requestFrame() {
 	let frame: number;
 	let running = false;
-	let lastTs: number;
-	const run = async () => {
-		let then = performance.now();
+	let then: number;
+	const run = (now: number) => {
+		if (!then) then = now;
 		const interval = 1000 / 30;
 		let delta = 0;
-		while (running) {
-			const now = await new Promise(requestAnimationFrame);
-			if (now - then < interval - delta) {
-				continue;
-			}
-			delta = Math.min(interval, delta + now - then - interval);
-			then = now;
-			// render code
-			const asyncTasks = [];
+		if (now - then < interval - delta) {
+			if (frame) cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(run);
 
-			for (const it of tasks.values()) {
-				const r = it(now);
-				if (r?.then) asyncTasks.push(r);
-			}
-			await Promise.race(asyncTasks);
-			await yieldMicrotask();
+			return;
 		}
+		delta = Math.min(interval, delta + now - then - interval);
+		// if (frame) cancelAnimationFrame(frame);
+		// render code
+		// const asyncTasks = [];
+
+		// await Promise.race(asyncTasks);
+		for (const it of tasks.values()) {
+			it(now);
+			// await yieldMicrotask();
+		}
+		then = now;
+		frame = requestAnimationFrame(run);
+		// frame = requestAnimationFrame(run);
 	};
 
 	return {
@@ -43,7 +45,7 @@ function requestFrame() {
 				tasks.add(cb);
 				if (!running) {
 					running = true;
-					frame = requestAnimationFrame(run);
+					requestAnimationFrame(run);
 				}
 				return this;
 			},

@@ -97,7 +97,7 @@ function _playerState() {
 			update((u) => {
 				return {
 					...u,
-					...state
+					position: state.position
 				};
 			});
 		},
