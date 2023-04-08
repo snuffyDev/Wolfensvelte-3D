@@ -39,7 +39,6 @@
 	import type Guard from "./Guard/Guard.svelte";
 	import { AudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
-	import { findPath } from "./Guard/state";
 	import type { MapItem, World } from "$lib/types/core";
 	import type { Position2D } from "$lib/types/position";
 	import { CurrentLevel } from "./Level.svelte";
@@ -60,7 +59,6 @@
 	const audioManager = new AudioManager({ pistol: new URL(PistolURL, import.meta.url).toString() });
 
 	let cssText = ``;
-
 	const f = frameLoop.add(() => {
 		const { x: a, y: b, z: c } = $PlayerState.rotation;
 
@@ -255,38 +253,12 @@
 </div>
 
 <style lang="scss">
-	.ray {
-		position: absolute;
-		transform-style: preserve-3d;
-		transform: translate3d(0px, 90px, 30px);
-		inset: 0;
-		width: 200px;
-		height: 200px;
-
-		background: red;
-	}
-	.left {
-		left: -50%;
-		top: 50%;
-	}
-	.right {
-		right: -50%;
-		top: 50%;
-	}
-	.center {
-		top: 50%;
-		left: 50%;
-	}
-	.player-hitbox {
-		border: 23px solid red;
-	}
-
 	.player-gun {
-		position: absolute;
+		position: fixed;
 		// top: 0;
 		bottom: 0;
 		margin: 0 auto;
-		z-index: 1;
+		z-index: 1000;
 		left: 0;
 		max-width: 24.125rem;
 		right: 0;
@@ -300,7 +272,7 @@
 	}
 	.player-gun::after {
 		content: "";
-		position: absolute;
+		position: fixed;
 		width: 24.125rem;
 		height: 24.125rem;
 		// inset: 0;
@@ -312,6 +284,7 @@
 		// transform: translateX(-80%);
 		transition-delay: 0s;
 
+		z-index: 1000;
 		// animation: unset;
 	}
 	.moving {
@@ -348,15 +321,13 @@
 	#camera,
 	#world {
 		position: fixed;
-		perspective: var(--perspective);
+		// perspective: var(--perspective);
 		inset: 0;
 		transform: translateZ(0);
 		// transform: translate3d(, -50%, -640px);
-		// contain: content size layout;
 		transform-style: preserve-3d;
 		will-change: transform;
 	}
-
 	#camera {
 		will-change: transform;
 		// contain: layout;

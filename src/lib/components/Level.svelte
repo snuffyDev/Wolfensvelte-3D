@@ -1,5 +1,3 @@
-<svelte:options immutable={true} />
-
 <script
 	context="module"
 	lang="ts"
@@ -59,19 +57,14 @@
 
 	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
-	import Guard, { rand } from "$lib/components/Guard/Guard.svelte";
+	import Guard from "$lib/components/Guard/Guard.svelte";
 	import Player from "$lib/components/Player.svelte";
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { Entity, MapItem, Texture, World } from "../types/core";
+	import type { World } from "../types/core";
 	import { compare } from "../utils/compare";
-	import {
-		getAngleBetweenPoints,
-		isAngleBetween,
-		isVisibleToPlayer,
-		normalizeAngle
-	} from "../utils/angle";
+	import { isVisibleToPlayer } from "../utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
 	import { noClipObjectIds } from "$lib/utils/engine/objects";
 
@@ -90,7 +83,7 @@
 
 			const pos = model.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(model, 30);
+			const visible = isVisibleToPlayer(model, 90);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
@@ -107,7 +100,7 @@
 
 			const pos = wall.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(wall, 30);
+			const visible = isVisibleToPlayer(wall, 90);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
@@ -123,59 +116,12 @@
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
 	}
 
-	function findConnectedRenderableMapItems(world: World): MapItem[][] {
-		const connectedMapItems: MapItem[][] = [];
-		const visited: Set<string> = new Set();
-
-		// Define a recursive DFS helper function
-		function dfs(x: number, y: number, currentItems: MapItem[]): void {
-			const item = world[x][y];
-			if (!visited.has(`${x},${y}`) && item?.surfaces) {
-				visited.add(`${x},${y}`);
-				currentItems.push(item);
-
-				// Recursively explore neighboring tiles
-				if (x > 0) dfs(x - 1, y, currentItems);
-				if (x < world.length - 1) dfs(x + 1, y, currentItems);
-				if (y > 0) dfs(x, y - 1, currentItems);
-				if (y < world[x].length - 1) dfs(x, y + 1, currentItems);
-			}
-		}
-
-		// Iterate over all tiles in the world
-		for (let x = 0; x < world.length; x++) {
-			const row: MapItem[] = [];
-			for (let y = 0; y < world[x].length; y++) {
-				if (
-					!visited.has(`${x},${y}`) &&
-					(typeof world[x][y].model === "object" || world[x][y].surfaces)
-				) {
-					const currentItems: MapItem[] = [];
-					dfs(x, y, currentItems);
-				}
-				if (
-					world[x][y] &&
-					(typeof world[x][y].model === "object" || world[x][y].surfaces !== null)
-				) {
-					row.push(world[x][y]);
-				} else {
-					row.push({ surfaces: null, rotation: undefined });
-				}
-			}
-			connectedMapItems.push(row.filter((item) => item));
-		}
-		connectedMapItems;
-		return connectedMapItems;
-	}
 	onMount(() => {
 		worldRef = document.getElementById("world")!;
 		CurrentLevel.set(level);
-		console.log($CurrentLevel);
 
 		gameLoop.start();
-		setTimeout(() => {
-			console.log(worldRef.childNodes.length);
-		}, 7500);
+
 		return () => {
 			gameLoop.stop();
 			frameLoop.dispose();
@@ -233,99 +179,29 @@
 	{/if}
 </div>
 
-<style
-	lang="scss"
-	global
-	x
->
+<style lang="scss">
 	#scene {
 		width: 100%;
-		/* height: 100%; */
 		perspective: calc(var(--perspective));
 		inset: 0;
 		overflow: hidden;
 		backface-visibility: hidden;
-		position: absolute;
+		position: fixed;
 		transform-style: preserve-3d;
-		// background-color: rgb(50, 50, 50); /* Sky texture */
-	}
-	*,
-	*::before,
-	*::after {
-		box-sizing: border-box;
-	}
-	.floor {
-		min-width: 100%;
-		height: 100%;
-		background-color: rgb(104, 104, 104);
-		backface-visibility: hidden;
-		position: fixed;
-		// inset: 0;
-		// bottom: 0;
-		top: 0;
-		transform: scale3d(64, 1, 64) translateY(-300px) rotateX(90deg);
-		backface-visibility: hidden;
 	}
 
-	html,
-	body {
-		margin: 0;
-		padding: 0;
-		backface-visibility: hidden;
-		width: 100%;
-		position: fixed;
-
-		height: 100%;
-	}
-
-	html,
-	body {
-		margin: 0;
-		padding: 0;
-		width: 100%;
-		height: 100%;
-		transform-style: preserve-3d !important;
-		position: absolute !important;
-		// inset: 0;
-	}
-	#scene {
-		width: 100%;
-		/* height: 100%; */
-		perspective: var(--perspective);
-		overflow: hidden;
-		backface-visibility: hidden;
-
-		/* Sky texture */
-		background-size: cover;
-	}
-
-	#camera,
 	#world {
 		position: absolute;
 		top: 50% !important;
 		left: 50% !important;
 		/* // transform-origin: center; */
 		inset: 0;
+		// overflow: hidden;
 
 		backface-visibility: hidden;
 		will-change: transform;
 		width: 100%;
 		height: 100%;
 		transform-style: preserve-3d;
-	}
-	.wall,
-	.floor {
-		/* left: 50%; */
-		top: 50%;
-		backface-visibility: hidden !important;
-
-		font-family: sans-serif;
-		font-size: 3em;
-		text-align: center;
-		line-height: 300px;
-
-		/* How to treat the textures */
-		background-size: 100%;
-		background-repeat: repeat;
 	}
 </style>

@@ -1,11 +1,9 @@
 import type { Position, Position2D } from "$lib/types/position";
 import { writable } from "svelte/store";
 import { CurrentLevel } from "../components/Level.svelte";
-import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "../utils/position";
-import { frameLoop } from "../utils/raf";
-import Guard, { rand } from "../components/Guard/Guard.svelte";
-import { GameObjects } from "$lib/utils/manager";
-import { isVisibleToPlayer } from "$lib/utils/angle";
+import { getLocalPositionFromRealPosition } from "../utils/position";
+import type Guard from "../components/Guard/Guard.svelte";
+import { rand } from "$lib/utils/engine";
 
 export const PlayerState = _playerState();
 
@@ -19,7 +17,7 @@ export type PlayerControls = {
 	shift: boolean;
 };
 
-export type Weapons = "pistol" | "knife" | "shotgun";
+export type Weapons = "pistol" | "knife" | "smg";
 
 export interface IPlayerState {
 	health: number;
@@ -30,7 +28,7 @@ export interface IPlayerState {
 }
 
 const CONSTANTS = {
-	speed: 10
+	speed: 6.41
 } as const;
 
 function _playerState() {
@@ -39,7 +37,7 @@ function _playerState() {
 		weapons: {
 			knife: { acquired: true, ammo: null },
 			pistol: { acquired: true, ammo: 8 },
-			shotgun: { acquired: false, ammo: null }
+			smg: { acquired: false, ammo: null }
 		},
 		score: 0,
 		position: { x: 1794, z: 3008, y: 0 },
@@ -55,7 +53,7 @@ function _playerState() {
 		},
 		takeDamage(n?: number | undefined) {
 			if (typeof n !== "number") {
-				n = Math.min(11, Math.max(14, rand.rnd() / 6));
+				n = Math.min(10, Math.abs(~~(rand.nextInt() / 0xbcbcfcb)));
 			}
 			state.health -= n;
 			update((u) => ({ ...u, health: state.health }));
@@ -79,13 +77,6 @@ function _playerState() {
 			}
 			if (input.leftarrow) this.rotate("left");
 			if (input.rightarrow) this.rotate("right");
-
-			update((u) => {
-				return {
-					...u,
-					...state
-				};
-			});
 
 			// state.canMove = canMove = true;
 		},
@@ -149,11 +140,11 @@ function _playerState() {
 			const { rotation } = state;
 			const angleToRotateTo =
 				direction === "left"
-					? Math.sin(-0.825 * Math.PI) * CONSTANTS.speed
-					: Math.sin(0.825 * Math.PI) * CONSTANTS.speed;
+					? Math.sin(-0.75 * Math.PI) * CONSTANTS.speed
+					: Math.sin(0.75 * Math.PI) * CONSTANTS.speed;
 
-			rotation.y += angleToRotateTo;
-			rotation.y = rotation.y % 360;
+			rotation.y += +angleToRotateTo;
+			rotation.y = +(rotation.y % 360).toFixed(3);
 			update((u) => ({ ...u, rotation: state.rotation }));
 		},
 

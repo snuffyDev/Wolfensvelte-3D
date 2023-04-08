@@ -34,7 +34,9 @@
 	$: rotation = 0;
 	$: console.log(rotation);
 
-	$: {
+	onMount(() => {
+		let interval;
+
 		try {
 			const isLeftRight =
 				compare(
@@ -57,10 +59,7 @@
 			if (isLeftRight) rotation = 0;
 			else if (isTopBottom) rotation = 90;
 		} catch {}
-	}
 
-	onMount(() => {
-		let interval;
 		interval = setInterval(
 			function cb() {
 				state = state === "open" ? "closed" : "open";
@@ -81,7 +80,7 @@
 				} else {
 					currentState.position = { x: offset, z: section };
 				}
-				$CurrentLevel[section][offset] = { ...currentState };
+				$CurrentLevel[section][offset] = currentState;
 				// }
 				clearInterval(interval);
 				interval = setInterval(cb, state === "closed" ? 1500 : 6000);
@@ -97,18 +96,12 @@
 
 <svelte:window
 	on:keydown={(e) => {
-		if (e.key === "Space" && isMouseOver) {
+		if (e.key === " " && isMouseOver) {
 			state = state === "open" ? "closed" : "open";
 		}
 	}}
 />
 <div
-	on:pointerover={() => {
-		isMouseOver = true;
-	}}
-	on:pointerleave={() => {
-		isMouseOver = false;
-	}}
 	class="door {state}"
 	style="visibility: {visibility
 		? 'visible'
@@ -137,7 +130,7 @@
 		top: 0;
 		left: 0;
 		right: 0;
-		contain: layout size style;
+		// contain: layout size style;
 		will-change: transform, visibility;
 		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
 
@@ -149,9 +142,9 @@
 			transform-style: preserve-3d;
 			// transition: inherit;
 			// backface-visibility: hidden;
-			transform: translate3d(0, 0%, -8px);
+			transform: translate3d(0, 0%, -4px);
 			&:nth-child(2) {
-				transform: translateZ(8px);
+				transform: translateZ(4px);
 			}
 			// background-color: slategray;
 			width: 64px;

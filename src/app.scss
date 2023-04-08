@@ -1,17 +1,18 @@
+*::before,
+*::after,
+* {
+	box-sizing: border-box;
+	// contain: auto
+	margin: 0;
+	padding: 0;
+}
 :root {
 	--perspective: 1000px;
 	transform-style: flat;
 	font-size: 16px;
 	user-select: none;
 }
-*::before,
-*::after,
-* {
-	box-sizing: border-box;
-	// contain: auto;
-	margin: 0;
-	padding: 0;
-}
+
 .container {
 	display: flex;
 	flex-direction: column;
@@ -19,15 +20,18 @@
 	max-width: 82%;
 	width: 100%;
 }
+
 p {
 	margin: 0.25em 0 0.25em 0;
 }
+
 html,
 body {
 	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
 		Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-	background-color: rgb(52, 52, 52);
-	position: absolute;
+	background-color: rgb(52, 52, 52) !important;
+	color: white;
+	position: fixed;
 	inset: 0;
 	overflow: hidden;
 	margin: 0;
@@ -38,8 +42,8 @@ body {
 	transform-style: preserve-3d;
 	position: fixed;
 
-	width: 65px;
-	height: 65px;
+	width: 64px;
+	height: 64px;
 	transform-origin: top left;
 	will-change: visibility;
 	backface-visibility: hidden;
@@ -47,14 +51,14 @@ body {
 
 .hidden {
 	display: none;
-	content-visibility: hidden;
+	// content-visibility: hidden;
 	visibility: hidden;
 }
 
 .wall {
 	position: fixed;
-	width: 65px;
-	height: 65px;
+	width: 64px;
+	height: 64px;
 	will-change: visibility;
 	// isolation: auto;
 	// overflow: hidden;
@@ -81,8 +85,30 @@ body {
 		// background-position-x: 51px;
 	}
 }
+
+.wall,
+.floor {
+	// top: 50%;
+	backface-visibility: hidden !important;
+
+	font-family: sans-serif;
+	font-size: 3em;
+	text-align: center;
+	line-height: 300px;
+
+	background-size: 100%;
+	background-repeat: repeat;
+}
+
 .floor {
 	position: fixed;
 	// overflow: hidden;
+	width: 4096px;
+	height: 4096px;
+	backface-visibility: hidden;
+	min-width: 100%;
+
+	background-color: rgb(104, 104, 104) !important;
+	transform: scale3d(64, 1, 64) rotateX(90deg);
 	backface-visibility: hidden;
 }

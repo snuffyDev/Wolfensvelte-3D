@@ -105,6 +105,7 @@
 		height: var(--height);
 		will-change: visibility;
 		background-image: var(--img);
+		/* top: 0%; */
 		background-size: 64px;
 		backface-visibility: hidden !important;
 		image-rendering: pixelated;

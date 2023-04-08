@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { dev } from "$app/environment";
+	import { page } from "$app/stores";
 	import { PlayerState } from "$lib/stores/player";
+	import { frameLoop } from "$lib/utils/raf";
+	import { onDestroy, onMount } from "svelte";
 
 	let SECTIONS = [
 		["Floor", 1],
@@ -12,6 +15,28 @@
 		["", ""],
 		["Gun", "[insert gun here]"]
 	];
+	const FACE_MAP = $page.data.FACES;
+	let PORTRAIT_STATE: keyof typeof FACE_MAP & string = "full";
+	let CURRENT_IDX: number = 0;
+
+	$: PORTRAIT_STATE =
+		$PlayerState.health > 0 ? $page.data.FACE_KEYS[Math.floor($PlayerState.health / 15)] : "dead";
+
+	let start: number | null = null;
+
+	const loop = frameLoop.add(async (now) => {
+		if (!start) start = now;
+		const elapsed = now - start;
+
+		if (elapsed >= 1500) {
+			start = now;
+			CURRENT_IDX = (CURRENT_IDX + 1) % 3;
+		}
+	});
+
+	onMount(() => {
+		loop.start();
+	});
 </script>
 
 {#if dev}
@@ -32,8 +57,23 @@
 			<span>{$PlayerState.score}</span>
 		</div>
 		<div class="col">
+			<b>Lives</b>
+			<span>{$PlayerState.score}</span>
+		</div>
+		<div class="col">
+			<div
+				role="img"
+				class="portrait {PORTRAIT_STATE}"
+				style={FACE_MAP[PORTRAIT_STATE][CURRENT_IDX]}
+			/>
+		</div>
+		<div class="col">
 			<b>Health</b>
 			<span>{$PlayerState.health}</span>
+		</div>
+		<div class="col">
+			<b>Ammo</b>
+			<span>{$PlayerState.weapons.pistol?.ammo}</span>
 		</div>
 	</div>
 	<!-- <div /> -->
@@ -41,23 +81,41 @@
 </div>
 
 <style lang="scss">
+	$FACES: (full, low_hp, beat_up, dying, near_death, hurt, dead);
+	.portrait {
+		position: relative;
+		inset: 0;
+		background-size: contain;
+		background-repeat: no-repeat;
+		background-image: var(--img);
+		max-height: 4rem;
+		justify-self: center;
+		height: 4rem;
+		min-height: 100%;
+		width: 100%;
+		// max-width: 4rem;
+	}
 	.stats {
 		margin: 0 auto;
 		// display: grid;
+		display: grid;
+		grid-template-columns: 5rem 7rem 5rem 3rem 5rem 5rem;
 		// grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 0.1fr 2fr;
-		display: flex;
+		// display: flex;
+		// flex: 1 1 auto;
 		max-width: 80dvh;
 		width: 100%;
 		// ju-items: center;
+
 		gap: 0.5em;
 		margin: 0 auto;
 		justify-items: space-around;
 		> :not(:first-child) {
-			margin-left: 0.5em;
+			// margin-left: 0.5em;
 		}
 		> :not(:last-child) {
 			// margin-right: 0em;
-			margin-right: 0.5em;
+			// margin-right: 0.5em;
 		}
 		> :nth-last-child(2) {
 			margin: 0em;
@@ -65,12 +123,19 @@
 		}
 	}
 	.col {
-		display: inline-flex;
-		flex-direction: column;
+		display: inline-grid;
+		grid-template-columns: 1fr;
+		grid-template-rows: 0.1fr 0.5fr;
 		// grid-template-rows: 1fr 2fr;
 		font-size: 1em;
 		// max-width: 100%;
+		max-height: 4rem;
+		position: relative;
 		width: 100%;
+		// flex: 1 0 auto;
+		// max-width: 5rem;
+		justify-content: center;
+		min-width: 1rem;
 		font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
 		&:not(:nth-last-child(2)) {
 			// width: 100%;
@@ -89,13 +154,15 @@
 		bottom: 0;
 		text-align: center;
 		display: grid;
-		grid-template-columns: 1fr;
+		// grid-template-columns: 2rem 4rem 3rem 2rem 3rem 3rem;
+		// grid-template-columns: 1fr;
 		align-items: center;
 		// font-size: 0.1rem;
 		justify-content: center;
 		// grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
 		// grid-auto-flow: row dense;
-		// place-content: center;
+		place-content: center;
+		// flex: 1 1;
 		// max-width: 100%;
 		width: 100%;
 		color: white;

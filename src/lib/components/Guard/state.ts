@@ -8,10 +8,11 @@ import {
 	getRealPositionFromLocalPosition
 } from "../../utils/position";
 import { CurrentLevel } from "../Level.svelte";
-import { rand } from "./Guard.svelte";
+import { rand } from "$lib/utils/engine";
 import { tick } from "svelte";
+import { findPath } from "$lib/helpers/ai";
 
-interface EnemyState extends IPlayerState {
+interface EnemyState extends Omit<IPlayerState, "score" | "rotation" | "position"> {
 	playerIsVisible: boolean;
 	state: "dead" | "idle" | "walk" | "attack" | "hurt";
 	position: Position2D;
@@ -20,7 +21,7 @@ interface EnemyState extends IPlayerState {
 
 export function enemyState(init?: Partial<EnemyState>) {
 	const state: EnemyState = {
-		health: 100,
+		health: 25,
 		playerIsVisible: false,
 		position: { x: 0, z: 0 },
 		rotation: { y: 0 },
@@ -55,32 +56,40 @@ export function enemyState(init?: Partial<EnemyState>) {
 			const playerPosition = getLocalPositionFromRealPosition(toMove);
 			const ourPosition = getLocalPositionFromRealPosition(state.position);
 
+			// Get the shortest (unblocked) path to the player
 			const paths = findPath(ourPosition, playerPosition);
 			if (!Array.isArray(paths)) return;
+
 			state.state = "walk";
 			update((u) => ({ ...u, state: state.state }));
 			for (const path of paths) {
 				state.state = "walk";
+				update((u) => ({ ...u, state: state.state }));
+
 				const current = state.position;
+
+				// Current path point is blocked by something, skip to next just in case.
 				if (CurrentLevel.checkCollisionWithWorld(path)) continue;
+
 				const realPosition = getRealPositionFromLocalPosition(path);
+
 				const tX = 1 - realPosition.x;
 				const tZ = 1 - realPosition.z;
 
-				const distance = getDistanceFromPoints(current, toMove);
-				await tSet({ x: tX, z: tZ }, { duration: distance * 2.325 }).then(() => {
+				const distance = getDistanceFromPoints(current, { x: tX, z: tZ });
+
+				await tSet({ x: tX, z: tZ }, { duration: 768 }).then(() => {
 					state.position = { x: tX, z: tZ };
 					update((u) => ({ ...u, position: { x: tX, z: tZ } }));
 				});
 			}
-			state.state = "idle";
-			update((u) => ({ ...u, state: state.state }));
 		},
 		async giveDamage(n?: number) {
+			const previousState = state.state;
 			update((u) => ({ ...u, state: "hurt" }));
 
 			if (typeof n !== "number") {
-				n = Math.min(30, Math.max(38, rand.rnd() / 8));
+				n = Math.abs(rand.randomInRange(7, 13));
 			}
 
 			state.health -= n;
@@ -89,91 +98,19 @@ export function enemyState(init?: Partial<EnemyState>) {
 				state.state = "dead";
 				PlayerState.givePoints(100);
 			}
-			update((u) => ({ ...u, health: state.health, state: state.state }));
+			update((u) => ({ ...u, health: state.health, state: previousState }));
 		},
 		setState(targetState: EnemyState["state"]) {
 			state.state = targetState;
-			queueMicrotask(() => {
-				update((u) => ({ ...u, state: state.state }));
-			});
 			if (state.state === "attack") {
-				if (Math.random() < 0.45) {
+				if (Math.random() < 0.7) {
 					tick().then(() => {
 						PlayerState.takeDamage();
 					});
 				}
 			}
+			update((u) => ({ ...u, state: state.state }));
 		}
 	};
 }
 
-type Path = Array<Position2D>;
-
-export function findPath(start: Position2D, end: Position2D): Path | null {
-	const queue: Array<Position2D> = [start];
-	const visited: Array<string> = [getKey(start)];
-
-	// A dictionary to store the previous position of each visited position
-	const previous: { [key: string]: Position2D } = {};
-
-	while (queue.length > 0) {
-		const current = queue.shift()!;
-		if (current.x === end.x && current.z === end.z) {
-			return getPath(previous, start, end);
-		}
-		const neighbors = getNeighbors(current);
-		for (const neighbor of neighbors) {
-			const key = getKey(neighbor);
-			if (!visited.includes(key)) {
-				visited.push(key);
-				previous[key] = current;
-				queue.push(neighbor);
-			}
-		}
-	}
-	return null;
-}
-
-function getKey(position: Position2D): string {
-	return `${position.x},${position.z}`;
-}
-
-function getPath(
-	previous: { [key: string]: Position2D },
-	start: Position2D,
-	end: Position2D
-): Path {
-	const path: Path = [];
-	let current = end;
-	while (!(current.x === start.x && current.z === start.z)) {
-		path.unshift(current);
-		current = previous[getKey(current)];
-	}
-	path.unshift(start);
-	return path;
-}
-
-function getNeighbors(position: Position2D): Array<Position2D> {
-	const neighbors = [];
-	const x = position.x;
-	const z = position.z;
-
-	if (x > 0 && !isBlocked(x - 1, z)) {
-		neighbors.push({ x: x - 1, z: z });
-	}
-	if (z > 0 && !isBlocked(x, z - 1)) {
-		neighbors.push({ x: x, z: z - 1 });
-	}
-	if (x < 64 - 1 && !isBlocked(x + 1, z)) {
-		neighbors.push({ x: x + 1, z: z });
-	}
-	if (z < 64 - 1 && !isBlocked(x, z + 1)) {
-		neighbors.push({ x: x, z: z + 1 });
-	}
-
-	return neighbors;
-}
-
-function isBlocked(x: number, z: number): boolean {
-	return !!CurrentLevel.checkCollisionWithWorld({ x, z });
-}
