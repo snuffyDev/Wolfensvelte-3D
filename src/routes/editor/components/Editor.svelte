@@ -261,6 +261,16 @@
 							TILE_MAP = [...TILE_MAP];
 						}}>Guard</button
 					>
+					<button
+						on:click={() => {
+							const [row, col] = selectedNode;
+							let ref = TILE_MAP[row][col].data;
+							ref = { ...ref, model: { component: "Dog" } };
+							TILE_MAP[row][col].data.model = { component: "Dog" };
+							TILE_MAP[row][col].data = { ...ref };
+							TILE_MAP = [...TILE_MAP];
+						}}>Dog</button
+					>
 				</div>
 
 				{#each Object.entries( { front: "Front", left: "Left", back: "Back", right: "Right" } ) as [edge, label]}

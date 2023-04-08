@@ -3,7 +3,6 @@ import { PlayerState, type IPlayerState } from "../../stores/player";
 import type { Position, Position2D } from "../../types/position";
 import { tweened } from "svelte/motion";
 import {
-	getDistanceFromPoints,
 	getLocalPositionFromRealPosition,
 	getRealPositionFromLocalPosition
 } from "../../utils/position";
@@ -12,14 +11,14 @@ import { rand } from "$lib/utils/engine";
 import { tick } from "svelte";
 import { findPath } from "$lib/helpers/ai";
 
-interface EnemyState extends Omit<IPlayerState, "score" | "rotation" | "position"> {
+export interface EnemyState extends Omit<IPlayerState, "score" | "rotation" | "position"> {
 	playerIsVisible: boolean;
 	state: "dead" | "idle" | "walk" | "attack" | "hurt";
 	position: Position2D;
 	rotation: Pick<Position, "y">;
 }
 
-export function enemyState(init?: Partial<EnemyState>) {
+export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: Partial<T>) {
 	const state: EnemyState = {
 		health: 25,
 		playerIsVisible: false,
@@ -49,37 +48,44 @@ export function enemyState(init?: Partial<EnemyState>) {
 			const current = state.position;
 
 			const toMove = {
-				x: position.x + current.x,
-				z: position.z + current.z
+				x: position.x + current.x - 1,
+				z: position.z + current.z - 1
 			};
 
 			const playerPosition = getLocalPositionFromRealPosition(toMove);
 			const ourPosition = getLocalPositionFromRealPosition(state.position);
 
 			// Get the shortest (unblocked) path to the player
-			const paths = findPath(ourPosition, playerPosition);
+			let paths = findPath(ourPosition, playerPosition);
 			if (!Array.isArray(paths)) return;
 
 			state.state = "walk";
 			update((u) => ({ ...u, state: state.state }));
-			console.log(paths);
+			console.log(paths, playerPosition);
+			let count = 0;
 			for (const path of paths) {
+				if (!path) return;
 				console.log(path);
 				state.state = "walk";
 				update((u) => ({ ...u, state: state.state }));
 
 				// Current path point is blocked by something, skip to next just in case.
-				if (CurrentLevel.checkCollisionWithWorld(path)) continue;
+				if (CurrentLevel.checkCollisionWithWorld(path)) {
+					if (count === 2) return;
+					count += 1;
+					console.log(CurrentLevel.get()[path.x][path.z]);
+					paths = findPath(ourPosition, playerPosition);
+					continue;
+				}
 
 				const realPosition = getRealPositionFromLocalPosition(path);
 
 				const tX = 1 - realPosition.x;
 				const tZ = 1 - realPosition.z;
 
-				await tSet({ x: tX, z: tZ }, { duration: 768 }).then(() => {
-					state.position = { x: tX, z: tZ };
-					update((u) => ({ ...u, position: { x: tX, z: tZ } }));
-				});
+				update((u) => ({ ...u, position: { x: tX, z: tZ } }));
+				await tSet({ x: tX, z: tZ }, { duration: 768 });
+				state.position = { x: tX, z: tZ };
 			}
 			state.state = "idle";
 			update((u) => ({ ...u, ...state }));

@@ -65,37 +65,39 @@
 		</div>
 	</div>
 {/if}
-{#if !hasAudioPerms && !dev}
-	<div class="center">
-		<div
-			style="color: white; background-color: black;max-width:40vw; max-height:30vh; width:100%;height:100%;"
-		>
-			<h1>Please click anywhere to allow audio</h1>
-			<h2 style="font-weight: 700;"><b>Controls</b></h2>
-			<p>WASD to move</p>
-			<p>Left/Right arrow keys to turn</p>
-			<p>Space to shoot</p>
+{#if !$isPlaying}
+	{#if !hasAudioPerms && !dev}
+		<div class="center">
+			<div
+				style="color: white; background-color: black;max-width:40vw; max-height:30vh; width:100%;height:100%;"
+			>
+				<h1>Please click anywhere to allow audio</h1>
+				<h2 style="font-weight: 700;"><b>Controls</b></h2>
+				<p>WASD to move</p>
+				<p>Left/Right arrow keys to turn</p>
+				<p>Space to shoot</p>
+			</div>
 		</div>
-	</div>
-{:else if !dev}
-	<div
-		class="center"
-		style="background-image: url({`${MenuImg}`});"
-	>
-		<button
-			on:click|once={() => {
-				const audio = new Audio(new URL(E1M1Music, import.meta.url).toString());
-				menuMusicPlayer.pause();
-				audio.autoplay = true;
-				audio.loop = true;
-				audio.volume = 0.5;
-				audio.play().then(() => {
-					audio.play();
-				});
-				isPlaying.set(true);
-			}}>Play Wolfensvelte 3D</button
+	{:else if !dev}
+		<div
+			class="center"
+			style="background-image: url({`${MenuImg}`});"
 		>
-	</div>
+			<button
+				on:click|once={() => {
+					const audio = new Audio(new URL(E1M1Music, import.meta.url).toString());
+					menuMusicPlayer.pause();
+					audio.autoplay = true;
+					audio.loop = true;
+					audio.volume = 0.5;
+					audio.play().then(() => {
+						audio.play();
+					});
+					isPlaying.set(true);
+				}}>Play Wolfensvelte 3D</button
+			>
+		</div>
+	{/if}
 {/if}
 
 <style lang="scss">

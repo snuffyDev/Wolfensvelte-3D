@@ -17,7 +17,10 @@
 			const tileZ = Math.round(z);
 
 			// Check if the tile at (tileX, tileZ) contains a MapItem
-			if (world[tileZ][tileX].model?.component === "Door" || world[tileZ][tileX].surfaces != null) {
+			if (
+				world[tileZ][tileX].model?.component !== "Door" &&
+				world[tileZ][tileX].surfaces !== null
+			) {
 				return false;
 			}
 
@@ -42,6 +45,7 @@
 	import type { MapItem, World } from "$lib/types/core";
 	import type { Position2D } from "$lib/types/position";
 	import { CurrentLevel } from "./Level.svelte";
+	import { noClipObjectIds } from "$lib/utils/engine";
 
 	const dispatch = createEventDispatcher<{ shoot: void }>();
 	let state: "shoot" | "idle" = "idle";

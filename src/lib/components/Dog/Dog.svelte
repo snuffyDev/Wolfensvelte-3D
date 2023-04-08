@@ -20,7 +20,7 @@
 			x: -a.x,
 			z: -a.z
 		});
-		const moveTo = { x: 1 - (a.x + b.x + x) + x, z: 1 - (a.z + b.z + y) + y };
+		const moveTo = { x: 1 - (a.x + b.x + x), z: 1 - (a.z + b.z + y) };
 
 		return moveTo;
 	}
@@ -38,13 +38,12 @@
 	import { onMount, tick } from "svelte";
 	import type { MapItem } from "../../types/core";
 	import { isVisibleToPlayer } from "../../utils/angle";
-	import { enemyState } from "./state";
-	import HaltSound from "$lib/sounds/guard_halt.WAV?url";
-	import ShootSound from "$lib/sounds/guard_shoot.WAV?url";
+	import BarkSound from "$lib/sounds/dog.WAV?url";
 	import { AudioManager } from "$lib/helpers/audio";
 	import { CurrentLevel } from "../Level.svelte";
 	import { testLineOfSight } from "../Player.svelte";
 	import { rand } from "$lib/utils/engine";
+	import { dogState } from "./state";
 
 	export let item: MapItem;
 	export let offset: number;
@@ -52,14 +51,13 @@
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
-	const state = enemyState({
+	const state = dogState({
 		position: { x: -position.x, z: -position.z },
 		state: "idle"
 	});
 
 	const audioManager = new AudioManager({
-		halt: new URL(HaltSound, import.meta.url).toString(),
-		shoot: new URL(ShootSound, import.meta.url).toString()
+		halt: new URL(BarkSound, import.meta.url).toString()
 	});
 
 	const tween = state.tween;
@@ -87,6 +85,7 @@
 	const stateLoop = frameLoop.add(async (now) => {
 		if (!startFrame) startFrame = now;
 		if (busy) return;
+		if ($state.state === "dead") return;
 		const elapsed = now - startFrame;
 
 		if (elapsed > 150 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
@@ -100,7 +99,7 @@
 				$state.position
 			);
 
-			const seen = isVisibleToPlayer(getPosition(), 45);
+			const seen = isVisibleToPlayer(getPosition(), 21);
 			if (seen) {
 				const playerPosition = getLocalPositionFromRealPosition({
 					x: 1 - $PlayerState.position.x,
@@ -118,27 +117,27 @@
 					audioManager.play("halt");
 				}
 
-				if (distance > 64 && distance < 750 && Math.abs(Math.random()) > 0.85) {
+				if (distance > 64 && distance < 850 && Math.abs(Math.random()) > 0.85) {
 					await tick();
 					previousAnimationState = "walk";
 					return state
 						.moveTo(
 							getPositionFromDistance(
-								{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
+								{ x: $PlayerState.position.x, z: $PlayerState.position.z },
 								$state.position
 							)
 						)
 						.finally(() => {
 							busy = false;
 						});
-				} else if (distance >= 55 && distance < 720 && Math.random() < 0.6) {
-					await tween.cancel();
+				} else if (distance >= 32 && distance < 150 && Math.random() < 0.6) {
 					await tick();
-
-					audioManager.play("shoot");
+					await tween.cancel();
 					previousAnimationState = "attack";
 					state.setState("attack");
 
+					// state.setState("attack");
+					busy = false;
 					// return;
 				} else {
 					await tick();
@@ -153,7 +152,7 @@
 				state.setState("idle");
 				busy = false;
 			}
-			return;
+			// return;
 		}
 		busy = false;
 	}, true);
@@ -164,7 +163,6 @@
 			stateLoop.stop();
 		};
 	});
-
 	$: if ($state.state === "dead") stateLoop.stop();
 </script>
 
@@ -179,12 +177,60 @@
 			busy = false;
 		}
 	}}
-	class="sprite enemy guard {$state.state}"
+	class="sprite dog {$state.state}"
 	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$PlayerState.rotation
 		.y}deg);"
 />
 
 <style lang="scss">
+	@keyframes attackAnimation {
+		0% {
+			background-position: -0px -64px;
+		}
+		50% {
+			background-position: -0px -0px;
+		}
+		100% {
+			background-position: -64px -0px;
+		}
+	}
+
+	@keyframes deadAnimation {
+		0% {
+			background-position: -0px -128px;
+		}
+		100% {
+			background-position: -64px -64px;
+		}
+	}
+
+	@keyframes hurtAnimation {
+		0% {
+			background-position: -64px -128px;
+		}
+		100% {
+			background-position: -128px -0px;
+		}
+	}
+
+	@keyframes runAnimation {
+		0% {
+			background-position: -128px -64px;
+		}
+		25% {
+			background-position: -128px -128px;
+		}
+		50% {
+			background-position: -0px -192px;
+		}
+		75% {
+			background-position: -64px -192px;
+		}
+		100% {
+			background-position: -128px -64px;
+		}
+	}
+
 	.sprite {
 		top: 0%;
 		position: absolute;
@@ -192,74 +238,43 @@
 		backface-visibility: hidden;
 		background-repeat: no-repeat !important;
 	}
-	.sprite.enemy.guard {
+	.sprite {
+		top: 0%;
+		position: absolute;
+
+		backface-visibility: hidden;
+		background-repeat: no-repeat !important;
+	}
+	.sprite.dog {
 		height: 64px;
 		width: 64px;
-		background: url(./guard.png);
-		background-size: 832px;
+		background: url(./../../sprites/guard_dog/spritesheet.png) no-repeat;
+		background-size: 192px;
+		image-rendering: pixelated;
+	}
+	.dog {
+		width: 64px;
+		height: 64px;
+		// background-size: 192px;
 		image-rendering: pixelated;
 
-		will-change: transform;
 		&.idle {
-			background-position-x: 0px;
+			background-position: -0px -192px;
 		}
-		&.walk {
-			animation: walk 1.1s steps(1) infinite;
-			@keyframes walk {
-				0% {
-					background-position-x: -64px;
-				}
-				25% {
-					background-position: -128px;
-				}
-				50% {
-					background-position: -192px;
-				}
-				75% {
-					background-position: -256px;
-				}
-			}
+		&.attack {
+			animation: attackAnimation 0.6s steps(1) infinite;
 		}
+
 		&.dead {
-			background-position: 84%;
-			animation: dead steps(1) 1s;
-
-			@keyframes dead {
-				0% {
-					background-position: 42%;
-				}
-				20% {
-					background-position: 50%;
-				}
-				40% {
-					background-position: 59%;
-				}
-
-				60% {
-					background-position: 68%;
-				}
-			}
+			animation: deadAnimation 1.1s steps(1) infinite;
 		}
 
 		&.hurt {
-			animation: hurt steps(1) 0.1s;
-			background-position: -576px;
-			@keyframes hurt {
-				50% {
-					background-position: -576px;
-				}
-			}
+			animation: hurtAnimation 0.6s steps(1) infinite;
 		}
-		&.attack {
-			animation: attack 1.1s steps(1);
-			@keyframes attack {
-				0% {
-					background-position: -704px;
-				}
-				50% {
-					background-position: -768px;
-				}
-			}
+
+		&.walk {
+			animation: runAnimation 0.625s steps(1) infinite;
 		}
 	}
 </style>

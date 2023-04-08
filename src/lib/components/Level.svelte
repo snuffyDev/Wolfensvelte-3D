@@ -6,6 +6,7 @@
 >
 	const MODEL_MAP = {
 		Guard: Guard,
+		Dog: Dog,
 		Door: Door,
 		Object: MapObject
 	} as const;
@@ -18,6 +19,9 @@
 
 		return {
 			subscribe,
+			get() {
+				return tilemap;
+			},
 			set: (level: World) => {
 				tilemap = Object.assign(tilemap, level);
 
@@ -38,7 +42,7 @@
 							wall.position.z === position.z
 						);
 					}
-					if (wall.model?.component === "Guard") return true;
+					if (wall.model?.component === "Guard" || wall.model?.component === "Dog") return true;
 
 					return compare(wall.surfaces, (t) => isValidTexture(t) !== false);
 				} catch (e) {
@@ -69,6 +73,7 @@
 	import { isVisibleToPlayer } from "../utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
 	import { noClipObjectIds } from "$lib/utils/engine/objects";
+	import Dog from "./Dog/Dog.svelte";
 
 	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
@@ -123,7 +128,7 @@
 		CurrentLevel.set(level);
 
 		gameLoop.start();
-
+		console.log($CurrentLevel);
 		return () => {
 			gameLoop.stop();
 			frameLoop.dispose();
@@ -148,7 +153,7 @@
 				{#each $CurrentLevel as group, section}
 					{#each group as item, offset}
 						{#if item.model?.component}
-							{#if item.model.component === "Guard"}
+							{#if item.model.component === "Guard" || item.model.component === "Dog"}
 								<svelte:component
 									this={MODEL_MAP[item.model.component]}
 									{offset}

@@ -80,7 +80,9 @@
 	{#each objectEntries(sides) as [direction, texture], i}
 		{#if direction && typeof texture === "number"}
 			{@const positionZ = getZPosition(direction)}
-			{@const validatedTexture = isValidTexture(texture) ? $textures[texture]?.original : ""}
+			{@const validatedTexture = isValidTexture(texture)
+				? $textures[direction !== "left" && direction !== "right" ? texture : texture + 1]?.original
+				: ""}
 			{@const img = ` --img: url(${validatedTexture});`}
 			<!-- {@debug img, validatedTexture} -->
 			<div
@@ -93,7 +95,7 @@
 					direction
 				]}deg); "
 			>
-				<!-- {direction} -->
+				{direction}
 			</div>
 		{/if}
 	{/each}
@@ -102,11 +104,14 @@
 <style>
 	.wall {
 		height: var(--height);
-		contain: content;
+		/* contain: content; */
 		background-image: var(--img);
 		/* top: 0%; */
 		background-size: 64px;
 		backface-visibility: hidden !important;
+		font-size: 1rem;
+		color: white;
+
 		image-rendering: pixelated;
 		opacity: 1;
 	}
