@@ -14,7 +14,6 @@
 	export let offset: number;
 	export let section: number;
 
-	$: item = item;
 	let state: "open" | "closed" = "closed";
 	let visibility = true;
 	const { textures }: TextureContext = getContext(ctxKey);
@@ -32,10 +31,9 @@
 	});
 
 	$: rotation = 0;
-	$: console.log(rotation);
 
 	onMount(() => {
-		let interval;
+		let interval: string | number | NodeJS.Timer | undefined;
 
 		try {
 			const isLeftRight =
@@ -130,7 +128,6 @@
 		top: 0;
 		left: 0;
 		right: 0;
-		// contain: layout size style;
 		will-change: transform, visibility;
 		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
 
@@ -140,48 +137,36 @@
 			background-size: 100%;
 			image-rendering: pixelated;
 			transform-style: preserve-3d;
-			// transition: inherit;
-			// backface-visibility: hidden;
 			transform: translate3d(0, 0%, -8px);
 			&:nth-child(2) {
 				transform: translateZ(8px);
 			}
-			// background-color: slategray;
 			width: 64px;
 			height: 64px;
 			position: inherit;
 			top: 0%;
 			//
 			left: 0%;
-			// transform: inherit;
 		}
 		&::before,
 		&::after {
 			content: "";
 			position: inherit;
 
-			// inset: 0;
 			width: 16px;
 			height: 100%;
-			// right: 0;
-			// will-change: transform;
-			// transform-origin: center;
 			background: darkcyan;
 			top: 0;
-			// inset: 0;
 			bottom: 0;
-			// transition: inherit;
 			backface-visibility: hidden;
 			transform: rotateY(90deg);
 		}
 		&::before {
 			right: -1.95px;
-			// left: 0;
 		}
 		&::after {
 			left: -1.95px;
 			transform: rotateY(-90deg);
-			// right: 0;
 		}
 	}
 </style>

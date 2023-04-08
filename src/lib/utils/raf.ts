@@ -23,18 +23,11 @@ function requestFrame() {
 			return;
 		}
 		delta = Math.min(interval, delta + now - then - interval);
-		// if (frame) cancelAnimationFrame(frame);
-		// render code
-		// const asyncTasks = [];
-
-		// await Promise.race(asyncTasks);
 		for (const it of tasks.values()) {
 			it(now);
-			// await yieldMicrotask();
 		}
 		then = now;
 		frame = requestAnimationFrame(run);
-		// frame = requestAnimationFrame(run);
 	};
 
 	return {
