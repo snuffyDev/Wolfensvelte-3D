@@ -8,7 +8,16 @@ export type WallFace = "front" | "left" | "back" | "right";
 // Alias for Texture
 export type Surface = Texture;
 
-export type Model = { component: "Guard" | "Dog" | "Door" | "Object"; texture?: number };
+export type Model = {
+	component: "Guard" | "Dog" | "Door" | "Object";
+	texture?: number;
+	attributes?: {
+		score: number | null;
+		health: number | null;
+		weapon: "chaingun" | "smg" | null;
+		ammo: number | null;
+	};
+};
 
 export type Entity = {
 	position?: Position2D | undefined;

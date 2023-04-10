@@ -1,4 +1,7 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script
 	lang="ts"
@@ -57,14 +60,20 @@
 	});
 
 	const audioManager = new AudioManager({
-		halt: new URL(BarkSound, import.meta.url).toString()
+		bark: new URL(BarkSound, import.meta.url).toString()
 	});
+
+	let isVisible = false;
 
 	const tween = state.tween;
 
 	export const getPosition = () => $tween;
 	export const setState = state.setState;
 	export const getState = () => $state.state;
+
+	export const getVisibility = () => isVisible;
+	export const setVisibility = (state: boolean) => (isVisible = state);
+
 	export const takeDamage = async () => {
 		await state.giveDamage();
 		if ($state.health <= 0) {
@@ -83,6 +92,7 @@
 	let playerLastSeenAt: number;
 	let playerJustSeen = false;
 	const stateLoop = frameLoop.add(async (now) => {
+		if (isVisible) return;
 		if (!startFrame) startFrame = now;
 		if (busy) return;
 		if ($state.state === "dead") return;
@@ -99,22 +109,16 @@
 				$state.position
 			);
 
-			const seen = isVisibleToPlayer(getPosition(), 21);
-			if (seen) {
-				const playerPosition = getLocalPositionFromRealPosition({
-					x: 1 - $PlayerState.position.x,
-					z: 1 - $PlayerState.position.z
-				});
-				const ourPosition = getLocalPositionFromRealPosition(getPosition());
-
-				if (!testLineOfSight($CurrentLevel, ourPosition, playerPosition)) {
-					busy = false;
-					return;
-				}
-
+			const seen = isVisibleToPlayer(getPosition(), 45);
+			const playerPosition = getLocalPositionFromRealPosition({
+				x: 1 - $PlayerState.position.x,
+				z: 1 - $PlayerState.position.z
+			});
+			const ourPosition = getLocalPositionFromRealPosition(getPosition());
+			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && seen && distance < 1000) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
-					audioManager.play("halt");
+					audioManager.play("bark");
 				}
 
 				if (distance > 64 && distance < 850 && Math.abs(Math.random()) > 0.85) {

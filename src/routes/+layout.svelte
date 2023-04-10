@@ -8,7 +8,6 @@
 	import { ctxKey, type TextureContext } from "./key";
 	import "./../app.scss";
 	const textureStore = writable<Awaited<ReturnType<typeof textureData>>>({});
-	const objectStore = writable<Awaited<ReturnType<typeof objectData>>>({});
 
 	let loaded = false;
 
@@ -22,11 +21,12 @@
 
 	// $: if ($textureStore)
 
-	setContext(ctxKey, { textures: textureStore, objects: objectStore } as TextureContext);
+	setContext(ctxKey, { textures: textureStore } as TextureContext);
 	let play = false;
 	// console.log(E1M1);
 </script>
 
+<!-- <Noise /> -->
 {#if loaded}
 	<slot><!-- optional fallback --></slot>
 {/if}

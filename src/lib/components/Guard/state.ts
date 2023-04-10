@@ -9,6 +9,7 @@ import {
 import { CurrentLevel } from "../Level.svelte";
 import { rand } from "$lib/utils/engine";
 import { tick } from "svelte";
+
 import { findPath } from "$lib/helpers/ai";
 
 export interface EnemyState extends Omit<IPlayerState, "score" | "rotation" | "position"> {
@@ -33,7 +34,14 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 	const { subscribe, update, set } = writable<EnemyState>(state);
 
 	const tween = tweened<Position2D>({ x: state.position.x, z: state.position.z });
-	const { subscribe: tSubscribe, set: tSet } = tween;
+	const { subscribe: tSubscribe, set: tSet, update: tUpdate } = tween;
+
+	let AC: AbortController;
+
+	const setupAbortController = () => {
+		if (AC?.signal?.aborted === false) return;
+		AC = new AbortController();
+	};
 
 	return {
 		subscribe,
@@ -45,70 +53,94 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 			}
 		},
 		async moveTo(position: Position2D) {
-			const current = state.position;
+			try {
+				const current = state.position;
 
-			const toMove = {
-				x: position.x + current.x - 1,
-				z: position.z + current.z - 1
-			};
+				const toMove = {
+					x: position.x + current.x,
+					z: position.z + current.z
+				};
 
-			const playerPosition = getLocalPositionFromRealPosition(toMove);
-			const ourPosition = getLocalPositionFromRealPosition(state.position);
+				const playerPosition = getLocalPositionFromRealPosition(toMove);
+				const ourPosition = getLocalPositionFromRealPosition(state.position);
 
-			// Get the shortest (unblocked) path to the player
-			let paths = findPath(ourPosition, playerPosition);
-			if (!Array.isArray(paths)) return;
+				// Get the shortest (unblocked) path to the player
+				let paths = findPath(ourPosition, playerPosition);
+				if (!Array.isArray(paths)) return;
 
-			state.state = "walk";
-			update((u) => ({ ...u, state: state.state }));
-			console.log(paths, playerPosition);
-			let count = 0;
-			for (const path of paths) {
-				if (!path) return;
-				console.log(path);
-				state.state = "walk";
-				update((u) => ({ ...u, state: state.state }));
+				console.log(paths, playerPosition);
+				let count = 0;
+				for (const path of paths) {
+					AC.signal.throwIfAborted();
+					if (state.state === "dead") break;
+					if (!path) return;
+					console.log(path);
+					state.state = "walk";
+					update((u) => ({ ...u, state: state.state }));
 
-				// Current path point is blocked by something, skip to next just in case.
-				if (CurrentLevel.checkCollisionWithWorld(path)) {
-					if (count === 2) return;
-					count += 1;
-					console.log(CurrentLevel.get()[path.x][path.z]);
-					paths = findPath(ourPosition, playerPosition);
-					continue;
+					// Current path point is blocked by something, skip to next just in case.
+					if (CurrentLevel.checkCollisionWithWorld(path)) {
+						if (count === 2) return;
+						count += 1;
+						console.log(CurrentLevel.get()[path.x][path.z]);
+						paths = findPath(ourPosition, playerPosition);
+						continue;
+					}
+
+					const realPosition = getRealPositionFromLocalPosition(path);
+
+					// All 'real' positions are inverted, relative to the camera
+					const tX = 1 - realPosition.x;
+					const tZ = 1 - realPosition.z;
+
+					state.position = { x: tX, z: tZ };
+					// Tween to the next position
+					await tUpdate(() => ({ x: tX, z: tZ }), { duration: 668 }).then(() => {
+						update((u) => ({ ...u, position: { x: tX, z: tZ } }));
+					});
 				}
-
-				const realPosition = getRealPositionFromLocalPosition(path);
-
-				const tX = 1 - realPosition.x;
-				const tZ = 1 - realPosition.z;
-
-				update((u) => ({ ...u, position: { x: tX, z: tZ } }));
-				await tSet({ x: tX, z: tZ }, { duration: 768 });
-				state.position = { x: tX, z: tZ };
+				// Ensure we go back to an 'idle' state before starting the next task
+				queueMicrotask(() => {
+					state.state = "idle";
+					update((u) => ({ ...u, ...state }));
+				});
+			} catch {
+				// We abort the tween here if there's an error, since we
+				// will want to stop moving, probably.
+				// (an error can be from the AbortController, or an actual error, even
+				// though real ones *should not* happen)
+				this.tween.cancel();
+				setupAbortController();
 			}
-			state.state = "idle";
-			update((u) => ({ ...u, ...state }));
 		},
 		async giveDamage(n?: number) {
-			const previousState = state.state;
+			let previousState = state.state;
+			if (AC) {
+				// Abort any movements we're making, attack!
+				AC?.abort();
+			}
+
 			update((u) => ({ ...u, state: "hurt" }));
 
 			if (typeof n !== "number") {
-				n = Math.abs(rand.randomInRange(7, 13));
+				n = Math.abs(rand.randomInRange(9, 13));
 			}
 
 			state.health -= n;
 
+			await tick();
+
 			if (state.health <= 0) {
 				state.state = "dead";
+				previousState = "dead";
 				PlayerState.givePoints(100);
 			}
-			await tick();
+			// Update our health and return our state to the previous state
 			update((u) => ({ ...u, health: state.health, state: previousState }));
 		},
 		setState(targetState: EnemyState["state"]) {
 			state.state = targetState;
+			// 70% chance of doing damage so it doesn't feel too predictable
 			if (state.state === "attack") {
 				if (Math.random() < 0.7) {
 					tick().then(() => {

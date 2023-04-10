@@ -9,8 +9,10 @@
 >
 	export const DIRECTION_MAP: Record<string, number> = {
 		front: 0,
+		backleft: 45,
 		left: 270,
 		back: 180,
+		topright: 135,
 		right: 90
 	};
 
@@ -18,8 +20,8 @@
 	import { objectEntries } from "$lib/utils/object";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { WALL_FACES, isValidTexture } from "$lib/utils/validation";
-	import { getContext, onMount } from "svelte";
-	import { CurrentLevel, type InternalWorld } from "./Level.svelte";
+	import { getContext } from "svelte";
+	import { CurrentLevel } from "./Level.svelte";
 	import { ctxKey, type TextureContext } from "../../routes/key";
 	import type { MapItem, Texture, WallFace } from "../types/core";
 </script>
@@ -72,47 +74,47 @@
 	};
 </script>
 
-<div
-	class="surface"
-	class:hidden={!isVisible}
-	style:visibility|important={isVisible ? "visible" : "hidden"}
->
-	{#each objectEntries(sides) as [direction, texture], i}
-		{#if direction && typeof texture === "number"}
-			{@const positionZ = getZPosition(direction)}
-			{@const validatedTexture = isValidTexture(texture)
-				? $textures[direction !== "left" && direction !== "right" ? texture : texture + 1]?.original
-				: ""}
-			{@const img = ` --img: url(${validatedTexture});`}
-			<!-- {@debug img, validatedTexture} -->
-			<div
-				class="wall {direction}"
-				bind:this={boundSides[i]}
-				data-x={-position.x}
-				data-z={positionZ}
-				data-rotation={DIRECTION_MAP[direction]}
-				style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
-					direction
-				]}deg); "
-			>
-				{direction}
-			</div>
-		{/if}
-	{/each}
-</div>
+{#if isVisible}
+	<div class="surface">
+		{#each objectEntries(sides) as [direction, texture], i}
+			{#if direction && typeof texture === "number"}
+				{@const positionZ = getZPosition(direction)}
+				{@const validatedTexture = isValidTexture(texture)
+					? $textures[direction !== "left" && direction !== "right" ? texture : texture + 1]
+							?.original
+					: ""}
+				{@const img = ` --img: url(${validatedTexture});`}
+
+				<div
+					class="wall {direction}"
+					bind:this={boundSides[i]}
+					data-x={-position.x}
+					data-z={positionZ}
+					data-rotation={DIRECTION_MAP[direction]}
+					style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
+						direction
+					]}deg); "
+				>
+					<!-- {direction} -->
+				</div>
+			{/if}
+		{/each}
+	</div>
+{/if}
 
 <style>
 	.wall {
 		height: var(--height);
-		/* contain: content; */
 		background-image: var(--img);
 		/* top: 0%; */
-		background-size: 64px;
+		image-rendering: pixelated;
+		background-size: 100%;
+		background-repeat: no-repeat;
 		backface-visibility: hidden !important;
 		font-size: 1rem;
 		color: white;
 
-		image-rendering: pixelated;
-		opacity: 1;
+		/* image-rendering: ; */
+		/* opacity: 1; */
 	}
 </style>

@@ -1,4 +1,7 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script
 	lang="ts"
@@ -20,7 +23,7 @@
 			x: -a.x,
 			z: -a.z
 		});
-		const moveTo = { x: 1 - (a.x + b.x + x) + x, z: 1 - (a.z + b.z + y) + y };
+		const moveTo = { x: 1 - (a.x + b.x + x), z: 1 - (a.z + b.z + y) };
 
 		return moveTo;
 	}
@@ -56,17 +59,26 @@
 		position: { x: -position.x, z: -position.z },
 		state: "idle"
 	});
-
+	const tween = state.tween;
 	const audioManager = new AudioManager({
 		halt: new URL(HaltSound, import.meta.url).toString(),
 		shoot: new URL(ShootSound, import.meta.url).toString()
 	});
 
-	const tween = state.tween;
+	let isVisible = false;
+	$: if ($state && !isVisible) $state.rotation.y = $PlayerState.rotation.y;
+	export const setState = state.setState;
 
 	export const getPosition = () => $tween;
-	export const setState = state.setState;
 	export const getState = () => $state.state;
+
+	export const getVisibility = () => isVisible;
+	export const setVisibility = (state: boolean) => (isVisible = state);
+	export const getLocalPosition = (): Position2D => ({
+		x: offset,
+		z: section
+	});
+
 	export const takeDamage = async () => {
 		await state.giveDamage();
 		if ($state.health <= 0) {
@@ -77,19 +89,21 @@
 	};
 	let previousAnimationState: typeof $state.state;
 
-	$: if ($state) $state.rotation.y = $PlayerState.rotation.y;
-
 	let startFrame: number;
 	let busy = false;
 
 	let playerLastSeenAt: number;
 	let playerJustSeen = false;
+	$: if ($state.state === "dead") stateLoop.stop();
+
 	const stateLoop = frameLoop.add(async (now) => {
+		if (isVisible) return;
+		if ($state.state === "dead") return;
 		if (!startFrame) startFrame = now;
 		if (busy) return;
 		const elapsed = now - startFrame;
 
-		if (elapsed > 150 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
+		if (elapsed > 225 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
 			if (busy) return;
 
 			busy = true;
@@ -101,25 +115,26 @@
 			);
 
 			const seen = isVisibleToPlayer(getPosition(), 45);
-			if (seen) {
-				const playerPosition = getLocalPositionFromRealPosition({
-					x: 1 - $PlayerState.position.x,
-					z: 1 - $PlayerState.position.z
-				});
-				const ourPosition = getLocalPositionFromRealPosition(getPosition());
-
-				if (!testLineOfSight($CurrentLevel, ourPosition, playerPosition)) {
-					busy = false;
-					return;
-				}
-
+			const playerPosition = getLocalPositionFromRealPosition({
+				x: 1 - $PlayerState.position.x,
+				z: 1 - $PlayerState.position.z
+			});
+			const ourPosition = getLocalPositionFromRealPosition(getPosition());
+			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && seen && distance < 1000) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("halt");
 				}
 
-				if (distance > 64 && distance < 750 && Math.abs(Math.random()) > 0.85) {
+				if (distance >= 55 && distance < 680 && Math.random() < 0.6) {
+					await tween.cancel();
+
+					audioManager.play("shoot");
+					previousAnimationState = "attack";
+					state.setState("attack");
 					await tick();
+					busy = false;
+				} else if (distance > 64 && distance < 750) {
 					previousAnimationState = "walk";
 					return state
 						.moveTo(
@@ -131,29 +146,17 @@
 						.finally(() => {
 							busy = false;
 						});
-				} else if (distance >= 55 && distance < 720 && Math.random() < 0.6) {
-					await tween.cancel();
-					await tick();
-
-					audioManager.play("shoot");
-					previousAnimationState = "attack";
-					state.setState("attack");
-
-					// return;
 				} else {
-					await tick();
-					if (distance > 1000) playerJustSeen = false;
-					previousAnimationState = "idle";
+					// if (distance > 1000) playerJustSeen = false;
 					state.setState("idle");
+					busy = false;
 				}
 			} else {
-				await tick();
-				if (distance > 1000) playerJustSeen = false;
+				// if (distance > 1000) playerJustSeen = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
 				busy = false;
 			}
-			return;
 		}
 		busy = false;
 	}, true);
@@ -164,8 +167,6 @@
 			stateLoop.stop();
 		};
 	});
-
-	$: if ($state.state === "dead") stateLoop.stop();
 </script>
 
 <div
@@ -175,11 +176,9 @@
 		}
 	}}
 	on:animationend={() => {
-		if (previousAnimationState === "hurt") {
-			busy = false;
-		}
+		busy = false;
 	}}
-	class="sprite enemy guard {$state.state}"
+	class="sprite enemy guard {$state.state} {isVisible ? 'hidden' : ''}"
 	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$PlayerState.rotation
 		.y}deg);"
 />
@@ -242,7 +241,7 @@
 		}
 
 		&.hurt {
-			animation: hurt steps(1) 0.1s;
+			animation: hurt steps(1) 75ms;
 			background-position: -576px;
 			@keyframes hurt {
 				50% {

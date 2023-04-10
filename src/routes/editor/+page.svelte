@@ -49,7 +49,7 @@
 		padding: 0;
 		width: 100%;
 		height: 100%;
-		perspective: 64px;
+		perspective: calc(var(--perspective));
 		transform-style: preserve-3d !important;
 		position: absolute !important;
 		inset: 0;
@@ -57,7 +57,6 @@
 	#scene {
 		width: 100%;
 		height: 100%;
-		perspective: 64px;
 		overflow: hidden;
 
 		/* Sky texture */

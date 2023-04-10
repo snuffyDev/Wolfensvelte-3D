@@ -9,7 +9,11 @@
 	import TexturePreview from "./Editor/TexturePreview.svelte";
 	import Level from "../../../lib/components/Level.svelte";
 	import type { MapItem, Texture, WallFace, World } from "../../../lib/types/core";
-	import { specialObjectIds as specialObjects } from "$lib/utils/engine/objects";
+	import {
+		EnemySymbol,
+		enemySymbolIds,
+		specialObjectIds as specialObjects
+	} from "$lib/utils/engine/objects";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
@@ -122,7 +126,12 @@
 			for (let x = 0; x < TILE_MAP.length; x++) {
 				for (let y = 0; y < TILE_MAP[x].length; y++) {
 					let col = TILE_MAP[x][y].data;
-					if (specialObjects.includes(+chunked[x][y])) {
+					if (enemySymbolIds.includes(+chunked[x][y])) {
+						TILE_MAP[x][y].data = {
+							...TILE_MAP[x][y].data,
+							model: { component: +chunked[x][y] === EnemySymbol.Guard ? "Guard" : "Dog" }
+						};
+					} else if (specialObjects.includes(+chunked[x][y])) {
 						TILE_MAP[x][y].data = {
 							...TILE_MAP[x][y].data,
 							model: { component: "Object", texture: +chunked[x][y] }

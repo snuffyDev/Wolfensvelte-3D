@@ -4,6 +4,13 @@
 	context="module"
 	lang="ts"
 >
+	const splice = (
+		input: any[],
+		start: number,
+		deleteCount = input.length - start,
+		...items: any[]
+	) => input.slice(0, start).concat(...items, input.slice(start + deleteCount));
+
 	const MODEL_MAP = {
 		Guard: Guard,
 		Dog: Dog,
@@ -27,6 +34,9 @@
 
 				set(tilemap);
 			},
+			updateTileAt: (x: number, z: number, data: any) => {
+				update((u) => [...u.slice(0, x), splice(u[x], z, 1, data), ...u.slice(x + 1)]);
+			},
 			update,
 			checkCollisionWithWorld(position: Position | Position2D) {
 				try {
@@ -42,7 +52,7 @@
 							wall.position.z === position.z
 						);
 					}
-					if (wall.model?.component === "Guard" || wall.model?.component === "Dog") return true;
+					if (wall.model?.component === "Guard" || wall.model?.component === "Dog") return false;
 
 					return compare(wall.surfaces, (t) => isValidTexture(t) !== false);
 				} catch (e) {
@@ -68,7 +78,7 @@
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { World } from "../types/core";
+	import type { Surface, WallFace, World } from "../types/core";
 	import { compare } from "../utils/compare";
 	import { isVisibleToPlayer } from "../utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
@@ -85,42 +95,93 @@
 	function update() {
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
 
-		for (const model of GameObjects.models) {
-			if (!model) continue;
-
-			const pos = model.getPosition?.();
-			if (!pos) continue;
-			const visible = isVisibleToPlayer(model, 90);
-			const distance = getDistanceFromPoints(
-				{ x: pos.x - 50, z: pos.z },
-				{ x, y, z } /* playerPosition */
-			);
-			if (visible !== true || distance >= 1650) {
-				model.setVisibility(false);
-				continue;
-			}
-
-			model.setVisibility(true);
-		}
-		for (const wall of GameObjects.walls) {
-			if (!wall) continue;
-
-			const pos = wall.getPosition?.();
-			if (!pos) continue;
-			const visible = isVisibleToPlayer(wall, 90);
-			const distance = getDistanceFromPoints(
-				{ x: pos.x - 50, z: pos.z },
-				{ x, y, z } /* playerPosition */
-			);
-			if (visible !== true || distance >= 1750) {
-				wall.setVisibility(false);
-				continue;
-			}
-
-			wall.setVisibility(true);
-		}
-
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+		for (const obj of GameObjects) {
+			if (!obj) continue;
+			queueMicrotask(() => {
+				const pos = obj.getPosition?.();
+				if (!pos) return;
+				const visible = isVisibleToPlayer(obj, 20);
+				const distance = getDistanceFromPoints(
+					{ x: pos.x - 50, z: pos.z },
+					{ x, y, z } /* playerPosition */
+				);
+
+				const isVisibleAlready = obj.getVisibility();
+
+				if (visible === false || distance >= 1564) {
+					obj.setVisibility(false);
+					return;
+				} else if (!isVisibleAlready && visible === true) {
+					obj.setVisibility(true);
+				}
+			});
+		}
+	}
+	type ConnectedTile = {
+		position: Position2D;
+		surface: Surface;
+		direction: WallFace | null;
+	};
+
+	function dfs(x: number, z: number, world: World, visited: boolean[][]): ConnectedTile[] {
+		const directions: Array<[number, number, WallFace]> = [
+			[-1, 0, "left"],
+			[1, 0, "right"],
+			[0, -1, "front"],
+			[0, 1, "back"]
+		];
+
+		const connectedGroup: ConnectedTile[] = [];
+		visited[x][z] = true;
+
+		for (const [dx, dz, direction] of directions) {
+			const newX = x + dx;
+			const newZ = z + dz;
+
+			if (
+				newX >= 0 &&
+				newX < world.length &&
+				newZ >= 0 &&
+				newZ < world[newX].length &&
+				!visited[newX][newZ] &&
+				!!world[x][z].surfaces &&
+				!!world[newX][newZ].surfaces &&
+				world[newX][newZ].surfaces === world[x][z].surfaces
+			) {
+				connectedGroup.push(...dfs(newX, newZ, world, visited));
+			}
+		}
+
+		return [
+			{
+				position: { x: x, z: z },
+				surface: world[x][z].surfaces,
+				direction: null
+			},
+			...connectedGroup
+		];
+	}
+
+	function findConnectedTileGroups(world: World): ConnectedTile[][] {
+		const visited: boolean[][] = Array.from({ length: world.length }, () =>
+			Array(world[0].length).fill(false)
+		);
+
+		const connectedTileGroups: ConnectedTile[][] = [];
+
+		for (let x = 0; x < world.length; x++) {
+			for (let z = 0; z < world[x].length; z++) {
+				if (!visited[x][z]) {
+					const connectedGroup = dfs(x, z, world, visited);
+					if (connectedGroup.length > 1) {
+						connectedTileGroups.push(connectedGroup);
+					}
+				}
+			}
+		}
+
+		return connectedTileGroups;
 	}
 
 	onMount(() => {
@@ -128,7 +189,10 @@
 		CurrentLevel.set(level);
 
 		gameLoop.start();
-		console.log($CurrentLevel);
+		console.log(findConnectedTileGroups($CurrentLevel), $CurrentLevel);
+		setTimeout(() => {
+			console.log(GameObjects);
+		}, 4000);
 		return () => {
 			gameLoop.stop();
 			frameLoop.dispose();
@@ -159,7 +223,15 @@
 									{offset}
 									{section}
 									bind:this={GameObjects.enemies[GameObjects.enemies.length]}
-									bind:item
+									{item}
+								/>
+							{:else if item.model.component === "Door"}
+								<svelte:component
+									this={MODEL_MAP[item.model.component]}
+									{offset}
+									{section}
+									bind:this={GameObjects.doors[GameObjects.doors.length]}
+									{item}
 								/>
 							{:else}
 								<svelte:component
@@ -167,7 +239,7 @@
 									{offset}
 									{section}
 									bind:this={GameObjects.models[GameObjects.models.length]}
-									bind:item
+									{item}
 								/>
 							{/if}
 						{:else if item.surfaces}
@@ -188,27 +260,31 @@
 
 <style lang="scss">
 	#scene {
-		width: 100%;
 		perspective: calc(var(--perspective));
+
+		will-change: contents;
+		// transform: perspective(1000px);
+		width: 100%;
 		inset: 0;
 		overflow: hidden;
 		backface-visibility: hidden;
 		position: fixed;
-		transform-style: preserve-3d;
+		// transform-style: preserve-3d;
 	}
 
 	#world {
 		position: absolute;
 		top: 50% !important;
 		left: 50% !important;
-		/* // transform-origin: center; */
+		// /* // transform-origin: center; */
 		inset: 0;
 		// overflow: hidden;
 
 		backface-visibility: hidden;
-		will-change: transform;
-		width: 100%;
-		height: 100%;
+		will-change: transform, contents;
+		// width: 100%;
+		// height: 100%;
+		contain: layout style size;
 		transform-style: preserve-3d;
 	}
 </style>

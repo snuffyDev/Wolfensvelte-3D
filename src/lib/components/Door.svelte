@@ -1,7 +1,7 @@
 <svelte:options accessors={true} />
 
 <script lang="ts">
-	import type { Position } from "$lib/types/position";
+	import type { Position, Position2D } from "$lib/types/position";
 	import type { MapItem } from "$lib/utils/map";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
@@ -24,6 +24,26 @@
 	export const getVisibility = () => visibility;
 	export const setVisibility = (visible: boolean) => (visibility = visible);
 
+	export const toggleOpen = () => {
+		state = state === "open" ? "closed" : "open";
+		position.update((u) =>
+			!rotation
+				? {
+						x: state === "open" ? _position.x + 64 : _position.x,
+						z: $position.z
+				  }
+				: { z: state === "open" ? _position.z + 64 : _position.z, x: $position.x }
+		);
+
+		let currentState = $CurrentLevel[section][offset];
+		if (!currentState.position) currentState.position = {} as Position2D;
+		if (state === "open") {
+			currentState.position = { x: offset + 1, z: section };
+		} else {
+			currentState.position = { x: offset, z: section };
+		}
+		CurrentLevel.updateTileAt(section, offset, currentState);
+	};
 	export const getPosition = () => $position;
 	export const getLocalPosition = (): Omit<Position, "y"> => ({
 		x: state === "open" ? offset + 1 : offset,
@@ -57,37 +77,6 @@
 			if (isLeftRight) rotation = 0;
 			else if (isTopBottom) rotation = 90;
 		} catch {}
-
-		interval = setInterval(
-			function cb() {
-				state = state === "open" ? "closed" : "open";
-				// if (state === 'open') {
-				position.update((u) =>
-					!rotation
-						? {
-								x: state === "open" ? _position.x + 64 : _position.x,
-								z: $position.z
-						  }
-						: { z: state === "open" ? _position.z + 64 : _position.z, x: $position.x }
-				);
-
-				let currentState = $CurrentLevel[section][offset];
-				if (!currentState.position) currentState.position = {};
-				if (state === "open") {
-					currentState.position = { x: offset + 1, z: section };
-				} else {
-					currentState.position = { x: offset, z: section };
-				}
-				$CurrentLevel[section][offset] = currentState;
-				// }
-				clearInterval(interval);
-				interval = setInterval(cb, state === "closed" ? 1500 : 6000);
-			},
-			state === "closed" ? 1500 : 6000
-		);
-		return () => {
-			clearInterval(interval);
-		};
 	});
 	let isMouseOver = false;
 </script>
@@ -128,7 +117,7 @@
 		top: 0;
 		left: 0;
 		right: 0;
-		will-change: transform, visibility;
+		// will-change: transform, visibility;
 		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
 
 		backface-visibility: hidden;

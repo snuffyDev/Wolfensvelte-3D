@@ -16,7 +16,7 @@
 		["Gun", "[insert gun here]"]
 	];
 	const FACE_MAP = $page.data.FACES;
-	let PORTRAIT_STATE: keyof typeof FACE_MAP & string = "full";
+	let PORTRAIT_STATE: keyof typeof FACE_MAP = "full";
 	let CURRENT_IDX: number = 0;
 
 	$: PORTRAIT_STATE =
@@ -37,12 +37,29 @@
 	onMount(() => {
 		loop.start();
 	});
+
+	function getFacingDirection(angle: number): string {
+		angle = angle < 0 ? 360 + angle : angle;
+		if (angle >= 315 || angle < 45) {
+			return "front";
+		} else if (angle >= 45 && angle < 135) {
+			return "right";
+		} else if (angle >= 135 && angle < 225) {
+			return "back";
+		} else {
+			return "left";
+		}
+	}
 </script>
 
 {#if dev}
 	<div class="debug">
 		{#key $PlayerState.position}
-			pos: {JSON.stringify($PlayerState.position)}
+			<p>pos: {JSON.stringify($PlayerState.position)}</p>
+		{/key}
+		{#key $PlayerState.rotation.y}
+			<p>rot: {JSON.stringify($PlayerState.rotation.y)}</p>
+			<p>{getFacingDirection($PlayerState.rotation.y)}</p>
 		{/key}
 	</div>
 {/if}
@@ -61,11 +78,14 @@
 			<span>{$PlayerState.score}</span>
 		</div>
 		<div class="col">
-			<div
-				role="img"
-				class="portrait {PORTRAIT_STATE}"
-				style={FACE_MAP[PORTRAIT_STATE][CURRENT_IDX]}
-			/>
+			{#each FACE_MAP[PORTRAIT_STATE] as img, idx}
+				<div
+					role="img"
+					class="portrait {PORTRAIT_STATE}"
+					class:show={PORTRAIT_STATE === "dead" ? true : idx === CURRENT_IDX}
+					style={FACE_MAP[PORTRAIT_STATE][idx]}
+				/>
+			{/each}
 		</div>
 		<div class="col">
 			<b>Health</b>
@@ -83,16 +103,21 @@
 <style lang="scss">
 	$FACES: (full, low_hp, beat_up, dying, near_death, hurt, dead);
 	.portrait {
-		position: relative;
+		position: absolute;
 		inset: 0;
 		background-size: contain;
 		background-repeat: no-repeat;
 		background-image: var(--img);
 		max-height: 4rem;
-		justify-self: center;
+		// justify-self: center;
 		height: 4rem;
 		min-height: 100%;
 		width: 100%;
+		bottom: unset;
+		opacity: 0;
+		&.show {
+			opacity: 1;
+		}
 		// max-width: 4rem;
 	}
 	.stats {
@@ -125,16 +150,16 @@
 	.col {
 		display: inline-grid;
 		grid-template-columns: 1fr;
-		grid-template-rows: 0.1fr 0.5fr;
+
 		// grid-template-rows: 1fr 2fr;
 		font-size: 1em;
 		// max-width: 100%;
-		max-height: 4rem;
+		max-height: 5rem;
 		position: relative;
 		width: 100%;
 		// flex: 1 0 auto;
 		// max-width: 5rem;
-		justify-content: center;
+		// justify-content: center;
 		min-width: 1rem;
 		font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
 		&:not(:nth-last-child(2)) {
@@ -144,8 +169,8 @@
 		// text-align: center;
 		font-size: 0.7em;
 
-		align-content: center;
-		place-items: center;
+		// align-content: center;
+		// place-items: center;
 	}
 	.hud {
 		position: absolute;
@@ -156,12 +181,12 @@
 		display: grid;
 		// grid-template-columns: 2rem 4rem 3rem 2rem 3rem 3rem;
 		// grid-template-columns: 1fr;
-		align-items: center;
+		// align-items: center;
 		// font-size: 0.1rem;
-		justify-content: center;
+		// justify-content: center;
 		// grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
 		// grid-auto-flow: row dense;
-		place-content: center;
+		// place-content: center;
 		// flex: 1 1;
 		// max-width: 100%;
 		width: 100%;
@@ -174,6 +199,8 @@
 
 	.debug {
 		background-color: hsla(0, 0%, 0%, 0.7);
+		display: flex;
+		flex-direction: column;
 		position: fixed;
 		top: 2.25rem;
 		z-index: 10000;

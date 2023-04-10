@@ -28,7 +28,7 @@ export interface IPlayerState {
 }
 
 const CONSTANTS = {
-	speed: 6.41
+	speed: 5.875
 } as const;
 
 function _playerState() {
@@ -140,8 +140,8 @@ function _playerState() {
 			const { rotation } = state;
 			const angleToRotateTo =
 				direction === "left"
-					? Math.sin(-0.75 * Math.PI) * CONSTANTS.speed
-					: Math.sin(0.75 * Math.PI) * CONSTANTS.speed;
+					? Math.sin(-0.825 * Math.PI) * CONSTANTS.speed
+					: Math.sin(0.825 * Math.PI) * CONSTANTS.speed;
 
 			rotation.y += +angleToRotateTo;
 			rotation.y = +(rotation.y % 360).toFixed(3);

@@ -11,8 +11,8 @@ export const getDistanceFromPoints = (p1: Position | Position2D, p2: Position | 
  */
 export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: Math.ceil(x * 64),
-		z: Math.ceil(z * 64)
+		x: Math.floor(x * 64),
+		z: Math.floor(z * 64)
 	};
 }
 
@@ -25,4 +25,18 @@ export function getLocalPositionFromRealPosition({ x, z }: Position | Omit<Posit
 		x: Math.abs(Math.ceil(x / 64)),
 		z: Math.abs(Math.ceil((z - 32) / 64))
 	};
+}
+
+/** Utility for getting the direction the player is currently facing */
+export function getFacingDirection(angle: number): "front" | "right" | "back" | "left" {
+	angle = angle < 0 ? 360 + angle : angle;
+	if (angle >= 315 || angle < 45) {
+		return "front";
+	} else if (angle >= 45 && angle < 135) {
+		return "right";
+	} else if (angle >= 135 && angle < 225) {
+		return "back";
+	} else {
+		return "left";
+	}
 }

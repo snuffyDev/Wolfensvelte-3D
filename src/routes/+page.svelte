@@ -73,9 +73,10 @@
 			>
 				<h1>Please click anywhere to allow audio</h1>
 				<h2 style="font-weight: 700;"><b>Controls</b></h2>
-				<p>WASD to move</p>
+
+				<p>WASD to move <em>(or Up/Down Arrow Keys)</em></p>
 				<p>Left/Right arrow keys to turn</p>
-				<p>Space to shoot</p>
+				<p>Space to use doors and shoot</p>
 			</div>
 		</div>
 	{:else if !dev}

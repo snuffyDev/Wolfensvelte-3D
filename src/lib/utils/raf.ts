@@ -2,6 +2,7 @@
 const tasks = new Set<(now: number) => void>();
 const asyncTasks = new Array<(now: number) => Promise<void>>();
 
+const yieldMicrotask = () => new Promise<void>(queueMicrotask);
 /**
  * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
  * Why a single frameloop? Imagine the map, each enemy, the player, etc. all calling RAF individually... Yeah, no bueno.
@@ -12,29 +13,39 @@ function requestFrame() {
 	let frame: number;
 	let running = false;
 	let then: number;
+	const _tasks: Promise<void>[] = [];
 	const processAsync = async (now: number) => {
-		await Promise.allSettled(asyncTasks.map((cb) => cb(now)));
+		for (let idx = 0; idx < asyncTasks.length; idx++) {
+			const task = asyncTasks[idx];
+			queueMicrotask(() => {
+				_tasks.push(task(now));
+			});
+		}
+		await Promise.allSettled(_tasks);
+		_tasks.length = 0;
 	};
 	let delta = 0;
-	const run = (now: number) => {
-		if (!then) then = now;
+	const run = async () => {
+		let then = performance.now();
 		const interval = 1000 / 29;
-		if (now - then < interval - delta) {
-			// if (frame) cancelAnimationFrame(frame);
-			frame = requestAnimationFrame(run);
-			return;
+		let delta = 0;
+		while (running) {
+			const now = await new Promise(requestAnimationFrame);
+			if (now - then < interval - delta) {
+				continue;
+			}
+			delta = Math.min(interval, delta + now - then - interval);
+			then = now;
+			for (const task of tasks) {
+				queueMicrotask(() => {
+					task(now);
+				});
+			}
+			processAsync(now);
+			// render code
 		}
-		delta = Math.min(interval, delta + now - then - interval);
 
-		for (const it of tasks.values()) {
-			it(now);
-		}
-
-		processAsync(now);
-
-		then = now;
-		// if (frame) cancelAnimationFrame(frame);
-		frame = requestAnimationFrame(run);
+		// }
 	};
 
 	return {
