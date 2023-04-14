@@ -2,13 +2,14 @@
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { MapItem } from "$lib/utils/map";
+	import type { MapItem } from "../types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
 	import { CurrentLevel } from "./Level.svelte";
 	import { ctxKey, type TextureContext } from "../../routes/key";
 	import { compare } from "../utils/compare";
+	import { AudioManager } from "$lib/helpers/audio";
 
 	export let item: MapItem;
 	export let offset: number;
@@ -16,15 +17,25 @@
 
 	let state: "open" | "closed" = "closed";
 	let visibility = true;
+	let shouldMute = true;
+	let count = 0;
+
 	const { textures }: TextureContext = getContext(ctxKey);
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);
+	const audioPlayer = new AudioManager({
+		open: new URL("../sounds/objects/door/door.WAV", import.meta.url).toString()
+	});
 
 	export const getVisibility = () => visibility;
 	export const setVisibility = (visible: boolean) => (visibility = visible);
 
 	export const toggleOpen = () => {
+		if (shouldMute && count >= 2) shouldMute = false;
+
+		if (shouldMute) count += 1;
+
 		state = state === "open" ? "closed" : "open";
 		position.update((u) =>
 			!rotation
@@ -43,6 +54,13 @@
 			currentState.position = { x: offset, z: section };
 		}
 		CurrentLevel.updateTileAt(section, offset, currentState);
+
+		if (!shouldMute && state === "open") {
+			audioPlayer.play("open");
+			setTimeout(() => {
+				toggleOpen();
+			}, 5000);
+		}
 	};
 	export const getPosition = () => $position;
 	export const getLocalPosition = (): Omit<Position, "y"> => ({
@@ -54,7 +72,8 @@
 
 	onMount(() => {
 		let interval: string | number | NodeJS.Timer | undefined;
-
+		toggleOpen();
+		toggleOpen();
 		try {
 			const isLeftRight =
 				compare(
@@ -76,18 +95,12 @@
 				);
 			if (isLeftRight) rotation = 0;
 			else if (isTopBottom) rotation = 90;
+
+			visibility = true;
 		} catch {}
 	});
-	let isMouseOver = false;
 </script>
 
-<svelte:window
-	on:keydown={(e) => {
-		if (e.key === " " && isMouseOver) {
-			state = state === "open" ? "closed" : "open";
-		}
-	}}
-/>
 <div
 	class="door {state}"
 	style="visibility: {visibility
@@ -126,7 +139,7 @@
 			background-size: 100%;
 			image-rendering: pixelated;
 			transform-style: preserve-3d;
-			transform: translate3d(0, 0%, -8px);
+			transform: translate3d(0, 0%, -8px) rotateY(180deg);
 			&:nth-child(2) {
 				transform: translateZ(8px);
 			}
@@ -135,6 +148,7 @@
 			position: inherit;
 			top: 0%;
 			//
+			backface-visibility: hidden;
 			left: 0%;
 		}
 		&::before,

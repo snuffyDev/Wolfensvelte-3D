@@ -23,19 +23,11 @@ export type Entity = {
 	position?: Position2D | undefined;
 	rotation: Position | undefined;
 	model?: Model;
-	surfaces: Surface;
-	secret?: boolean;
-	pushwall?: boolean;
+	surfaces: [front: Surface, right: Surface, back: Surface, left: Surface] | null;
 };
-// Updated Entity type
-export type ExtendedEntity = {
-	position?: Position2D | undefined;
-	rotation: Position | undefined;
-	model?: Model;
-	surfaces: Record<WallFace, Surface> | null;
-};
+
 // Dict containing textures for each cardinal direction
 export type MapItem = Entity;
 
 // A Multidimensional Array with MapItems
-export type World = ReadonlyArray<Entity[]>;
+export type World = ReadonlyArray<MapItem[]>;

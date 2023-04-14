@@ -41,7 +41,8 @@
 	import { onMount, tick } from "svelte";
 	import type { MapItem } from "../../types/core";
 	import { isVisibleToPlayer } from "../../utils/angle";
-	import BarkSound from "$lib/sounds/dog.WAV?url";
+	import BarkSound from "$lib/sounds/dog/bark.WAV?url";
+	import DeathSound from "$lib/sounds/dog/death.WAV?url";
 	import { AudioManager } from "$lib/helpers/audio";
 	import { CurrentLevel } from "../Level.svelte";
 	import { testLineOfSight } from "../Player.svelte";
@@ -60,7 +61,8 @@
 	});
 
 	const audioManager = new AudioManager({
-		bark: new URL(BarkSound, import.meta.url).toString()
+		bark: new URL(BarkSound, import.meta.url).toString(),
+		death: new URL(DeathSound, import.meta.url).toString()
 	});
 
 	let isVisible = false;
@@ -68,6 +70,8 @@
 	const tween = state.tween;
 
 	export const getPosition = () => $tween;
+	export const getLocalPosition = () => ({ x: offset, z: section });
+
 	export const setState = state.setState;
 	export const getState = () => $state.state;
 
@@ -79,6 +83,7 @@
 		if ($state.health <= 0) {
 			tween.cancel();
 			stateLoop.stop();
+			audioManager.play("death");
 			state.setState("dead");
 		}
 	};
@@ -98,7 +103,7 @@
 		if ($state.state === "dead") return;
 		const elapsed = now - startFrame;
 
-		if (elapsed > 150 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
+		if (!busy && elapsed > 100 + rand.nextByte()) {
 			if (busy) return;
 
 			busy = true;
@@ -109,19 +114,19 @@
 				$state.position
 			);
 
-			const seen = isVisibleToPlayer(getPosition(), 45);
 			const playerPosition = getLocalPositionFromRealPosition({
 				x: 1 - $PlayerState.position.x,
 				z: 1 - $PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
-			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && seen && distance < 1000) {
+
+			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1000) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("bark");
 				}
 
-				if (distance > 64 && distance < 850 && Math.abs(Math.random()) > 0.85) {
+				if (distance >= 75 && distance < 680 && Math.random() < 0.6) {
 					await tick();
 					previousAnimationState = "walk";
 					return state
@@ -134,7 +139,7 @@
 						.finally(() => {
 							busy = false;
 						});
-				} else if (distance >= 32 && distance < 150 && Math.random() < 0.6) {
+				} else if (distance > 4 && distance < 150) {
 					await tick();
 					await tween.cancel();
 					previousAnimationState = "attack";
@@ -144,14 +149,12 @@
 					busy = false;
 					// return;
 				} else {
-					await tick();
-					if (distance > 1000) playerJustSeen = false;
-					previousAnimationState = "idle";
+					// if (distance > 1000) playerJustSeen = false;
 					state.setState("idle");
+					busy = false;
 				}
 			} else {
-				await tick();
-				if (distance > 1000) playerJustSeen = false;
+				// if (distance > 1000) playerJustSeen = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
 				busy = false;

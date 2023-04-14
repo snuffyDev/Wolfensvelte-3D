@@ -18,26 +18,52 @@ export interface TiledJSON {
 
 interface Layer {
 	data?: number[];
+	height?: number;
+	id: number;
+	name: string;
+	opacity: number;
+	type: string;
+	visible: boolean;
+	width?: number;
+	x: number;
+	y: number;
+	draworder?: string;
+	objects?: Object[];
+}
+
+interface Object {
+	gid: number;
 	height: number;
 	id: number;
 	name: string;
-	opacity?: number;
+	properties?: Property[];
+	rotation: number;
 	type: string;
 	visible: boolean;
 	width: number;
 	x: number;
 	y: number;
-	rotation?: number;
 }
+
+interface Property {
+	name: Name;
+	type: Type;
+	value: Value;
+}
+
+type Name = "secret" | "type" | "elevator";
+
+type Type = "bool" | "string";
+
+type Value = boolean | string;
 
 interface Tileset {
 	columns: number;
 	firstgid: number;
-	image: string;
-	imageheight: number;
-	imagewidth: number;
+	grid: Grid;
 	margin: number;
 	name: string;
+	objectalignment: string;
 	spacing: number;
 	tilecount: number;
 	tileheight: number;
@@ -45,19 +71,15 @@ interface Tileset {
 	tilewidth: number;
 }
 
-interface Tile {
-	id: number;
-	objectgroup: Objectgroup;
+interface Grid {
+	height: number;
+	orientation: string;
+	width: number;
 }
 
-interface Objectgroup {
-	draworder: string;
+interface Tile {
 	id: number;
-	name: string;
-	objects: Layer[];
-	opacity: number;
-	type: string;
-	visible: boolean;
-	x: number;
-	y: number;
+	image: string;
+	imageheight: number;
+	imagewidth: number;
 }

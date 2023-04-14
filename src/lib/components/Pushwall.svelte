@@ -1,0 +1,121 @@
+<svelte:options accessors={true} />
+
+<script lang="ts">
+	import type { Position, Position2D } from "$lib/types/position";
+	import type { MapItem } from "../types/core";
+	import { getFacingDirection, getRealPositionFromLocalPosition } from "$lib/utils/position";
+	import { getContext, onMount } from "svelte";
+	import { tweened } from "svelte/motion";
+	import { CurrentLevel } from "./Level.svelte";
+	import { ctxKey, type TextureContext } from "../../routes/key";
+	import { compare } from "../utils/compare";
+	import { AudioManager } from "$lib/helpers/audio";
+	import Wall from "./Wall.svelte";
+	import { PlayerState } from "$lib/stores/player";
+
+	export let item: MapItem;
+	export let offset: number;
+	export let section: number;
+
+	let state: "open" | "closed" = "closed";
+	let hasOpenedOnce = false;
+	let visibility = true;
+	let shouldMute = true;
+	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
+	const position = tweened(_position);
+
+	export const getVisibility = () => visibility;
+	export const setVisibility = (visible: boolean) => (visibility = visible);
+
+	export const toggleOpen = async () => {
+		if (state === "open" || hasOpenedOnce) return;
+		hasOpenedOnce = true;
+
+		const direction = getFacingDirection($PlayerState.rotation.y);
+		let toPosition: Position2D = getLocalPosition();
+
+		switch (direction) {
+			case "left":
+				toPosition = { ...toPosition, x: toPosition.x + 1 };
+				break;
+			case "right":
+				toPosition = { ...toPosition, x: toPosition.x - 1 };
+				break;
+			case "back":
+				toPosition = { ...toPosition, z: toPosition.z - 1 };
+				break;
+			case "front":
+				toPosition = { ...toPosition, z: toPosition.z + 1 };
+				break;
+			default:
+				break;
+		}
+
+		while ($CurrentLevel[toPosition.z][toPosition.x].surfaces === null) {
+			const nextPosition = getRealPositionFromLocalPosition({ ...toPosition });
+
+			await position.set({ x: nextPosition.x, z: nextPosition.z }, { duration: 1000 }).then(() => {
+				switch (direction) {
+					case "left":
+						toPosition = { ...toPosition, x: toPosition.x + 1 };
+						break;
+					case "right":
+						toPosition = { ...toPosition, x: toPosition.x - 1 };
+						break;
+					case "back":
+						toPosition = { ...toPosition, z: toPosition.z - 1 };
+						break;
+					case "front":
+						toPosition = { ...toPosition, z: toPosition.z + 1 };
+						break;
+					default:
+						break;
+				}
+			});
+		}
+		let currentState = $CurrentLevel[section][offset];
+		// if (!currentState.position) currentState.position = {} as Position2D;
+		currentState.position = toPosition;
+
+		CurrentLevel.updateTileAt(toPosition.z, toPosition.x, {
+			position: currentState.position,
+			surfaces: currentState.surfaces,
+			rotation: undefined,
+			secret: false,
+			pushwall: true
+		});
+
+		queueMicrotask(() => {
+			state = "open";
+		});
+	};
+	export const getPosition = () => $position;
+	export const getLocalPosition = (): Omit<Position, "y"> =>
+		state === "open" && item.position
+			? item.position
+			: {
+					x: offset,
+					z: section
+			  };
+</script>
+
+<div
+	class="pushwall  {state}"
+	style="visibility: {visibility
+		? 'visible'
+		: 'hidden'};  --pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {0}deg;"
+>
+	<Wall {item} />
+</div>
+
+<style lang="scss">
+	.pushwall {
+		position: absolute;
+		width: 64px;
+		height: 64px;
+		transform: translate3d(var(--pX), 0%, var(--pZ)) rotateY(var(--rotation));
+		// contain: content;
+		backface-visibility: hidden;
+		transform-style: preserve-3d;
+	}
+</style>

@@ -1,7 +1,4 @@
-<svelte:options
-	accessors={true}
-	immutable={true}
-/>
+<svelte:options accessors={true} />
 
 <script lang="ts">
 	import { getContext } from "svelte";
@@ -9,7 +6,6 @@
 	import type { Entity } from "$lib/types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { PlayerState } from "$lib/stores/player";
-	import { isVisibleToPlayer } from "$lib/utils/angle";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
@@ -31,8 +27,6 @@
 	export const getLocalPosition = () => ({ x: offset, z: section });
 
 	let texture = item.model?.texture;
-	let rotation: number;
-	$: if (isVisibleToPlayer(position, 30)) rotation = -$PlayerState.rotation.y;
 </script>
 
 {#if isVisible && texture}
@@ -41,7 +35,8 @@
 		class="sprite"
 		style="{url} visibility: {isVisible
 			? 'visible'
-			: 'hidden'}; transform: translate3d({-position.x}px, -50%, {-position.z}px) rotateY({rotation}deg); "
+			: 'hidden'}; transform: translate3d({-position.x}px, -50%, {-position.z}px) rotateY({-$PlayerState
+			.rotation.y}deg); "
 	/>
 {/if}
 

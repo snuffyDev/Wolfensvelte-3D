@@ -1,6 +1,6 @@
 <svelte:options
-	immutable={true}
 	accessors={true}
+	immutable={true}
 />
 
 <script
@@ -58,7 +58,6 @@
 
 	/** Returns an array of DOM elements for each wall face */
 	export const boundSides: HTMLDivElement[] = [];
-
 	const { textures }: TextureContext = getContext(ctxKey);
 
 	const getZPosition = (direction: "front" | "left" | "right" | "back") => {
@@ -93,7 +92,7 @@
 					data-rotation={DIRECTION_MAP[direction]}
 					style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
 						direction
-					]}deg); "
+					]}deg);"
 				>
 					<!-- {direction} -->
 				</div>
@@ -108,11 +107,12 @@
 		background-image: var(--img);
 		/* top: 0%; */
 		image-rendering: pixelated;
-		background-size: 100%;
+		background-size: 64px;
 		background-repeat: no-repeat;
-		backface-visibility: hidden !important;
+		/* backface-visibility: hidden !important; */
 		font-size: 1rem;
 		color: white;
+		backface-visibility: hidden !important;
 
 		/* image-rendering: ; */
 		/* opacity: 1; */

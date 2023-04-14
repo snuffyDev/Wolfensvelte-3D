@@ -75,7 +75,7 @@
 		</div>
 		<div class="col">
 			<b>Lives</b>
-			<span>{$PlayerState.score}</span>
+			<span>{$PlayerState.lives}</span>
 		</div>
 		<div class="col">
 			{#each FACE_MAP[PORTRAIT_STATE] as img, idx}
@@ -89,7 +89,7 @@
 		</div>
 		<div class="col">
 			<b>Health</b>
-			<span>{$PlayerState.health}</span>
+			<span>{$PlayerState.health}%</span>
 		</div>
 		<div class="col">
 			<b>Ammo</b>
@@ -161,7 +161,9 @@
 		// max-width: 5rem;
 		// justify-content: center;
 		min-width: 1rem;
-		font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+		line-height: 1.7;
+		font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+			Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 		&:not(:nth-last-child(2)) {
 			// width: 100%;
 		}

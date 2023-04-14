@@ -68,13 +68,13 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 				let paths = findPath(ourPosition, playerPosition);
 				if (!Array.isArray(paths)) return;
 
-				console.log(paths, playerPosition);
+				// console.log(paths, playerPosition);
 				let count = 0;
 				for (const path of paths) {
 					AC.signal.throwIfAborted();
 					if (state.state === "dead") break;
 					if (!path) return;
-					console.log(path);
+					// console.log(path);
 					state.state = "walk";
 					update((u) => ({ ...u, state: state.state }));
 
@@ -123,7 +123,7 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 			update((u) => ({ ...u, state: "hurt" }));
 
 			if (typeof n !== "number") {
-				n = Math.abs(rand.randomInRange(9, 13));
+				n = Math.abs(rand.nextInt(5, 20));
 			}
 
 			state.health -= n;
@@ -140,15 +140,18 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 		},
 		setState(targetState: EnemyState["state"]) {
 			state.state = targetState;
-			// 70% chance of doing damage so it doesn't feel too predictable
-			if (state.state === "attack") {
-				if (Math.random() < 0.7) {
-					tick().then(() => {
-						PlayerState.takeDamage();
-					});
+			return new Promise((res) => {
+				// 80% chance of doing damage so it doesn't feel too predictable
+				if (state.state === "attack") {
+					if (Math.random() < 0.8) {
+						tick().then(() => {
+							PlayerState.takeDamage();
+						});
+					}
 				}
-			}
-			update((u) => ({ ...u, state: state.state }));
+				update((u) => ({ ...u, state: state.state }));
+				setTimeout(res, 1000);
+			});
 		}
 	};
 }

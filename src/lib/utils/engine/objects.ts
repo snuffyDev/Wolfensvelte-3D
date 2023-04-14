@@ -11,22 +11,31 @@ export const EnemySymbol = {
 } as const
 
 export const ItemPickups = {
-    Cross: 146,
-    Goblet: 147,
-    Chest: 148,
-    Crown: 149,
+	Cross: 146,
+	Goblet: 147,
+	Chest: 148,
+	Crown: 149,
 
-    Chaingun: 145,
-    Smg: 144,
+	Chaingun: 145,
+	Smg: 144,
 
-    Ammo: 143,
+	Ammo: 143,
 
-    Medkit: 142,
-    Food: 141,
+	Medkit: 142,
+	Food: 141,
+	DogFood: 123
+} as const;
 
+export const ItemPickupIds =
+	Object.values<Readonly<(typeof ItemPickups)[keyof typeof ItemPickups]>>(ItemPickups);
 
+export const TreasurePickupPointMap = {
+	146: 100,
+	147: 500,
+	148: 1000,
+	149: 5000
 } as const;
 
 export const noClipObjectIds = [
-	131, 121, 155, 151, 165, 143, 144, 145, 146, 147, 148, 149, 150, 138, 137, 165
+	131, 121, 155, 151, 165, 143, 142, 144, 145, 146, 147, 123, 148, 149, 150, 138, 137, 165, 126
 ];

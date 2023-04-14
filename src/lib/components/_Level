@@ -1,4 +1,4 @@
-<svelte:options />
+<svelte:options immutable={true} />
 
 <script
 	context="module"
@@ -25,94 +25,40 @@
 		const { subscribe, set, update } = writable<World>([]);
 
 		const checkCollisionWithWorld = (position: Position | Position2D, isBot = false) => {
-			const {
-				pushwall = false,
-				secret = false,
-				model,
-				position: wallPosition,
-				surfaces,
-				rotation
-			} = TILES[position!.z][position!.x];
+			const { model, position: wallPosition, surfaces } = TILES[position!.z][position!.x];
 
 			if (model?.texture && noClipObjectIds.includes(model?.texture)) {
 				handleNoClipObject(model, position);
 				return false;
 			} else if (model?.texture) return true;
 
-			const doorCheck = isDoor(
-				{ pushwall, secret, model, position: wallPosition, rotation, surfaces },
-				position
-			);
-			if (doorCheck) return doorCheck;
-			if (
-				isWall(
-					{ position: wallPosition, secret, rotation, pushwall, model, surfaces },
-					wallPosition
-				)
-			)
-				return true;
+			if (isWall(model, wallPosition)) return true;
 
 			if (isBot && isEnemy(model)) return true;
 			else if (isEnemy(model)) return false;
 
-			return (
-				surfaces &&
-				(pushwall
-					? position.x === wallPosition?.x && position.z === wallPosition?.z
-					: surfaces && hasValidTexture(surfaces))
-			);
-		};
-
-		const isDoor = (entity: { [K in keyof Entity]: Entity[K] }, position: Position2D) => {
-			return (
-				(entity.pushwall === true &&
-					entity.secret === true &&
-					entity.position?.x === position.x &&
-					entity.position?.z === position.z) ||
-				("model" in entity &&
-					typeof entity.model === "object" &&
-					"component" in entity.model &&
-					entity.model.component === "Door" &&
-					entity.position?.x === position.x &&
-					entity.position?.z === position.z)
-			);
+			return hasValidTexture(surfaces);
 		};
 
 		const handleNoClipObject = (model: NonNullable<Entity["model"]>, position: Position2D) => {
-			if (!ArrayUtils.includesUnknown(ItemPickupIds, model.texture)) return;
-
 			if (model.texture === ItemPickups.Ammo) {
+				model.texture = undefined;
+				updateTileAt(position.x, position.z, { rotation: undefined, surfaces: null });
 				PlayerState.giveAmmo("pistol", 4);
 			}
-
-			if (model.texture! in TreasurePickupPointMap) {
-				PlayerState.givePoints(
-					TreasurePickupPointMap[model.texture! as keyof typeof TreasurePickupPointMap]
-				);
-			}
-			if (model.texture === ItemPickups.DogFood) {
-				PlayerState.giveHealth(4);
-			}
 			if (model.texture === ItemPickups.Medkit) {
+				model.texture = undefined;
+				updateTileAt(position.x, position.z, { rotation: undefined, surfaces: null });
 				PlayerState.giveHealth(25);
 			}
-
-			model.texture = undefined;
-			updateTileAt(position.z, position.x, { rotation: undefined, surfaces: null });
 		};
 
-		const isWall = (
-			{ position: wallPosition, pushwall, surfaces, model }: { [K in keyof Entity]: Entity[K] },
-			position: Entity["position"]
-		) => {
+		const isWall = (model: Entity["model"], position: Entity["position"]) => {
 			return (
 				position &&
-				!model &&
-				wallPosition &&
-				wallPosition.x === position.x &&
-				wallPosition.z === position.z &&
-				surfaces &&
-				!pushwall
+				model?.component !== "Object" &&
+				position.x === position.x &&
+				position.z === position.z
 			);
 		};
 
@@ -124,34 +70,24 @@
 			return compare(surfaces, (t) => isValidTexture(t) !== false);
 		};
 
-		const updateTileAt = (row: number, column: number, data: Entity) => {
-			console.log("BEFORE UPDATE TILE AT ", { row, column }, TILES[row][column]);
-			console.log("BEFORE UPDATE DATA", data);
-			TILES[row][column] = data;
-
+		const updateTileAt = (x: number, z: number, data: Entity) => {
 			update((u) => {
-				u = [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
+				u = [...u.slice(0, x), splice(u[x], z, 1, data), ...u.slice(x + 1)];
+				TILES = u;
 				return u;
 			});
-			console.log("AFTER UPDATE TILE AT", TILES[row][column]);
-			console.log({ row, column });
 		};
 		return {
 			subscribe,
 			get() {
 				return TILES;
 			},
-			set(level: typeof TILES) {
+			set(level: World) {
 				TILES = level;
 				set(TILES);
 			},
 			updateTileAt,
-			update: (updateFn: Updater<typeof TILES>) => {
-				update((v) => {
-					v = updateFn(TILES);
-					return v;
-				});
-			},
+			update,
 			checkCollisionWithWorld
 		};
 	}
@@ -160,10 +96,10 @@
 <script lang="ts">
 	import { frameLoop } from "$lib/utils/raf";
 	import { getDistanceFromPoints } from "$lib/utils/position";
-	import { ArrayUtils, isValidTexture } from "../utils/validation";
+	import { isValidTexture } from "../utils/validation";
 	import { onMount } from "svelte";
 	import { PlayerState } from "$lib/stores/player";
-	import { writable, type Updater } from "svelte/store";
+	import { writable } from "svelte/store";
 
 	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
@@ -172,18 +108,12 @@
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { Entity, Entity, Model, Surface, WallFace, World } from "../types/core";
+	import type { Entity, Surface, WallFace, World } from "../types/core";
 	import { compare } from "../utils/compare";
 	import { isVisibleToPlayer } from "../utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
-	import {
-		ItemPickupIds,
-		ItemPickups,
-		TreasurePickupPointMap,
-		noClipObjectIds
-	} from "$lib/utils/engine/objects";
+	import { ItemPickups, noClipObjectIds } from "$lib/utils/engine/objects";
 	import Dog from "./Dog/Dog.svelte";
-	import Pushwall from "./Pushwall.svelte";
 
 	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
@@ -199,31 +129,98 @@
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
 		for (const obj of GameObjects) {
 			if (!obj) continue;
-			const pos = obj.getPosition?.();
-			if (!pos) return;
-			const visible = isVisibleToPlayer(obj, -180);
-			const distance = getDistanceFromPoints(
-				{ x: pos.x - 50, z: pos.z },
-				{ x, y, z } /* playerPosition */
-			);
+			queueMicrotask(() => {
+				const pos = obj.getPosition?.();
+				if (!pos) return;
+				const visible = isVisibleToPlayer(obj, -180);
+				const distance = getDistanceFromPoints(
+					{ x: pos.x - 50, z: pos.z },
+					{ x, y, z } /* playerPosition */
+				);
 
-			const isVisibleAlready = obj.getVisibility();
+				const isVisibleAlready = obj.getVisibility();
 
-			if (visible !== true && isVisibleAlready && distance > 1500) {
-				obj.setVisibility(false);
-				return;
-			} else if (!isVisibleAlready && distance < 1500 && visible === true) {
-				obj.setVisibility(true);
-			}
+				if (visible === false || distance >= 1564) {
+					obj.setVisibility(false);
+					return;
+				} else if (!isVisibleAlready && visible === true) {
+					obj.setVisibility(true);
+				}
+			});
 		}
 	}
+	type ConnectedTile = {
+		position: Position2D;
+		surface: Surface;
+		direction: WallFace | null;
+	};
+
+	function dfs(x: number, z: number, world: World, visited: boolean[][]): ConnectedTile[] {
+		const directions: Array<[number, number, WallFace]> = [
+			[-1, 0, "left"],
+			[1, 0, "right"],
+			[0, -1, "front"],
+			[0, 1, "back"]
+		];
+
+		const connectedGroup: ConnectedTile[] = [];
+		visited[x][z] = true;
+
+		for (const [dx, dz, direction] of directions) {
+			const newX = x + dx;
+			const newZ = z + dz;
+
+			if (
+				newX >= 0 &&
+				newX < world.length &&
+				newZ >= 0 &&
+				newZ < world[newX].length &&
+				!visited[newX][newZ] &&
+				!!world[x][z].surfaces &&
+				!!world[newX][newZ].surfaces &&
+				world[newX][newZ].surfaces === world[x][z].surfaces
+			) {
+				connectedGroup.push(...dfs(newX, newZ, world, visited));
+			}
+		}
+
+		return [
+			{
+				position: { x: x, z: z },
+				surface: world[x][z].surfaces,
+				direction: null
+			},
+			...connectedGroup
+		];
+	}
+
+	function findConnectedTileGroups(world: World): ConnectedTile[][] {
+		const visited: boolean[][] = Array.from({ length: world.length }, () =>
+			Array(world[0].length).fill(false)
+		);
+
+		const connectedTileGroups: ConnectedTile[][] = [];
+
+		for (let x = 0; x < world.length; x++) {
+			for (let z = 0; z < world[x].length; z++) {
+				if (!visited[x][z]) {
+					const connectedGroup = dfs(x, z, world, visited);
+					if (connectedGroup.length > 1) {
+						connectedTileGroups.push(connectedGroup);
+					}
+				}
+			}
+		}
+
+		return connectedTileGroups;
+	}
+
 	onMount(() => {
 		worldRef = document.getElementById("world")!;
-		// const newWorld = createUpdatedWorld(level);
 		CurrentLevel.set(level);
 		gameLoop = frameLoop.add(update);
 		gameLoop.start();
-		console.log($CurrentLevel);
+		console.log(findConnectedTileGroups($CurrentLevel), $CurrentLevel);
 		setTimeout(() => {
 			console.log(GameObjects);
 		}, 4000);
@@ -278,13 +275,6 @@
 									{item}
 								/>
 							{/if}
-						{:else if item.pushwall && item.secret}
-							<Pushwall
-								bind:this={GameObjects.doors[GameObjects.doors.length]}
-								{item}
-								{section}
-								{offset}
-							/>
 						{:else if item.surfaces}
 							<Wall
 								bind:this={GameObjects.walls[GameObjects.walls.length]}
@@ -304,15 +294,15 @@
 <style lang="scss">
 	#scene {
 		perspective: calc(var(--perspective));
-		// transform: perspective(1000px);
 
 		will-change: contents;
+		// transform: perspective(1000px);
 		width: 100%;
 		inset: 0;
 		overflow: hidden;
 		height: 100%;
 		backface-visibility: hidden;
-		transform-style: preserve-3d;
+		// transform-style: preserve-3d;
 	}
 
 	#world {

@@ -25,20 +25,35 @@ export interface IPlayerState {
 	weapons: Partial<Record<Weapons, { ammo: number | null; acquired: boolean }>>;
 	rotation: Position;
 	position: Position;
+	lives?: number;
 }
 
 const CONSTANTS = {
 	speed: 5.875
 } as const;
 
+const DEFAULT_STATE = (lives = 3): IPlayerState => ({
+	health: 100,
+	weapons: {
+		knife: { acquired: true, ammo: null },
+		pistol: { acquired: true, ammo: 8 },
+		smg: { acquired: false, ammo: null }
+	},
+	lives,
+	score: 0,
+	position: { x: 1794, z: 3008, y: 0 },
+	rotation: { x: 0, y: 270, z: 0 }
+});
+
 function _playerState() {
-	const state: IPlayerState = {
+	let state: Required<IPlayerState> = {
 		health: 100,
 		weapons: {
 			knife: { acquired: true, ammo: null },
 			pistol: { acquired: true, ammo: 8 },
 			smg: { acquired: false, ammo: null }
 		},
+		lives: 3,
 		score: 0,
 		position: { x: 1794, z: 3008, y: 0 },
 		rotation: { x: 0, y: 270, z: 0 }
@@ -48,19 +63,45 @@ function _playerState() {
 	return {
 		subscribe,
 		set,
+		init() {
+			state = DEFAULT_STATE(state.lives - 1);
+			set(state);
+		},
 		get() {
 			return state;
 		},
+		giveHealth(health: 25 | 4 | 10) {
+			state.health += health;
+			if (state.health >= 100) state.health = 100;
+			update((u) => ({ ...u, health: state.health }));
+		},
 		takeDamage(n?: number | undefined) {
 			if (typeof n !== "number") {
-				n = Math.min(10, Math.abs(~~(rand.nextInt() / 0xbcbcfcb)));
+				n = rand.nextInt(9, 18);
 			}
 			state.health -= n;
+			state.health = state.health < 0 ? 0 : state.health;
+
 			update((u) => ({ ...u, health: state.health }));
 		},
 		givePoints(points: number) {
 			state.score += points;
 			update((u) => ({ ...u, score: state.score }));
+		},
+
+		giveAmmo(weapon: Weapons, count: number) {
+			const weaponState = state["weapons"][weapon];
+			if (!weaponState) {
+				state["weapons"][weapon] = { acquired: true, ammo: count };
+			} else {
+				if (weaponState.ammo === null) {
+					weaponState.ammo = count;
+				} else {
+					weaponState.ammo += count;
+				}
+			}
+
+			update((u) => ({ ...u, weapons: { ...state.weapons, [weapon]: weaponState } }));
 		},
 		update: function (input: PlayerControls) {
 			const moves: Position2D[] = [];
@@ -95,10 +136,8 @@ function _playerState() {
 				state.position.z = +toMove.z;
 			}
 			update((u) => {
-				return {
-					...u,
-					position: state.position
-				};
+				u.position = state.position;
+				return u;
 			});
 		},
 		moveForward(): Position2D {
@@ -144,7 +183,7 @@ function _playerState() {
 					: Math.sin(0.825 * Math.PI) * CONSTANTS.speed;
 
 			rotation.y += +angleToRotateTo;
-			rotation.y = +(rotation.y % 360).toFixed(3);
+			rotation.y = +(rotation.y % 360).toFixed(0);
 			update((u) => ({ ...u, rotation: state.rotation }));
 		},
 

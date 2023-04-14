@@ -7,8 +7,8 @@
 	padding: 0;
 }
 :root {
-	--perspective: 1000px;
-	// transform-style: flat;
+	--perspective: 1150px;
+	transform-style: flat;
 	font-size: 16px;
 	user-select: none;
 }
@@ -41,13 +41,15 @@ body {
 
 .surface {
 	transform-style: preserve-3d;
-	position: fixed;
-	// inset: 0;
-	contain: layout style size;
-	// overflow: ;
+	position: absolute;
+	inset: 0;
+	// contain: layout style size;
+	// overflow: hidden;
+	// flex-direction: ;
+	// flex: 0 1;
 	width: 64px;
 	height: 64px;
-	transform-origin: top left;
+	transform-origin: center;
 	opacity: 1;
 	backface-visibility: hidden;
 }
@@ -61,34 +63,38 @@ body {
 }
 
 .wall {
-	position: fixed;
+	position: absolute;
 	width: 64px;
 	height: 64px;
-	contain: layout style size;
-
+	will-change: none;
+	// contain: layout style size;
 	// will-change: opacity;
 	// isolation: auto;
 	// overflow: hidden;
 	//
-	// transform-style: preserve-3d;
-	backface-visibility: hidden;
+	top: 0;
+	left: 0;
+	// inset: 0;
+	transform-style: preserve-3d;
+	backface-visibility: hidden !important;
 	image-rendering: pixelated;
 	&.front {
 		transform-origin: center;
-		transform: rotateY(0deg) translateZ(64px);
+		transform: rotateY(0deg);
 	}
 	&.right {
 		transform-origin: right;
-		transform: rotateY(90deg) translateZ(32px);
+		transform: rotateY(90deg);
 	}
 	&.back {
-		transform: rotateY(180deg) translateZ(32px);
+		transform: rotateY(180deg);
 		// background-position-x: 51px;
+
 		transform-origin: center;
 	}
 	&.left {
 		transform-origin: left;
-		transform: rotateY(-90deg) translateZ(32px);
+		transform: rotateY(270deg);
 		// background-position-x: 51px;
 	}
 }
@@ -98,15 +104,15 @@ body {
 	// top: 50%;
 	backface-visibility: hidden !important;
 
-	font-family: sans-serif;
-	font-size: 3em;
+	// font-family: sans-serif;
+	// font-size: 3em;
 
-	background-size: 100%;
+	// background-size: 100%;
 }
 
 .floor {
 	position: fixed;
-	// overflow: hidden;
+	overflow: hidden;
 	width: 4096px;
 	height: 4096px;
 	backface-visibility: hidden;

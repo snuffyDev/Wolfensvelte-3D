@@ -5,14 +5,15 @@ export const getDistanceFromPoints = (p1: Position | Position2D, p2: Position | 
     return Math.sqrt((p2.x - p1.x) ** 2 + (p2.z - p1.z) ** 2);
 };
 
+
 /**
  * Converts "local" position (ex: a map tile) to a "real" position that can
  * be used for the actual transformations
  */
 export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: Math.floor(x * 64),
-		z: Math.floor(z * 64)
+		x: Math.round(x * 64),
+		z: Math.round(z * 64)
 	};
 }
 
@@ -22,11 +23,10 @@ export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Posit
  */
 export function getLocalPositionFromRealPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: Math.abs(Math.ceil(x / 64)),
-		z: Math.abs(Math.ceil((z - 32) / 64))
+		x: (Math.ceil(x / 64) + (x >> 31)) ^ (x >> 31),
+		z: (Math.ceil((z - 32) / 64) + (z >> 31)) ^ (z >> 31)
 	};
 }
-
 /** Utility for getting the direction the player is currently facing */
 export function getFacingDirection(angle: number): "front" | "right" | "back" | "left" {
 	angle = angle < 0 ? 360 + angle : angle;

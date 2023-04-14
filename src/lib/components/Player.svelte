@@ -1,4 +1,4 @@
-<svelte:options immutable={true} />
+<svelte:options />
 
 <script
 	context="module"
@@ -81,11 +81,6 @@
 		f.stop();
 	});
 
-	async function requestPointerLock(e: MouseEvent) {
-		const target = e.target as HTMLElement;
-		await target.requestPointerLock();
-	}
-
 	async function primaryAction() {
 		const { position } = $PlayerState;
 		const shouldAttackEnemy = await interactWithDoor(position);
@@ -96,6 +91,7 @@
 
 	// Returns true or false, to indicate whether the user should shoot or not (confusing, I know)
 	async function interactWithDoor(position: Position2D) {
+		if (!GameObjects.doors) return;
 		const playerLocal = getLocalPositionFromRealPosition(position);
 		let toPosition: Position2D = {} as Position2D;
 
@@ -117,7 +113,7 @@
 				break;
 		}
 		for (const door of GameObjects.doors) {
-			const localPosition = door.getLocalPosition();
+			const localPosition = door?.getLocalPosition();
 			if (
 				(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
 				(localPosition.x - 1 === toPosition.x && localPosition.z === toPosition.z)
@@ -131,6 +127,12 @@
 	}
 
 	async function attackClosestEnemy(position: Position2D) {
+		audioManager.play("pistol");
+		if (state === "shoot") {
+		}
+		if ($PlayerState.weapons.pistol) {
+			$PlayerState.weapons.pistol!.ammo! -= 1;
+		}
 		state = "shoot";
 		await tick();
 
@@ -141,12 +143,22 @@
 				x: -position.x,
 				z: -position.z
 			});
-			if (isVisibleToPlayer(e?.getPosition(), 30) && distance < 750 && e?.getState() !== "dead") {
+			if (
+				isVisibleToPlayer(e?.getPosition(), 5) &&
+				testLineOfSight(
+					$CurrentLevel,
+					getLocalPositionFromRealPosition({
+						x: position.x,
+						z: position.z
+					}),
+					e.getLocalPosition()
+				) &&
+				distance < 750 &&
+				e?.getState() !== "dead"
+			) {
 				enemiesInRange.push(e);
 			}
 		}
-
-		audioManager.play("pistol");
 
 		if (!enemiesInRange.length) return;
 
@@ -176,35 +188,6 @@
 		if (canShoot) {
 			await PlayerState.attack(target);
 		}
-	}
-
-	function handleMouseMove(node: HTMLElement) {
-		function handleMove(event: MouseEvent) {
-			x = event.movementX;
-			if (x < -1) {
-				buttonsPressed.leftarrow = true;
-				buttonsPressed.rightarrow = false;
-			} else if (x > 1) {
-				buttonsPressed.rightarrow = true;
-				buttonsPressed.leftarrow = false;
-			} else {
-				buttonsPressed.rightarrow = false;
-				buttonsPressed.leftarrow = false;
-			}
-			buttonsPressed = { ...buttonsPressed };
-		}
-		const mouseOut = () => {
-			buttonsPressed.leftarrow = false;
-			buttonsPressed.rightarrow = false;
-		};
-		window.addEventListener("mousemove", handleMove);
-		window.addEventListener("mouseout", mouseOut);
-		return {
-			destroy() {
-				window.removeEventListener("mousemove", handleMove);
-				window.removeEventListener("mouseout", mouseOut);
-			}
-		};
 	}
 </script>
 
@@ -272,11 +255,6 @@
 	}}
 />
 
-<svelte:body
-	use:handleMouseMove
-	on:click={requestPointerLock}
-/>
-
 <div
 	class="player-gun {state}"
 	on:animationend|capture={() => {
@@ -336,11 +314,11 @@
 	}
 
 	.camera {
-		position: fixed;
+		position: absolute;
 
 		inset: 0;
 		contain: layout size style;
-		transform: translateZ(0);
+		// transform: translateZ(0);
 
 		transform-style: preserve-3d;
 		will-change: transform;

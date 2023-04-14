@@ -14,6 +14,7 @@
 		enemySymbolIds,
 		specialObjectIds as specialObjects
 	} from "$lib/utils/engine/objects";
+	import { getLocalPositionFromRealPosition } from "$lib/utils/position";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
@@ -22,7 +23,7 @@
 		data: MapItem;
 	}[][] = [[]];
 
-	$: TILE_MAP = [...Array(64).keys()].map(() =>
+	TILE_MAP = [...Array(64).keys()].map(() =>
 		[...Array(64).keys()].map(() => ({
 			active: false,
 			data: {
@@ -114,6 +115,13 @@
 			for (let r = 0; r < data.length; r += 64) {
 				chunks.push(data.slice(r, r + 64));
 			}
+			while (chunks.length <= 63) {
+				chunks.push(
+					Array(64)
+						.fill(false)
+						.map(() => ({ surfaces: null, rotation: undefined })) as T[]
+				);
+			}
 			return chunks as T[][];
 		};
 
@@ -121,7 +129,9 @@
 			const jsonString = reader.result as string;
 			jsonFile = JSON.parse(jsonString);
 			const chunked = chunk(jsonFile?.layers?.[0]?.data!);
-			console.log(jsonFile, chunked);
+			const objectLayer = Array.from(jsonFile?.layers?.[1]?.objects ?? []);
+
+			console.log(jsonFile, chunked, objectLayer);
 
 			for (let x = 0; x < TILE_MAP.length; x++) {
 				for (let y = 0; y < TILE_MAP[x].length; y++) {
@@ -167,6 +177,23 @@
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 90, z: 0 } };
 					}
 					TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data };
+				}
+			}
+			if (objectLayer) {
+				for (const object of objectLayer) {
+					const { x, z } = getLocalPositionFromRealPosition({
+						...object,
+						x: object.y,
+						z: object.x
+					});
+					if (object.type === "Pushwall") {
+						TILE_MAP[x][z].data = {
+							surfaces: +object.gid,
+							secret: true,
+							pushwall: true,
+							rotation: undefined
+						};
+					}
 				}
 			}
 			TILE_MAP = [...TILE_MAP];

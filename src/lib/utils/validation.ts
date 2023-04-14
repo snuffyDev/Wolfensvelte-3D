@@ -13,3 +13,9 @@ export const WALL_FACES: ReadonlyArray<WallFace> = ["front", "left", "right", "b
 export function isWallFace(input: unknown): input is WallFace {
 	return typeof input === "string" && WALL_FACES.includes(input as WallFace);
 }
+
+export const ArrayUtils = {
+	includesUnknown<T extends unknown[]>(array: T, searchElement: unknown) {
+		return array.includes(searchElement);
+	}
+};

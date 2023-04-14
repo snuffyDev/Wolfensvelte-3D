@@ -1,15 +1,21 @@
 <script lang="ts">
 	import Ui from "$lib/components/UI.svelte";
 	import { E1M1 } from "$lib/utils/map";
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { writable } from "svelte/store";
-	import Level from "../lib/components/Level.svelte";
+	import Level, { CurrentLevel } from "../lib/components/Level.svelte";
 	import E1M1Music from "../lib/music/E1M1.mp3?url";
 	import MenuMusic from "../lib/music/menu.mp3?url";
 	import { dev } from "$app/environment";
 	import MenuImg from "../lib/sprites/menu/wolf_menu.BMP?url";
 	import GetPsychedImg from "../lib/sprites/menu/get_psyched.BMP?url";
 	import { fade } from "svelte/transition";
+	import Fizzlefade from "$lib/components/Fizzlefade.svelte";
+	import { PlayerState } from "$lib/stores/player";
+	import { frameLoop } from "$lib/utils/raf";
+	import { GameObjects } from "$lib/utils/manager";
+	import Splash from "./_menu/Splash.svelte";
+	import GetPsyched from "./_menu/GetPsyched.svelte";
 
 	const isPlaying = writable(false);
 
@@ -17,57 +23,78 @@
 	let get_psyched_promise: Promise<void>;
 
 	let hasAudioPerms = false;
+	let initialized = false;
 
 	$: if ($isPlaying) menuMusicPlayer.pause();
+	const showSplashscreen = () => {
+		frameLoop.dispose();
+		if (!initialized) initialized = true;
+		$CurrentLevel = [];
+		GameObjects.reset();
 
-	$: if ($isPlaying || dev)
-		get_psyched_promise = new Promise((resolve) => {
-			setTimeout(resolve, 1500);
+		$isPlaying = true;
+		get_psyched_promise = new Promise((r) => {
+			setTimeout(r, 2500);
 		});
+		// setTimeout(() => {
+		// 	// resolve();
+		// });
+	};
+
+	$: if ($isPlaying && !initialized) showSplashscreen();
+	$: if ($PlayerState.health <= 0) {
+		frameLoop.dispose();
+		setTimeout(() => {
+			$isPlaying = false;
+
+			tick().then(() => {
+				PlayerState.init();
+				showSplashscreen();
+			});
+		}, 1500);
+	}
 
 	onMount(() => {
 		menuMusicPlayer = new Audio(new URL(MenuMusic, import.meta.url).toString());
+		menuMusicPlayer.volume = 0.5;
 	});
 </script>
 
 <svelte:body
 	on:pointerdown={() => {
 		if (hasAudioPerms) return;
-		if (dev) return;
 		hasAudioPerms = true;
 		menuMusicPlayer.play();
 	}}
 />
-{#if $isPlaying || dev}
+{#if $isPlaying}
 	<div class="game-container">
-		{#if get_psyched_promise}
+		<div class="level">
 			{#await get_psyched_promise}
-				<div
-					out:fade={{ duration: 1500, delay: 250 }}
-					class="splash-wrapper"
-				>
-					<div
-						class="get-psyched"
-						style="position: absolute; background-image: url({new URL(
-							GetPsychedImg,
-							import.meta.url
-						).toString()});"
-					/>
-				</div>
-			{:then}
-				<div class="level">
-					<Level level={E1M1} />
-				</div>
+				<GetPsyched
+					--aspect-ratio="16/9"
+					imgUrl={new URL(GetPsychedImg, import.meta.url).toString()}
+					loadPromise={get_psyched_promise}
+					zIndex={1000}
+				/>
+			{:then _}
+				{#if $PlayerState.health <= 0}
+					<Fizzlefade />
+				{/if}
+				<Level level={E1M1} />
 			{/await}
-		{/if}
+		</div>
 		<div class="ui">
 			<Ui />
 		</div>
 	</div>
 {/if}
 {#if !$isPlaying}
-	{#if !hasAudioPerms && !dev}
-		<div class="center">
+	{#if !hasAudioPerms}
+		<div
+			class="center"
+			style="text-align:center"
+		>
 			<div
 				style="color: white; background-color: black;max-width:40vw; max-height:30vh; width:100%;height:100%;"
 			>
@@ -79,11 +106,11 @@
 				<p>Space to use doors and shoot</p>
 			</div>
 		</div>
-	{:else if !dev}
-		<div
-			class="center"
-			style="background-image: url({`${MenuImg}`});"
-		>
+	{:else}
+		<div class="center">
+			<div class="background-img">
+				<img src={MenuImg} />
+			</div>
 			<button
 				on:click|once={() => {
 					const audio = new Audio(new URL(E1M1Music, import.meta.url).toString());
@@ -130,33 +157,49 @@
 		background-repeat: no-repeat;
 		background-size: 100%;
 	}
+	.background-img {
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		display: grid;
+		place-items: center;
+		img {
+			aspect-ratio: 4/3;
+			width: 100%;
+			// height: 100%;
+		}
+	}
 	button {
 		font-size: 1.3em;
 		padding: 1em;
 		border-radius: 0.2em;
 	}
 	.game-container {
-		display: grid;
+		// display: flex;
+		// flex-direction: column;
 		position: absolute;
-		overflow: hidden;
+		// overflow: hidden;
 		min-height: 100%;
 		// will-change: transform;
 		// will-change: none;
-		contain: content;
-		max-width: 100%;
+		// contain: content;
+		// max-width: 100%;
 		width: 100%;
-		// /grid-template-rows: 1fr 4em;
+		inset: 0;
+		// grid-template-rows: 1fr 4em;
 	}
 	.level {
 		will-change: transform;
-		contain: content;
-
-		// transform: translateZ(0px);
-		transform-style: preserve-3d;
-		backface-visibility: hidden;
-		position: absolute;
+		// contain: content;
 		overflow: hidden;
-		inset: 0;
+		// transform: translateZ(0px);
+		// transform-style: flat;
+		backface-visibility: hidden;
+		// position: absolute;
+		// display: flex;
+		width: 100%;
+		height: 100%;
+		flex-direction: column; // overflow: hidden;
 	}
 	.ui {
 		position: relative;

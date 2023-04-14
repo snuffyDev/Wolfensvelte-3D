@@ -14,38 +14,53 @@ function requestFrame() {
 	let running = false;
 	let then: number;
 	const _tasks: Promise<void>[] = [];
+	// let delta = 0;
+	// const run = async () => {
+	// 	let then = performance.now();
 	const processAsync = async (now: number) => {
 		for (let idx = 0; idx < asyncTasks.length; idx++) {
 			const task = asyncTasks[idx];
-			queueMicrotask(() => {
-				_tasks.push(task(now));
-			});
+			task(now);
+			// _tasks.push(task(now));
 		}
-		await Promise.allSettled(_tasks);
+		// Promise.allSettled(_tasks);
 		_tasks.length = 0;
 	};
-	let delta = 0;
-	const run = async () => {
-		let then = performance.now();
-		const interval = 1000 / 29;
-		let delta = 0;
-		while (running) {
-			const now = await new Promise(requestAnimationFrame);
-			if (now - then < interval - delta) {
-				continue;
-			}
-			delta = Math.min(interval, delta + now - then - interval);
-			then = now;
-			for (const task of tasks) {
-				queueMicrotask(() => {
-					task(now);
-				});
+	// 	const interval = 1000 / 60;
+	// 	let delta = 0;
+	// 	while (running) {
+	// 		const now = await new Promise(requestAnimationFrame);
+	// 		if (now - then < interval - delta) {
+	// 			continue;
+	// 		}
+	// 		delta = Math.min(interval, delta + now - then - interval);
+	// 		for (const task of tasks) {
+	// 			task(now);
+	// 		}
+	// 		processAsync(now);
+	// 		then = now;
+
+	// 		// render code
+	// 	}
+
+	// 	// }
+	// };
+	const run = (now: number) => {
+		const frameRate = 30;
+		const timeout = 1000 / frameRate;
+		if (!then) then = now;
+
+		const elapsed = now - then;
+
+		if (elapsed >= timeout) {
+			then = now - (elapsed % timeout);
+			for (const task of tasks.values()) {
+				task(now);
 			}
 			processAsync(now);
-			// render code
 		}
 
-		// }
+		frame = requestAnimationFrame(run);
 	};
 
 	return {
@@ -60,7 +75,7 @@ function requestFrame() {
 				}
 				if (!running) {
 					running = true;
-					requestAnimationFrame(run);
+					frame = requestAnimationFrame(run);
 				}
 				return this;
 			},
@@ -81,6 +96,7 @@ function requestFrame() {
 		}),
 		/** Kills all callbacks, removing them from the loop, and kills the loop globally. */
 		dispose: () => {
+			running = false;
 			cancelAnimationFrame(frame);
 			tasks.clear();
 			asyncTasks.length = 0;

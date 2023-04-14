@@ -1,7 +1,4 @@
-<svelte:options
-	accessors={true}
-	immutable={true}
-/>
+<svelte:options accessors={true} />
 
 <script
 	lang="ts"
@@ -39,15 +36,19 @@
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onMount, tick } from "svelte";
-	import type { MapItem } from "../../types/core";
+	import type { MapItem, WallFace } from "../../types/core";
 	import { isVisibleToPlayer } from "../../utils/angle";
 	import { enemyState } from "./state";
-	import HaltSound from "$lib/sounds/guard_halt.WAV?url";
-	import ShootSound from "$lib/sounds/guard_shoot.WAV?url";
+	import HaltSound from "$lib/sounds/guard/halt.WAV?url";
+	import ShootSound from "$lib/sounds/guard/shoot.WAV?url";
+	import Death1Sound from "$lib/sounds/guard/death_1.WAV?url";
+	import Death2Sound from "$lib/sounds/guard/death_2.WAV?url";
+	import Death3Sound from "$lib/sounds/guard/death_3.WAV?url";
 	import { AudioManager } from "$lib/helpers/audio";
 	import { CurrentLevel } from "../Level.svelte";
 	import { testLineOfSight } from "../Player.svelte";
 	import { rand } from "$lib/utils/engine";
+	import { WALL_FACES } from "$lib/utils/validation";
 
 	export let item: MapItem;
 	export let offset: number;
@@ -62,11 +63,14 @@
 	const tween = state.tween;
 	const audioManager = new AudioManager({
 		halt: new URL(HaltSound, import.meta.url).toString(),
-		shoot: new URL(ShootSound, import.meta.url).toString()
+		shoot: new URL(ShootSound, import.meta.url).toString(),
+		death_1: new URL(Death1Sound, import.meta.url).toString(),
+		death_2: new URL(Death2Sound, import.meta.url).toString(),
+		death_3: new URL(Death3Sound, import.meta.url).toString()
 	});
 
 	let isVisible = false;
-	$: if ($state && !isVisible) $state.rotation.y = $PlayerState.rotation.y;
+
 	export const setState = state.setState;
 
 	export const getPosition = () => $tween;
@@ -74,16 +78,16 @@
 
 	export const getVisibility = () => isVisible;
 	export const setVisibility = (state: boolean) => (isVisible = state);
-	export const getLocalPosition = (): Position2D => ({
-		x: offset,
-		z: section
-	});
+	export const getLocalPosition = (): Position2D => getLocalPositionFromRealPosition($tween);
 
 	export const takeDamage = async () => {
 		await state.giveDamage();
 		if ($state.health <= 0) {
 			tween.cancel();
 			stateLoop.stop();
+			audioManager.play(
+				`death_${Math.max(1, Math.min(3, Math.floor(Math.random() * 4))) as 1 | 2 | 3}`
+			);
 			state.setState("dead");
 		}
 	};
@@ -94,19 +98,51 @@
 
 	let playerLastSeenAt: number;
 	let playerJustSeen = false;
-	$: if ($state.state === "dead") stateLoop.stop();
+	$: if (previousAnimationState !== "dead" && $state.state === "dead") {
+		previousAnimationState = "dead";
+		const findEmptyTile = (direction: WallFace) => {
+			let toPosition: Position2D = getLocalPosition() as Position2D;
+
+			switch (direction) {
+				case "left":
+					toPosition = { ...toPosition, x: toPosition.x + 1 };
+					break;
+				case "right":
+					toPosition = { ...toPosition, x: toPosition.x - 1 };
+					break;
+				case "back":
+					toPosition = { ...toPosition, z: toPosition.z + 1 };
+					break;
+				case "front":
+					toPosition = { ...toPosition, z: toPosition.z - 1 };
+					break;
+				default:
+					break;
+			}
+			return [CurrentLevel.checkCollisionWithWorld(toPosition), toPosition] as const;
+		};
+
+		const [, p] = WALL_FACES.map(findEmptyTile)
+			.filter(([v]) => !v)
+			.shift()!;
+
+		CurrentLevel.updateTileAt(p.z, p.x, {
+			...$CurrentLevel[p.z][p.x],
+			model: { component: "Object", texture: 143 }
+		});
+
+		stateLoop.stop();
+	}
 
 	const stateLoop = frameLoop.add(async (now) => {
 		if (isVisible) return;
-		if ($state.state === "dead") return;
+		if ($state.state === "dead") {
+			return;
+		}
 		if (!startFrame) startFrame = now;
-		if (busy) return;
 		const elapsed = now - startFrame;
 
-		if (elapsed > 225 + Math.abs(~~(rand.nextInt() / 0xfef0b))) {
-			if (busy) return;
-
-			busy = true;
+		if (!busy && elapsed > 400 + rand.nextByte()) {
 			startFrame = now;
 
 			const distance = getDistanceFromPoints(
@@ -120,23 +156,24 @@
 				z: 1 - $PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
-			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && seen && distance < 1000) {
+			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1000) {
+				busy = true;
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("halt");
 				}
 
 				if (distance >= 55 && distance < 680 && Math.random() < 0.6) {
-					await tween.cancel();
-
 					audioManager.play("shoot");
+					tween.cancel();
+
 					previousAnimationState = "attack";
-					state.setState("attack");
-					await tick();
-					busy = false;
-				} else if (distance > 64 && distance < 750) {
+					state.setState("attack").then(() => {
+						busy = false;
+					});
+				} else if (distance > 74 && distance < 750) {
 					previousAnimationState = "walk";
-					return state
+					state
 						.moveTo(
 							getPositionFromDistance(
 								{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
@@ -149,16 +186,14 @@
 				} else {
 					// if (distance > 1000) playerJustSeen = false;
 					state.setState("idle");
-					busy = false;
 				}
 			} else {
 				// if (distance > 1000) playerJustSeen = false;
+				busy = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
-				busy = false;
 			}
 		}
-		busy = false;
 	}, true);
 
 	onMount(() => {
@@ -172,11 +207,14 @@
 <div
 	on:animationstart={() => {
 		if ($state.state === "hurt" && previousAnimationState !== "hurt") {
+			tween.cancel();
 			previousAnimationState = "hurt";
 		}
 	}}
 	on:animationend={() => {
-		busy = false;
+		if (previousAnimationState === "hurt") {
+			busy = false;
+		}
 	}}
 	class="sprite enemy guard {$state.state} {isVisible ? 'hidden' : ''}"
 	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$PlayerState.rotation
@@ -190,10 +228,16 @@
 
 		backface-visibility: hidden;
 		background-repeat: no-repeat !important;
-	}
-	.sprite.enemy.guard {
 		height: 64px;
 		width: 64px;
+	}
+	.ammo {
+		background: url(./../../textures/143.png) 100%;
+		width: 64px;
+		height: 64px;
+		z-index: 500;
+	}
+	.sprite.enemy.guard {
 		background: url(./guard.png);
 		background-size: 832px;
 		image-rendering: pixelated;
@@ -241,7 +285,7 @@
 		}
 
 		&.hurt {
-			animation: hurt steps(1) 75ms;
+			animation: hurt steps(1) 1s;
 			background-position: -576px;
 			@keyframes hurt {
 				50% {
@@ -250,7 +294,7 @@
 			}
 		}
 		&.attack {
-			animation: attack 1.1s steps(1);
+			animation: attack 1.1s steps(1) infinite;
 			@keyframes attack {
 				0% {
 					background-position: -704px;
