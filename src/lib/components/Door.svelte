@@ -2,7 +2,7 @@
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { MapItem } from "../types/core";
+	import type { ExtendedEntity, MapItem } from "../types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
@@ -11,7 +11,7 @@
 	import { compare } from "../utils/compare";
 	import { AudioManager } from "$lib/helpers/audio";
 
-	export let item: MapItem;
+	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
 
@@ -25,7 +25,8 @@
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);
 	const audioPlayer = new AudioManager({
-		open: new URL("../sounds/objects/door/door.WAV", import.meta.url).toString()
+		open: new URL("../sounds/objects/door/door.WAV", import.meta.url).toString(),
+		close: new URL("../sounds/objects/door/door_close.WAV", import.meta.url).toString()
 	});
 
 	export const getVisibility = () => visibility;
@@ -55,11 +56,15 @@
 		}
 		CurrentLevel.updateTileAt(section, offset, currentState);
 
-		if (!shouldMute && state === "open") {
-			audioPlayer.play("open");
-			setTimeout(() => {
-				toggleOpen();
-			}, 5000);
+		if (!shouldMute) {
+			if (state === "open") {
+				audioPlayer.play("open");
+				setTimeout(() => {
+					toggleOpen();
+				}, 5000);
+			} else {
+				audioPlayer.play("close");
+			}
 		}
 	};
 	export const getPosition = () => $position;
@@ -76,21 +81,17 @@
 		toggleOpen();
 		try {
 			const isLeftRight =
-				compare(
-					$CurrentLevel?.[section]?.[offset + 1]?.surfaces,
+				Object.values($CurrentLevel?.[section]?.[offset + 1]?.surfaces ?? {}).some(
 					(v) => typeof v === "number" && v !== 0
 				) &&
-				compare(
-					$CurrentLevel?.[section]?.[offset - 1]?.surfaces,
+				Object.values($CurrentLevel?.[section]?.[offset - 1]?.surfaces ?? {}).some(
 					(v) => typeof v === "number" && v !== 0
 				);
 			const isTopBottom =
-				compare(
-					$CurrentLevel?.[section - 1]?.[offset]?.surfaces,
+				Object.values($CurrentLevel?.[section - 1]?.[offset]?.surfaces ?? {}).some(
 					(v) => typeof v === "number" && v !== 0
 				) &&
-				compare(
-					$CurrentLevel?.[section + 1]?.[offset]?.surfaces,
+				Object.values($CurrentLevel?.[section + 1]?.[offset]?.surfaces ?? {}).some(
 					(v) => typeof v === "number" && v !== 0
 				);
 			if (isLeftRight) rotation = 0;

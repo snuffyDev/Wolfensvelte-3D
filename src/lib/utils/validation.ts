@@ -15,7 +15,7 @@ export function isWallFace(input: unknown): input is WallFace {
 }
 
 export const ArrayUtils = {
-	includesUnknown<T extends unknown[]>(array: T, searchElement: unknown) {
+	includesUnknown<T extends ReadonlyArray<unknown>>(array: T, searchElement: unknown) {
 		return array.includes(searchElement);
 	}
 };

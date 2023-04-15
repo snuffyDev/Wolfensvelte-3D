@@ -51,7 +51,7 @@
 				PlayerState.init();
 				showSplashscreen();
 			});
-		}, 1500);
+		}, 4500);
 	}
 
 	onMount(() => {
@@ -175,18 +175,22 @@
 		border-radius: 0.2em;
 	}
 	.game-container {
-		// display: flex;
-		// flex-direction: column;
+		display: grid;
+		// flex-directin: column;
 		position: absolute;
-		// overflow: hidden;
+		overflow: hidden;
 		min-height: 100%;
 		// will-change: transform;
 		// will-change: none;
-		// contain: content;
+		background-color: #003e3e;
+		max-width: 57vw;
+		aspect-ratio: 4/3;
+		margin: 0 auto;
+		contain: content;
 		// max-width: 100%;
 		width: 100%;
 		inset: 0;
-		// grid-template-rows: 1fr 4em;
+		grid-template-rows: 1fr 15vh;
 	}
 	.level {
 		will-change: transform;
@@ -194,11 +198,17 @@
 		overflow: hidden;
 		// transform: translateZ(0px);
 		// transform-style: flat;
+		aspect-ratio: 4/3;
+		max-width: 55vw;
+		width: 100%;
 		backface-visibility: hidden;
+		filter: url("#pixelate");
 		// position: absolute;
 		// display: flex;
-		width: 100%;
-		height: 100%;
+		background-color: rgb(52, 52, 52) !important;
+		// width: 97%;
+		margin: auto;
+		height: 95%;
 		flex-direction: column; // overflow: hidden;
 	}
 	.ui {

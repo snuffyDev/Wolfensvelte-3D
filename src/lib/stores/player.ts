@@ -4,6 +4,7 @@ import { CurrentLevel } from "../components/Level.svelte";
 import { getLocalPositionFromRealPosition } from "../utils/position";
 import type Guard from "../components/Guard/Guard.svelte";
 import { rand } from "$lib/utils/engine";
+import { ArrayUtils } from "$lib/utils/validation";
 
 export const PlayerState = _playerState();
 
@@ -19,10 +20,15 @@ export type PlayerControls = {
 
 export type Weapons = "pistol" | "knife" | "smg";
 
+const WEAPON_KEYS: Weapons[] = ["knife", "pistol", "smg"] as const;
+
+const isValidWeaponKey = (input: unknown): input is Weapons => {
+	return typeof input === "string" && ArrayUtils.includesUnknown(WEAPON_KEYS, input);
+};
 export interface IPlayerState {
 	health: number;
 	score: number;
-	weapons: Partial<Record<Weapons, { ammo: number | null; acquired: boolean }>>;
+	weapons: Partial<Record<Weapons, { acquired: boolean }>> & { ammo: number; active: Weapons };
 	rotation: Position;
 	position: Position;
 	lives?: number;
@@ -35,9 +41,11 @@ const CONSTANTS = {
 const DEFAULT_STATE = (lives = 3): IPlayerState => ({
 	health: 100,
 	weapons: {
-		knife: { acquired: true, ammo: null },
-		pistol: { acquired: true, ammo: 8 },
-		smg: { acquired: false, ammo: null }
+		ammo: 8,
+		active: "pistol",
+		knife: { acquired: true },
+		pistol: { acquired: true },
+		smg: { acquired: false }
 	},
 	lives,
 	score: 0,
@@ -49,9 +57,11 @@ function _playerState() {
 	let state: Required<IPlayerState> = {
 		health: 100,
 		weapons: {
-			knife: { acquired: true, ammo: null },
-			pistol: { acquired: true, ammo: 8 },
-			smg: { acquired: false, ammo: null }
+			ammo: 8,
+			active: "pistol",
+			knife: { acquired: true },
+			pistol: { acquired: true },
+			smg: { acquired: false }
 		},
 		lives: 3,
 		score: 0,
@@ -75,6 +85,29 @@ function _playerState() {
 			if (state.health >= 100) state.health = 100;
 			update((u) => ({ ...u, health: state.health }));
 		},
+		giveWeapon(weapon: Weapons) {
+			if (state.weapons[weapon]?.acquired) state.weapons.ammo += 4;
+			else {
+				if (isValidWeaponKey(weapon)) {
+					if (!state.weapons[weapon]) state.weapons[weapon] = {} as { acquired: boolean };
+
+					// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+					state.weapons[weapon]!.acquired = true;
+				}
+			}
+
+			update((u) => ({ ...u, weapons: state["weapons"] }));
+		},
+		changeWeapon(key: number) {
+			if (key > WEAPON_KEYS.length) return;
+			const toWeapon = WEAPON_KEYS[key - 1];
+			if (state.weapons.active === toWeapon) return;
+
+			if (state.weapons[toWeapon]?.acquired) {
+				state.weapons.active = toWeapon;
+			}
+			update((u) => ({ ...u, weapons: state.weapons }));
+		},
 		takeDamage(n?: number | undefined) {
 			if (typeof n !== "number") {
 				n = rand.nextInt(9, 18);
@@ -92,12 +125,12 @@ function _playerState() {
 		giveAmmo(weapon: Weapons, count: number) {
 			const weaponState = state["weapons"][weapon];
 			if (!weaponState) {
-				state["weapons"][weapon] = { acquired: true, ammo: count };
+				state["weapons"][weapon] = { acquired: true };
 			} else {
-				if (weaponState.ammo === null) {
-					weaponState.ammo = count;
+				if (state.weapons.ammo === null) {
+					state.weapons.ammo = count;
 				} else {
-					weaponState.ammo += count;
+					state.weapons.ammo += count;
 				}
 			}
 

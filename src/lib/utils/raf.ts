@@ -57,7 +57,9 @@ function requestFrame() {
 			for (const task of tasks.values()) {
 				task(now);
 			}
-			processAsync(now);
+			queueMicrotask(() => {
+				processAsync(now);
+			});
 		}
 
 		frame = requestAnimationFrame(run);

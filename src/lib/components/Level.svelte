@@ -19,10 +19,69 @@
 	} as const;
 
 	export const CurrentLevel = _levelStore();
+	function createExtendedWorld(world: World): ExtendedEntity[][] {
+		return world.map((row) => {
+			return row.map((entity) => {
+				if (entity.surfaces !== null) {
+					const surfaces: Record<WallFace, Surface> = {
+						front: entity.surfaces,
+						left: entity.surfaces,
+						back: entity.surfaces,
+						right: entity.surfaces
+					};
 
+					return { ...entity, surfaces } as ExtendedEntity;
+				}
+
+				return { ...entity, surfaces: null } as ExtendedEntity;
+			});
+		});
+	}
+
+	function removeConnectedSurfaces(world: ExtendedEntity[][]): void {
+		const numRows = world.length;
+		const numCols = world[0].length;
+
+		for (let row = 0; row < numRows; row++) {
+			for (let col = 0; col < numCols; col++) {
+				const currentEntity = world[row][col];
+
+				if (
+					currentEntity.surfaces === null ||
+					currentEntity.model ||
+					currentEntity.pushwall ||
+					currentEntity.rotation
+				)
+					continue;
+
+				// Check adjacent tiles
+				const adjacentPositions = [
+					{ row: row - 1, col, face: "front" as WallFace },
+					{ row: row + 1, col, face: "back" as WallFace },
+					{ row, col: col - 1, face: "left" as WallFace },
+					{ row, col: col + 1, face: "right" as WallFace }
+				];
+
+				for (const { row: adjRow, col: adjCol, face } of adjacentPositions) {
+					if (
+						adjRow >= 0 &&
+						adjRow < numRows &&
+						adjCol >= 0 &&
+						adjCol < numCols &&
+						world[adjRow][adjCol].surfaces !== null &&
+						world[adjRow][adjCol].pushwall !== true
+					) {
+						// Set connected surfaces to null
+						currentEntity.surfaces[face] = null;
+					}
+				}
+			}
+		}
+	}
+	type WorldState = ExtendedEntity[][];
 	function _levelStore() {
-		let TILES: World = [];
-		const { subscribe, set, update } = writable<World>([]);
+		let TILES: WorldState = [];
+		const { subscribe, set, update } = writable<WorldState>([]);
 
 		const checkCollisionWithWorld = (position: Position | Position2D, isBot = false) => {
 			const {
@@ -58,17 +117,17 @@
 			return (
 				surfaces &&
 				(pushwall
-					? position.x === wallPosition?.x && position.z === wallPosition?.z
-					: surfaces && hasValidTexture(surfaces))
+					? secret && position.x === wallPosition?.x && position.z === wallPosition?.z
+					: surfaces && Object.values(surfaces).some(hasValidTexture))
 			);
 		};
 
-		const isDoor = (entity: { [K in keyof Entity]: Entity[K] }, position: Position2D) => {
+		const isDoor = (
+			entity: { [K in keyof ExtendedEntity]: ExtendedEntity[K] },
+			position: Position2D
+		) => {
 			return (
-				(entity.pushwall === true &&
-					entity.secret === true &&
-					entity.position?.x === position.x &&
-					entity.position?.z === position.z) ||
+				(entity.pushwall === true && entity.secret === true) ||
 				("model" in entity &&
 					typeof entity.model === "object" &&
 					"component" in entity.model &&
@@ -78,9 +137,15 @@
 			);
 		};
 
-		const handleNoClipObject = (model: NonNullable<Entity["model"]>, position: Position2D) => {
+		const handleNoClipObject = (
+			model: NonNullable<ExtendedEntity["model"]>,
+			position: Position2D
+		) => {
 			if (!ArrayUtils.includesUnknown(ItemPickupIds, model.texture)) return;
 
+			if (model.texture === ItemPickups.Smg) {
+				PlayerState.giveWeapon("smg");
+			}
 			if (model.texture === ItemPickups.Ammo) {
 				PlayerState.giveAmmo("pistol", 4);
 			}
@@ -102,8 +167,14 @@
 		};
 
 		const isWall = (
-			{ position: wallPosition, pushwall, surfaces, model }: { [K in keyof Entity]: Entity[K] },
-			position: Entity["position"]
+			{
+				secret,
+				position: wallPosition,
+				pushwall,
+				surfaces,
+				model
+			}: { [K in keyof ExtendedEntity]: ExtendedEntity[K] },
+			position: ExtendedEntity["position"]
 		) => {
 			return (
 				position &&
@@ -112,27 +183,28 @@
 				wallPosition.x === position.x &&
 				wallPosition.z === position.z &&
 				surfaces &&
-				!pushwall
+				!secret
 			);
 		};
 
-		const isEnemy = (model: Entity["model"]) => {
+		const isEnemy = (model: ExtendedEntity["model"]) => {
 			return model?.component === "Guard" || model?.component === "Dog";
 		};
 
-		const hasValidTexture = (surfaces: Entity["surfaces"]) => {
+		const hasValidTexture = (surfaces: ExtendedEntity["surfaces"]) => {
 			return compare(surfaces, (t) => isValidTexture(t) !== false);
 		};
 
-		const updateTileAt = (row: number, column: number, data: Entity) => {
+		const updateTileAt = (row: number, column: number, data: ExtendedEntity) => {
 			console.log("BEFORE UPDATE TILE AT ", { row, column }, TILES[row][column]);
 			console.log("BEFORE UPDATE DATA", data);
-			TILES[row][column] = data;
 
 			update((u) => {
 				u = [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
 				return u;
 			});
+
+			TILES[row][column] = data;
 			console.log("AFTER UPDATE TILE AT", TILES[row][column]);
 			console.log({ row, column });
 		};
@@ -149,6 +221,7 @@
 			update: (updateFn: Updater<typeof TILES>) => {
 				update((v) => {
 					v = updateFn(TILES);
+					TILES = v;
 					return v;
 				});
 			},
@@ -172,7 +245,7 @@
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { Entity, Entity, Model, Surface, WallFace, World } from "../types/core";
+	import type { ExtendedEntity, Entity, Model, Surface, WallFace, World } from "../types/core";
 	import { compare } from "../utils/compare";
 	import { isVisibleToPlayer } from "../utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
@@ -219,8 +292,11 @@
 	}
 	onMount(() => {
 		worldRef = document.getElementById("world")!;
-		// const newWorld = createUpdatedWorld(level);
-		CurrentLevel.set(level);
+		// Create an ExtendedWorld and remove connected surfaces
+		const extendedRoom = createExtendedWorld(level);
+		const rm = removeConnectedSurfaces(extendedRoom);
+		console.log(extendedRoom, rm);
+		CurrentLevel.set(extendedRoom);
 		gameLoop = frameLoop.add(update);
 		gameLoop.start();
 		console.log($CurrentLevel);
@@ -278,7 +354,7 @@
 									{item}
 								/>
 							{/if}
-						{:else if item.pushwall && item.secret}
+						{:else if item.pushwall}
 							<Pushwall
 								bind:this={GameObjects.doors[GameObjects.doors.length]}
 								{item}

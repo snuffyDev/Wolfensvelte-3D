@@ -34,6 +34,8 @@ body {
 	position: fixed;
 	inset: 0;
 	contain: strict;
+
+	background-color: black !important;
 	overflow: hidden;
 	margin: 0;
 	// transform-style: preserve-3d;
@@ -76,14 +78,14 @@ body {
 	left: 0;
 	// inset: 0;
 	transform-style: preserve-3d;
-	backface-visibility: hidden !important;
+	// backface-visibility: hidden !important;
 	image-rendering: pixelated;
 	&.front {
 		transform-origin: center;
 		transform: rotateY(0deg);
 	}
 	&.right {
-		transform-origin: right;
+		transform-origin: left;
 		transform: rotateY(90deg);
 	}
 	&.back {
@@ -93,8 +95,8 @@ body {
 		transform-origin: center;
 	}
 	&.left {
-		transform-origin: left;
-		transform: rotateY(270deg);
+		transform-origin: right;
+		transform: rotateY(-90deg);
 		// background-position-x: 51px;
 	}
 }

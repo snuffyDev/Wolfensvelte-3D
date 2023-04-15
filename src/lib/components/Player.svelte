@@ -63,7 +63,11 @@
 
 	let x: number = 0;
 
-	const audioManager = new AudioManager({ pistol: new URL(PistolURL, import.meta.url).toString() });
+	const audioManager = new AudioManager({
+		pistol: new URL(PistolURL, import.meta.url).toString(),
+		knife: "",
+		smg: new URL("../sounds/smg.WAV", import.meta.url).toString()
+	});
 
 	let cssText = ``;
 
@@ -87,6 +91,7 @@
 		if (shouldAttackEnemy) {
 			await attackClosestEnemy(position);
 		}
+		// state = "idle";
 	}
 
 	// Returns true or false, to indicate whether the user should shoot or not (confusing, I know)
@@ -127,11 +132,12 @@
 	}
 
 	async function attackClosestEnemy(position: Position2D) {
-		audioManager.play("pistol");
-		if (state === "shoot") {
-		}
-		if ($PlayerState.weapons.pistol) {
-			$PlayerState.weapons.pistol!.ammo! -= 1;
+		if (state === "shoot" && $PlayerState.weapons.active !== "smg") return;
+
+		if ($PlayerState.weapons.active) audioManager.play($PlayerState.weapons.active);
+
+		if (!$PlayerState.weapons.ammo) {
+			$PlayerState.weapons.ammo -= 1;
 		}
 		state = "shoot";
 		await tick();
@@ -195,6 +201,12 @@
 	on:keydown={(e) => {
 		const b = buttonsPressed;
 		switch (e.key.toLowerCase()) {
+			case "1":
+			case "2":
+			case "3":
+				const key = +e.key;
+				PlayerState.changeWeapon(key);
+				break;
 			case "w":
 			case "arrowup":
 				b.w = true;
@@ -256,14 +268,14 @@
 />
 
 <div
-	class="player-gun {state}"
+	class="player-gun {state} {$PlayerState.weapons.active}"
 	on:animationend|capture={() => {
 		state = "idle";
 	}}
 />
 
 <div
-	class="player camera"
+	class="player camera "
 	style={cssText}
 >
 	<slot />
@@ -271,7 +283,7 @@
 
 <style lang="scss">
 	.player-gun {
-		position: fixed;
+		position: absolute;
 		bottom: 0;
 		margin: 0 auto;
 		z-index: 1000;
@@ -284,30 +296,83 @@
 	}
 	.player-gun::after {
 		content: "";
-		position: fixed;
+		position: absolute;
 		width: 24.125rem;
 		height: 24.125rem;
 		bottom: 0;
-		background: url(../sprites/PISTOL.png) left center no-repeat;
-		background-size: 400%;
+		background: var(--url);
+		background-size: cover;
 		transition: inherit;
 		transition-delay: 0s;
 
 		z-index: 1000;
 	}
+	@keyframes shooting {
+		0% {
+			background-position-x: -0px;
+		}
+		20% {
+			background-position-x: -369px;
+		}
+		40% {
+			background-position-x: -768px;
+		}
+		60% {
+			background-position-x: -1148px;
+		}
+	}
+	.pistol {
+		--url: url(../sprites/PISTOL.png) no-repeat;
+		--shoot-speed-anim: 0.6125s;
+		@keyframes shooting {
+			0% {
+				background-position-x: -0px;
+			}
+			20% {
+				background-position-x: -369px;
+			}
+			40% {
+				background-position-x: -768px;
+			}
+			60% {
+				background-position-x: -1148px;
+			}
+		}
+	}
+	.smg {
+		--url: url(../sprites/SMG.png) no-repeat;
+		--shoot-speed-anim: 0.125s;
+		@keyframes shooting {
+			0% {
+				background-position-x: -0px;
+			}
+			20% {
+				background-position-x: -369px;
+			}
+			40% {
+				background-position-x: -768px;
+			}
+			60% {
+				background-position-x: -1148px;
+			}
+		}
+	}
 	.shoot {
 		&::after {
-			animation: shooting steps(1) 0.6125s;
+			animation: shooting steps(1) var(--shoot-speed-anim);
 
 			@keyframes shooting {
+				0% {
+					background-position-x: -0px;
+				}
 				20% {
-					background-position-x: 33%;
+					background-position-x: -369px;
 				}
 				40% {
-					background-position-x: 66%;
+					background-position-x: -768px;
 				}
 				60% {
-					background-position-x: 99%;
+					background-position-x: -1148px;
 				}
 			}
 		}

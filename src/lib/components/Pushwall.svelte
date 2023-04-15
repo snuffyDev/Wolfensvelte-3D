@@ -34,45 +34,34 @@
 		const direction = getFacingDirection($PlayerState.rotation.y);
 		let toPosition: Position2D = getLocalPosition();
 
-		switch (direction) {
-			case "left":
-				toPosition = { ...toPosition, x: toPosition.x + 1 };
-				break;
-			case "right":
-				toPosition = { ...toPosition, x: toPosition.x - 1 };
-				break;
-			case "back":
-				toPosition = { ...toPosition, z: toPosition.z - 1 };
-				break;
-			case "front":
-				toPosition = { ...toPosition, z: toPosition.z + 1 };
-				break;
-			default:
-				break;
-		}
+		do {
+			let nextMove: Position2D = {} as Position2D;
 
-		while ($CurrentLevel[toPosition.z][toPosition.x].surfaces === null) {
-			const nextPosition = getRealPositionFromLocalPosition({ ...toPosition });
+			switch (direction) {
+				case "left":
+					nextMove = { ...toPosition, x: toPosition.x + 1 };
+					break;
+				case "right":
+					nextMove = { ...toPosition, x: toPosition.x - 1 };
+					break;
+				case "back":
+					nextMove = { ...toPosition, z: toPosition.z - 1 };
+					break;
+				case "front":
+					nextMove = { ...toPosition, z: toPosition.z + 1 };
+					break;
+				default:
+					break;
+			}
+			if ($CurrentLevel[nextMove.z][nextMove.x].surfaces !== null) break;
+
+			const nextPosition = getRealPositionFromLocalPosition({ ...nextMove });
 
 			await position.set({ x: nextPosition.x, z: nextPosition.z }, { duration: 1000 }).then(() => {
-				switch (direction) {
-					case "left":
-						toPosition = { ...toPosition, x: toPosition.x + 1 };
-						break;
-					case "right":
-						toPosition = { ...toPosition, x: toPosition.x - 1 };
-						break;
-					case "back":
-						toPosition = { ...toPosition, z: toPosition.z - 1 };
-						break;
-					case "front":
-						toPosition = { ...toPosition, z: toPosition.z + 1 };
-						break;
-					default:
-						break;
-				}
+				toPosition = nextMove;
 			});
-		}
+		} while ($CurrentLevel[toPosition.z][toPosition.x].surfaces === null);
+
 		let currentState = $CurrentLevel[section][offset];
 		// if (!currentState.position) currentState.position = {} as Position2D;
 		currentState.position = toPosition;
@@ -80,6 +69,13 @@
 		CurrentLevel.updateTileAt(toPosition.z, toPosition.x, {
 			position: currentState.position,
 			surfaces: currentState.surfaces,
+			rotation: undefined,
+			secret: false,
+			pushwall: true
+		});
+
+		CurrentLevel.updateTileAt(section, offset, {
+			surfaces: null,
 			rotation: undefined,
 			secret: false,
 			pushwall: true

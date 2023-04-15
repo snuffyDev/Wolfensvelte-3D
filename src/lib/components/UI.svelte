@@ -66,15 +66,15 @@
 <div class="hud">
 	<div class="stats">
 		<div class="col">
-			<b>Level</b>
+			<b />
 			<span>{1}</span>
 		</div>
 		<div class="col">
-			<b>Score</b>
+			<b />
 			<span>{$PlayerState.score}</span>
 		</div>
 		<div class="col">
-			<b>Lives</b>
+			<b />
 			<span>{$PlayerState.lives}</span>
 		</div>
 		<div class="col">
@@ -88,12 +88,12 @@
 			{/each}
 		</div>
 		<div class="col">
-			<b>Health</b>
-			<span>{$PlayerState.health}%</span>
+			<b />
+			<span>{$PlayerState.health}</span>
 		</div>
 		<div class="col">
-			<b>Ammo</b>
-			<span>{$PlayerState.weapons.pistol?.ammo}</span>
+			<b />
+			<span>{$PlayerState.weapons.ammo}</span>
 		</div>
 	</div>
 	<!-- <div /> -->
@@ -105,16 +105,29 @@
 	.portrait {
 		position: absolute;
 		inset: 0;
+		&::before {
+			background-color: #555;
+			z-index: -1;
+			position: absolute;
+			inset: 0;
+			content: "";
+		}
 		background-size: contain;
 		background-repeat: no-repeat;
 		background-image: var(--img);
-		max-height: 4rem;
-		// justify-self: center;
-		height: 4rem;
-		min-height: 100%;
+		background-position: center;
+		// max-height: 4rem;
+		justify-self: center;
+		place-self: center;
+		height: 100%;
+		left: 0;
+		right: 0;
 		width: 100%;
-		bottom: unset;
+		// bottom: 0;
+		top: 0;
 		opacity: 0;
+		image-rendering: pixelated;
+
 		&.show {
 			opacity: 1;
 		}
@@ -124,17 +137,19 @@
 		margin: 0 auto;
 		// display: grid;
 		display: grid;
-		grid-template-columns: 5rem 7rem 5rem 3rem 5rem 5rem;
-		// grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 0.1fr 2fr;
+		grid-template-columns: 1fr 2fr 1fr 1fr 1.25fr 1.25fr 0.25fr 1.95fr;
+		aspect-ratio: 5/3; // grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 0.1fr 2fr;
 		// display: flex;
 		// flex: 1 1 auto;
-		max-width: 80dvh;
+		height: inherit;
+
 		width: 100%;
 		// ju-items: center;
-
-		gap: 0.5em;
+		text-align: center;
+		gap: 4px;
 		margin: 0 auto;
-		justify-items: space-around;
+		max-width: 60vw;
+		padding: 1rem 2rem;
 		> :not(:first-child) {
 			// margin-left: 0.5em;
 		}
@@ -142,61 +157,66 @@
 			// margin-right: 0em;
 			// margin-right: 0.5em;
 		}
+
+		background-image: url(../sprites/hud/main.BMP);
+		background-repeat: no-repeat;
+		background-size: contain;
+		background-position: center;
 		> :nth-last-child(2) {
 			margin: 0em;
 			// width: 0;
 		}
 	}
 	.col {
-		display: inline-grid;
+		// display: none;
 		grid-template-columns: 1fr;
+		contain: layout style paint;
 
 		// grid-template-rows: 1fr 2fr;
-		font-size: 1em;
 		// max-width: 100%;
-		max-height: 5rem;
 		position: relative;
 		width: 100%;
+		display: grid;
+		grid-template-rows: 0.25fr 1fr;
+
 		// flex: 1 0 auto;
 		// max-width: 5rem;
 		// justify-content: center;
-		min-width: 1rem;
-		line-height: 1.7;
+		// min-width: 1rem;
+		line-height: 1.2;
 		font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
 			Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 		&:not(:nth-last-child(2)) {
 			// width: 100%;
 		}
-		background: #00009e;
+		max-width: 100%;
+		// background: #00009e;
 		// text-align: center;
-		font-size: 0.7em;
-
-		// align-content: center;
-		// place-items: center;
+		height: 100%;
+		font-size: 2rem;
+		place-self: center;
+		// max-height: 1.1rem;
+		align-content: center;
+		place-items: center;
 	}
 	.hud {
-		position: absolute;
+		position: relative;
 		left: 0;
 		right: 0;
 		bottom: 0;
 		text-align: center;
-		display: grid;
-		// grid-template-columns: 2rem 4rem 3rem 2rem 3rem 3rem;
-		// grid-template-columns: 1fr;
-		// align-items: center;
-		// font-size: 0.1rem;
+		// display: flex;
+		height: 100%;
+		max-height: 100%;
 		// justify-content: center;
-		// grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-		// grid-auto-flow: row dense;
-		// place-content: center;
-		// flex: 1 1;
-		// max-width: 100%;
 		width: 100%;
+		aspect-ratio: 2/7;
 		color: white;
-		background-color: #003e3e;
-		font-size: 1.5em;
+		image-rendering: pixelated;
+		// background-color: #003e3e;
+		font-size: 16px;
 		font-weight: 500;
-		height: 4rem;
+		// height: 100%;
 	}
 
 	.debug {

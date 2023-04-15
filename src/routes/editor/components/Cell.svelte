@@ -125,6 +125,12 @@
 		/>
 	{:else if data.model?.component}
 		<span>{data.model.component[0]}</span>
+	{:else}
+		<span
+			class="edge "
+			style={data.surfaces ? `--img: url(${$textures[data.surfaces].original});` : ""}
+			class:active={data.surfaces !== 0}
+		/>
 	{/if}
 </div>
 

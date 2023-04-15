@@ -32,6 +32,8 @@ export type ExtendedEntity = {
 	position?: Position2D | undefined;
 	rotation: Position | undefined;
 	model?: Model;
+	secret?: boolean;
+	pushwall?: boolean;
 	surfaces: Record<WallFace, Surface> | null;
 };
 // Dict containing textures for each cardinal direction

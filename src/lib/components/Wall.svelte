@@ -10,13 +10,25 @@
 	export const DIRECTION_MAP: Record<string, number> = {
 		front: 0,
 		backleft: 45,
-		left: 270,
+		left: 90,
 		back: 180,
 		topright: 135,
-		right: 90
+		right: -90
 	};
 
-	import type { Position } from "$lib/types/position";
+	const getZPosition = (direction: "front" | "left" | "right" | "back", position: Position2D) => {
+		switch (direction) {
+			case "back":
+				return -position.z - 32;
+			case "front":
+				return -position.z + 32;
+			case "left":
+			case "right":
+				return -position.z - 32;
+		}
+	};
+
+	import type { Position, Position2D } from "$lib/types/position";
 	import { objectEntries } from "$lib/utils/object";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { WALL_FACES, isValidTexture } from "$lib/utils/validation";
@@ -59,25 +71,13 @@
 	/** Returns an array of DOM elements for each wall face */
 	export const boundSides: HTMLDivElement[] = [];
 	const { textures }: TextureContext = getContext(ctxKey);
-
-	const getZPosition = (direction: "front" | "left" | "right" | "back") => {
-		switch (direction) {
-			case "back":
-				return -position.z - 32;
-			case "front":
-				return -position.z + 32;
-			case "left":
-			case "right":
-				return -position.z - 32;
-		}
-	};
 </script>
 
 {#if isVisible}
 	<div class="surface">
-		{#each objectEntries(sides) as [direction, texture], i}
+		{#each objectEntries(item.surfaces) as [direction, texture], i}
 			{#if direction && typeof texture === "number"}
-				{@const positionZ = getZPosition(direction)}
+				{@const positionZ = getZPosition(direction, position)}
 				{@const validatedTexture = isValidTexture(texture)
 					? $textures[direction !== "left" && direction !== "right" ? texture : texture + 1]
 							?.original
@@ -112,7 +112,7 @@
 		/* backface-visibility: hidden !important; */
 		font-size: 1rem;
 		color: white;
-		backface-visibility: hidden !important;
+		backface-visibility: visible !important;
 
 		/* image-rendering: ; */
 		/* opacity: 1; */

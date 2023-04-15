@@ -1,5 +1,3 @@
-import type { Position } from "$lib/types/position";
-
 /// @ts-ignore big big big array
 export const E1M1: World = [
 	[

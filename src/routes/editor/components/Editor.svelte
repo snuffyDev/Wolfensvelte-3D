@@ -115,7 +115,7 @@
 			for (let r = 0; r < data.length; r += 64) {
 				chunks.push(data.slice(r, r + 64));
 			}
-			while (chunks.length <= 63) {
+			while (chunks.length !== 64) {
 				chunks.push(
 					Array(64)
 						.fill(false)
