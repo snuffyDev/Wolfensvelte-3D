@@ -30,7 +30,7 @@
 </script>
 
 <script lang="ts">
-	import { PlayerState } from "$lib/stores/player";
+	import { PlayerState, playerRotation } from "$lib/stores/player";
 	import type { Position2D } from "$lib/types/position";
 	import {
 		getDistanceFromPoints,
@@ -39,8 +39,7 @@
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onMount, tick } from "svelte";
-	import type { MapItem } from "../../types/core";
-	import { isVisibleToPlayer } from "../../utils/angle";
+	import type { ExtendedEntity, MapItem } from "../../types/core";
 	import BarkSound from "$lib/sounds/dog/bark.WAV?url";
 	import DeathSound from "$lib/sounds/dog/death.WAV?url";
 	import { AudioManager } from "$lib/helpers/audio";
@@ -49,7 +48,7 @@
 	import { rand } from "$lib/utils/engine";
 	import { dogState } from "./state";
 
-	export let item: MapItem;
+	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
 
@@ -89,7 +88,7 @@
 	};
 	let previousAnimationState: typeof $state.state;
 
-	$: if ($state) $state.rotation.y = $PlayerState.rotation.y;
+	$: if ($state) $state.rotation.y = $playerRotation;
 
 	let startFrame: number;
 	let busy = false;
@@ -145,21 +144,16 @@
 					previousAnimationState = "attack";
 					state.setState("attack");
 
-					// state.setState("attack");
 					busy = false;
-					// return;
 				} else {
-					// if (distance > 1000) playerJustSeen = false;
 					state.setState("idle");
 					busy = false;
 				}
 			} else {
-				// if (distance > 1000) playerJustSeen = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
 				busy = false;
 			}
-			// return;
 		}
 		busy = false;
 	}, true);
@@ -170,6 +164,7 @@
 			stateLoop.stop();
 		};
 	});
+
 	$: if ($state.state === "dead") stateLoop.stop();
 </script>
 
@@ -185,8 +180,7 @@
 		}
 	}}
 	class="sprite dog {$state.state}"
-	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$PlayerState.rotation
-		.y}deg);"
+	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$playerRotation}deg);"
 />
 
 <style lang="scss">
@@ -262,7 +256,6 @@
 	.dog {
 		width: 64px;
 		height: 64px;
-		// background-size: 192px;
 		image-rendering: pixelated;
 
 		&.idle {

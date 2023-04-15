@@ -1,4 +1,4 @@
-<svelte:options />
+<svelte:options immutable={true} />
 
 <script
 	context="module"
@@ -78,7 +78,9 @@
 			}
 		}
 	}
-	type WorldState = ExtendedEntity[][];
+
+	export type WorldState = ExtendedEntity[][];
+
 	function _levelStore() {
 		let TILES: WorldState = [];
 		const { subscribe, set, update } = writable<WorldState>([]);
@@ -191,7 +193,7 @@
 			return model?.component === "Guard" || model?.component === "Dog";
 		};
 
-		const hasValidTexture = (surfaces: ExtendedEntity["surfaces"]) => {
+		const hasValidTexture = (surfaces: Surface) => {
 			return compare(surfaces, (t) => isValidTexture(t) !== false);
 		};
 
@@ -273,7 +275,7 @@
 		for (const obj of GameObjects) {
 			if (!obj) continue;
 			const pos = obj.getPosition?.();
-			if (!pos) return;
+			if (!pos) continue;
 			const visible = isVisibleToPlayer(obj, -180);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
@@ -284,7 +286,7 @@
 
 			if (visible !== true && isVisibleAlready && distance > 1500) {
 				obj.setVisibility(false);
-				return;
+				continue;
 			} else if (!isVisibleAlready && distance < 1500 && visible === true) {
 				obj.setVisibility(true);
 			}
@@ -381,14 +383,14 @@
 	#scene {
 		perspective: calc(var(--perspective));
 		// transform: perspective(1000px);
-
-		will-change: contents;
+		position: absolute;
+		will-change: transform, contents;
 		width: 100%;
 		inset: 0;
-		overflow: hidden;
+		// overflow: hidden;
 		height: 100%;
 		backface-visibility: hidden;
-		transform-style: preserve-3d;
+		// transform-style: preserve-3d;
 	}
 
 	#world {
@@ -400,10 +402,10 @@
 		// overflow: hidden;
 
 		backface-visibility: hidden;
-		will-change: transform, contents;
+		will-change: transform;
 		// width: 100%;
 		// height: 100%;
-		contain: layout style size;
+		// contain: layout style size;
 		transform-style: preserve-3d;
 	}
 </style>

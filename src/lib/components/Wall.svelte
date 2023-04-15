@@ -35,14 +35,14 @@
 	import { getContext } from "svelte";
 	import { CurrentLevel } from "./Level.svelte";
 	import { ctxKey, type TextureContext } from "../../routes/key";
-	import type { MapItem, Texture, WallFace } from "../types/core";
+	import type { ExtendedEntity, Texture, WallFace } from "../types/core";
 </script>
 
 <script lang="ts">
 	export let offset = 0;
 	export let section = 0;
 	export let height = 64;
-	export let item: MapItem;
+	export let item: ExtendedEntity;
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
@@ -75,29 +75,31 @@
 
 {#if isVisible}
 	<div class="surface">
-		{#each objectEntries(item.surfaces) as [direction, texture], i}
-			{#if direction && typeof texture === "number"}
-				{@const positionZ = getZPosition(direction, position)}
-				{@const validatedTexture = isValidTexture(texture)
-					? $textures[direction !== "left" && direction !== "right" ? texture : texture + 1]
-							?.original
-					: ""}
-				{@const img = ` --img: url(${validatedTexture});`}
+		{#if item.surfaces}
+			{#each objectEntries(item.surfaces) as [direction, texture], i}
+				{#if direction && typeof texture === "number"}
+					{@const positionZ = getZPosition(direction, position)}
+					{@const validatedTexture = isValidTexture(texture)
+						? $textures[direction !== "left" && direction !== "right" ? texture : texture + 1]
+								?.original
+						: ""}
+					{@const img = ` --img: url(${validatedTexture});`}
 
-				<div
-					class="wall {direction}"
-					bind:this={boundSides[i]}
-					data-x={-position.x}
-					data-z={positionZ}
-					data-rotation={DIRECTION_MAP[direction]}
-					style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
-						direction
-					]}deg);"
-				>
-					<!-- {direction} -->
-				</div>
-			{/if}
-		{/each}
+					<div
+						class="wall {direction}"
+						bind:this={boundSides[i]}
+						data-x={-position.x}
+						data-z={positionZ}
+						data-rotation={DIRECTION_MAP[direction]}
+						style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
+							direction
+						]}deg);"
+					>
+						<!-- {direction} -->
+					</div>
+				{/if}
+			{/each}
+		{/if}
 	</div>
 {/if}
 

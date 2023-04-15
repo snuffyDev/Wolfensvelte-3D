@@ -1,10 +1,10 @@
-<svelte:options />
+<svelte:options immutable={true} />
 
 <script
 	context="module"
 	lang="ts"
 >
-	export function testLineOfSight(world: World, start: Position2D, end: Position2D): boolean {
+	export function testLineOfSight(world: WorldState, start: Position2D, end: Position2D): boolean {
 		const dx = end.x - start.x;
 		const dz = end.z - start.z;
 		const distance = Math.sqrt(dx * dx + dz * dz);
@@ -19,7 +19,12 @@
 			const tileZ = Math.round(z);
 
 			// Check if the tile at (tileX, tileZ) contains a MapItem
-			if (world[tileZ][tileX].model?.component === "Door" || world[tileZ][tileX].surfaces != null) {
+			if (
+				world[tileZ][tileX].model?.component === "Door" ||
+				(world[tileZ][tileX] &&
+					world[tileZ][tileX].surfaces &&
+					world[tileZ][tileX].surfaces != null)
+			) {
 				return false;
 			}
 
@@ -45,9 +50,9 @@
 	import type Guard from "./Guard/Guard.svelte";
 	import { AudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
-	import type { World } from "$lib/types/core";
+	import type { ExtendedEntity, World } from "$lib/types/core";
 	import type { Position2D } from "$lib/types/position";
-	import { CurrentLevel } from "./Level.svelte";
+	import { CurrentLevel, type WorldState } from "./Level.svelte";
 
 	let state: "shoot" | "idle" = "idle";
 
@@ -70,13 +75,19 @@
 	});
 
 	let cssText = ``;
+	let start: number;
 
-	const f = frameLoop.add(() => {
-		const { x: a, y: b, z: c } = $PlayerState.rotation;
+	const f = frameLoop.add((now) => {
+		if (!start) start = now;
+		const elapsed = now - start;
+		if (elapsed > 8) {
+			start = now;
+			const { x: a, y: b, z: c } = $PlayerState.rotation;
 
-		PlayerState.update(buttonsPressed);
+			PlayerState.update(buttonsPressed);
 
-		cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
+			cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
+		}
 	});
 
 	f.start();
@@ -380,11 +391,12 @@
 
 	.camera {
 		position: absolute;
-
+		perspective: var(--perspective);
 		inset: 0;
-		contain: layout size style;
-		// transform: translateZ(0);
 
+		// contain: layout size style;
+		// transform: translateZ(0);
+		backface-visibility: hidden;
 		transform-style: preserve-3d;
 		will-change: transform;
 	}

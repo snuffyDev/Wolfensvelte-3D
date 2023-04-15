@@ -11,7 +11,7 @@
 	import GetPsychedImg from "../lib/sprites/menu/get_psyched.BMP?url";
 	import { fade } from "svelte/transition";
 	import Fizzlefade from "$lib/components/Fizzlefade.svelte";
-	import { PlayerState } from "$lib/stores/player";
+	import { PlayerState, playerHealth } from "$lib/stores/player";
 	import { frameLoop } from "$lib/utils/raf";
 	import { GameObjects } from "$lib/utils/manager";
 	import Splash from "./_menu/Splash.svelte";
@@ -42,7 +42,7 @@
 	};
 
 	$: if ($isPlaying && !initialized) showSplashscreen();
-	$: if ($PlayerState.health <= 0) {
+	$: if ($playerHealth <= 0) {
 		frameLoop.dispose();
 		setTimeout(() => {
 			$isPlaying = false;
@@ -175,41 +175,43 @@
 		border-radius: 0.2em;
 	}
 	.game-container {
-		display: grid;
+		display: flex;
+		flex-direction: column;
 		// flex-directin: column;
-		position: absolute;
-		overflow: hidden;
+		// position: absolute;
 		min-height: 100%;
 		// will-change: transform;
-		// will-change: none;
 		background-color: #003e3e;
 		max-width: 57vw;
 		aspect-ratio: 4/3;
 		margin: 0 auto;
+
+		// contain: strict;
 		contain: content;
 		// max-width: 100%;
 		width: 100%;
 		inset: 0;
-		grid-template-rows: 1fr 15vh;
+		// grid-template-rows: 1fr 15vh;
 	}
 	.level {
-		will-change: transform;
 		// contain: content;
 		overflow: hidden;
-		// transform: translateZ(0px);
-		// transform-style: flat;
+		transform: translateZ(0px);
+		transform-style: flat;
 		aspect-ratio: 4/3;
+		inset: 0;
 		max-width: 55vw;
 		width: 100%;
 		backface-visibility: hidden;
-		filter: url("#pixelate");
 		// position: absolute;
 		// display: flex;
 		background-color: rgb(52, 52, 52) !important;
 		// width: 97%;
 		margin: auto;
 		height: 95%;
-		flex-direction: column; // overflow: hidden;
+		position: relative;
+		// will-change: contents;
+		// flex-direction: column; // overflow: hidden;
 	}
 	.ui {
 		position: relative;

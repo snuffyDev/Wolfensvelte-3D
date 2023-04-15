@@ -1,5 +1,5 @@
 import type { Position, Position2D } from "$lib/types/position";
-import { writable } from "svelte/store";
+import { derived, writable } from "svelte/store";
 import { CurrentLevel } from "../components/Level.svelte";
 import { getLocalPositionFromRealPosition } from "../utils/position";
 import type Guard from "../components/Guard/Guard.svelte";
@@ -228,4 +228,10 @@ function _playerState() {
 	};
 }
 
+const playerRotation = derived(PlayerState, (state) => state.rotation.y);
+const playerHealth = derived(PlayerState, (state) => state.health);
+const playerScore = derived(PlayerState, (state) => state.score);
+const playerPosition = derived(PlayerState, (state) => state.position);
+
+export { playerRotation, playerHealth, playerScore, playerPosition };
 export { _playerState as AIBaseStore };

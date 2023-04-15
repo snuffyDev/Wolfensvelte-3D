@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dev } from "$app/environment";
 	import { page } from "$app/stores";
-	import { PlayerState } from "$lib/stores/player";
+	import { PlayerState, playerHealth, playerScore } from "$lib/stores/player";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onDestroy, onMount } from "svelte";
 
@@ -71,7 +71,7 @@
 		</div>
 		<div class="col">
 			<b />
-			<span>{$PlayerState.score}</span>
+			<span>{$playerScore}</span>
 		</div>
 		<div class="col">
 			<b />
@@ -89,7 +89,7 @@
 		</div>
 		<div class="col">
 			<b />
-			<span>{$PlayerState.health}</span>
+			<span>{$playerHealth}</span>
 		</div>
 		<div class="col">
 			<b />
@@ -123,7 +123,7 @@
 		left: 0;
 		right: 0;
 		width: 100%;
-		// bottom: 0;
+		bottom: 0;
 		top: 0;
 		opacity: 0;
 		image-rendering: pixelated;
@@ -192,9 +192,7 @@
 		max-width: 100%;
 		// background: #00009e;
 		// text-align: center;
-		height: 100%;
 		font-size: 2rem;
-		place-self: center;
 		// max-height: 1.1rem;
 		align-content: center;
 		place-items: center;
@@ -206,7 +204,7 @@
 		bottom: 0;
 		text-align: center;
 		// display: flex;
-		height: 100%;
+		// height: 100%;
 		max-height: 100%;
 		// justify-content: center;
 		width: 100%;
@@ -216,7 +214,9 @@
 		// background-color: #003e3e;
 		font-size: 16px;
 		font-weight: 500;
+		contain: strict;
 		// height: 100%;
+		height: 15vh;
 	}
 
 	.debug {

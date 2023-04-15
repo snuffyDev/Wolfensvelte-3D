@@ -7,8 +7,7 @@
 	padding: 0;
 }
 :root {
-	--perspective: 1150px;
-	transform-style: flat;
+	--perspective: 960px;
 	font-size: 16px;
 	user-select: none;
 }
@@ -31,24 +30,18 @@ body {
 		Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 	background-color: rgb(52, 52, 52) !important;
 	color: white;
-	position: fixed;
 	inset: 0;
-	contain: strict;
-
+	position: absolute;
 	background-color: black !important;
 	overflow: hidden;
 	margin: 0;
-	// transform-style: preserve-3d;
+	transform-style: preserve-3d;
 }
 
 .surface {
 	transform-style: preserve-3d;
 	position: absolute;
-	inset: 0;
-	// contain: layout style size;
-	// overflow: hidden;
-	// flex-direction: ;
-	// flex: 0 1;
+	// inset: 0;
 	width: 64px;
 	height: 64px;
 	transform-origin: center;
@@ -59,7 +52,6 @@ body {
 .hidden {
 	display: none;
 
-	content-visibility: hidden;
 	visibility: hidden;
 	opacity: 0;
 }
@@ -68,17 +60,11 @@ body {
 	position: absolute;
 	width: 64px;
 	height: 64px;
-	will-change: none;
-	// contain: layout style size;
-	// will-change: opacity;
-	// isolation: auto;
-	// overflow: hidden;
 	//
 	top: 0;
 	left: 0;
-	// inset: 0;
 	transform-style: preserve-3d;
-	// backface-visibility: hidden !important;
+	backface-visibility: hidden !important;
 	image-rendering: pixelated;
 	&.front {
 		transform-origin: center;
@@ -103,13 +89,7 @@ body {
 
 .wall,
 .floor {
-	// top: 50%;
 	backface-visibility: hidden !important;
-
-	// font-family: sans-serif;
-	// font-size: 3em;
-
-	// background-size: 100%;
 }
 
 .floor {
@@ -117,6 +97,7 @@ body {
 	overflow: hidden;
 	width: 4096px;
 	height: 4096px;
+	contain: layout style paint;
 	backface-visibility: hidden;
 	min-width: 100%;
 

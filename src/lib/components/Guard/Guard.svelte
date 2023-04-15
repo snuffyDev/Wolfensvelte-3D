@@ -27,7 +27,7 @@
 </script>
 
 <script lang="ts">
-	import { PlayerState } from "$lib/stores/player";
+	import { PlayerState, playerRotation } from "$lib/stores/player";
 	import type { Position2D } from "$lib/types/position";
 	import {
 		getDistanceFromPoints,
@@ -36,7 +36,7 @@
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onMount, tick } from "svelte";
-	import type { MapItem, WallFace } from "../../types/core";
+	import type { ExtendedEntity, MapItem, WallFace } from "../../types/core";
 	import { isVisibleToPlayer } from "../../utils/angle";
 	import { enemyState } from "./state";
 	import HaltSound from "$lib/sounds/guard/halt.WAV?url";
@@ -50,7 +50,7 @@
 	import { rand } from "$lib/utils/engine";
 	import { WALL_FACES } from "$lib/utils/validation";
 
-	export let item: MapItem;
+	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
 
@@ -217,8 +217,7 @@
 		}
 	}}
 	class="sprite enemy guard {$state.state} {isVisible ? 'hidden' : ''}"
-	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$PlayerState.rotation
-		.y}deg);"
+	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$playerRotation}deg);"
 />
 
 <style lang="scss">

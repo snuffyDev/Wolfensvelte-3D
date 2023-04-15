@@ -13,56 +13,41 @@ function requestFrame() {
 	let frame: number;
 	let running = false;
 	let then: number;
+
 	const _tasks: Promise<void>[] = [];
-	// let delta = 0;
-	// const run = async () => {
-	// 	let then = performance.now();
+
 	const processAsync = async (now: number) => {
 		for (let idx = 0; idx < asyncTasks.length; idx++) {
 			const task = asyncTasks[idx];
 			task(now);
 			// _tasks.push(task(now));
 		}
-		// Promise.allSettled(_tasks);
-		_tasks.length = 0;
+		await Promise.allSettled(_tasks);
 	};
-	// 	const interval = 1000 / 60;
-	// 	let delta = 0;
-	// 	while (running) {
-	// 		const now = await new Promise(requestAnimationFrame);
-	// 		if (now - then < interval - delta) {
-	// 			continue;
-	// 		}
-	// 		delta = Math.min(interval, delta + now - then - interval);
-	// 		for (const task of tasks) {
-	// 			task(now);
-	// 		}
-	// 		processAsync(now);
-	// 		then = now;
 
-	// 		// render code
-	// 	}
-
-	// 	// }
-	// };
-	const run = (now: number) => {
+	const run = async () => {
 		const frameRate = 30;
 		const timeout = 1000 / frameRate;
-		if (!then) then = now;
-
-		const elapsed = now - then;
-
-		if (elapsed >= timeout) {
-			then = now - (elapsed % timeout);
+		const frameRequest = (now: number) => {
 			for (const task of tasks.values()) {
-				task(now);
+				queueMicrotask(() => task(now));
 			}
-			queueMicrotask(() => {
-				processAsync(now);
-			});
-		}
+		};
 
-		frame = requestAnimationFrame(run);
+		while (running) {
+			const now = await new Promise(requestAnimationFrame);
+			if (!then) then = now;
+
+			const elapsed = now - then;
+
+			if (elapsed >= timeout) {
+				frameRequest(now);
+				processAsync(now).then(() => {
+					_tasks.length = 0;
+					then = now - (elapsed % timeout);
+				});
+			}
+		}
 	};
 
 	return {
@@ -77,7 +62,7 @@ function requestFrame() {
 				}
 				if (!running) {
 					running = true;
-					frame = requestAnimationFrame(run);
+					run();
 				}
 				return this;
 			},

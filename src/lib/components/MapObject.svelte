@@ -3,13 +3,13 @@
 <script lang="ts">
 	import { getContext } from "svelte";
 	import { type TextureContext, ctxKey } from "../../routes/key";
-	import type { Entity } from "$lib/types/core";
+	import type { Entity, ExtendedEntity } from "$lib/types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
-	import { PlayerState } from "$lib/stores/player";
+	import { PlayerState, playerRotation } from "$lib/stores/player";
 
 	const { textures }: TextureContext = getContext(ctxKey);
 
-	export let item: Entity;
+	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
 
@@ -35,8 +35,7 @@
 		class="sprite"
 		style="{url} visibility: {isVisible
 			? 'visible'
-			: 'hidden'}; transform: translate3d({-position.x}px, -50%, {-position.z}px) rotateY({-$PlayerState
-			.rotation.y}deg); "
+			: 'hidden'}; transform: translate3d({-position.x}px, -50%, {-position.z}px) rotateY({-$playerRotation}deg); "
 	/>
 {/if}
 

@@ -2,25 +2,21 @@
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { MapItem } from "../types/core";
+	import type { ExtendedEntity } from "../types/core";
 	import { getFacingDirection, getRealPositionFromLocalPosition } from "$lib/utils/position";
-	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
 	import { CurrentLevel } from "./Level.svelte";
-	import { ctxKey, type TextureContext } from "../../routes/key";
-	import { compare } from "../utils/compare";
-	import { AudioManager } from "$lib/helpers/audio";
 	import Wall from "./Wall.svelte";
 	import { PlayerState } from "$lib/stores/player";
 
-	export let item: MapItem;
+	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
 
 	let state: "open" | "closed" = "closed";
 	let hasOpenedOnce = false;
 	let visibility = true;
-	let shouldMute = true;
+
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);
 
