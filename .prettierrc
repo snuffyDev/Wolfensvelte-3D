@@ -2,7 +2,7 @@
 	"useTabs": true,
 	"editorconfig": true,
 	"singleAttributePerLine": true,
-	"svelteSortOrder": "scripts-markup-styles",
+	"svelteSortOrder": "options-scripts-markup-styles",
 	"singleQuote": false,
 	"trailingComma": "none",
 	"printWidth": 100,

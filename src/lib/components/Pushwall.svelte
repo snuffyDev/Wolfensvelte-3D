@@ -23,7 +23,7 @@
 	export const getVisibility = () => visibility;
 	export const setVisibility = (visible: boolean) => (visibility = visible);
 
-	export const toggleOpen = async () => {
+	export const toggleAction = async () => {
 		if (state === "open" || hasOpenedOnce) return;
 		hasOpenedOnce = true;
 

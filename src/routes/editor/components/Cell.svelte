@@ -111,7 +111,7 @@
 		event.preventDefault();
 	}}
 >
-	{#if data.model?.texture}
+	{#if data.model?.texture && data.model.component === "Object"}
 		<span
 			class="edge "
 			class:active={true}

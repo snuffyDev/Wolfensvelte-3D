@@ -95,17 +95,16 @@
 
 	let playerLastSeenAt: number;
 	let playerJustSeen = false;
+
 	const stateLoop = frameLoop.add(async (now) => {
 		if (isVisible) return;
+		if ($state.state === "dead") {
+			return;
+		}
 		if (!startFrame) startFrame = now;
-		if (busy) return;
-		if ($state.state === "dead") return;
 		const elapsed = now - startFrame;
 
-		if (!busy && elapsed > 100 + rand.nextByte()) {
-			if (busy) return;
-
-			busy = true;
+		if (!busy && elapsed > 400 + rand.nextByte()) {
 			startFrame = now;
 
 			const distance = getDistanceFromPoints(
@@ -117,45 +116,46 @@
 				x: 1 - $PlayerState.position.x,
 				z: 1 - $PlayerState.position.z
 			});
+
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
 
 			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1000) {
+				busy = true;
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("bark");
 				}
 
-				if (distance >= 75 && distance < 680 && Math.random() < 0.6) {
-					await tick();
+				if (distance >= 5 && distance < 95) {
+					tween.cancel();
+
+					previousAnimationState = "attack";
+					state.setState("attack").then(() => {
+						busy = false;
+					});
+				} else if (distance > 74 && distance < 750) {
 					previousAnimationState = "walk";
-					return state
+					state
 						.moveTo(
 							getPositionFromDistance(
-								{ x: $PlayerState.position.x, z: $PlayerState.position.z },
+								{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
 								$state.position
 							)
 						)
 						.finally(() => {
 							busy = false;
 						});
-				} else if (distance > 4 && distance < 150) {
-					await tick();
-					await tween.cancel();
-					previousAnimationState = "attack";
-					state.setState("attack");
-
-					busy = false;
 				} else {
+					// if (distance > 1000) playerJustSeen = false;
 					state.setState("idle");
-					busy = false;
 				}
 			} else {
+				// if (distance > 1000) playerJustSeen = false;
+				busy = false;
 				previousAnimationState = "idle";
 				state.setState("idle");
-				busy = false;
 			}
 		}
-		busy = false;
 	}, true);
 
 	onMount(() => {
@@ -171,6 +171,7 @@
 <div
 	on:animationstart={() => {
 		if ($state.state === "hurt" && previousAnimationState !== "hurt") {
+			tween.cancel();
 			previousAnimationState = "hurt";
 		}
 	}}

@@ -32,7 +32,7 @@
 	export const getVisibility = () => visibility;
 	export const setVisibility = (visible: boolean) => (visibility = visible);
 
-	export const toggleOpen = () => {
+	export const toggleAction = () => {
 		if (shouldMute && count >= 2) shouldMute = false;
 
 		if (shouldMute) count += 1;
@@ -60,7 +60,7 @@
 			if (state === "open") {
 				audioPlayer.play("open");
 				setTimeout(() => {
-					toggleOpen();
+					toggleAction();
 				}, 5000);
 			} else {
 				audioPlayer.play("close");
@@ -77,8 +77,8 @@
 
 	onMount(() => {
 		let interval: string | number | NodeJS.Timer | undefined;
-		toggleOpen();
-		toggleOpen();
+		toggleAction();
+		toggleAction();
 		try {
 			const isLeftRight =
 				Object.values($CurrentLevel?.[section]?.[offset + 1]?.surfaces ?? {}).some(
@@ -109,18 +109,20 @@
 		: 'hidden'};  --pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {rotation ?? 0}deg;"
 >
 	<!---->
-	<div
-		class=" sprite"
-		style="background-image: url({$textures[99].original});"
-	>
-		<!---->
-	</div>
-	<div
-		class=" sprite"
-		style="background-image: url({$textures[99].original});"
-	>
-		<!---->
-	</div>
+	{#if item.model && item.model.texture}
+		<div
+			class=" sprite"
+			style="background-image: url({$textures[item.model.texture].original});"
+		>
+			<!---->
+		</div>
+		<div
+			class=" sprite"
+			style="background-image: url({$textures[item.model.texture].original});"
+		>
+			<!---->
+		</div>
+	{/if}
 </div>
 
 <style lang="scss">

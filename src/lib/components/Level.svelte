@@ -15,7 +15,8 @@
 		Guard: Guard,
 		Dog: Dog,
 		Door: Door,
-		Object: MapObject
+		Object: MapObject,
+		Elevator: Elevator
 	} as const;
 
 	export const CurrentLevel = _levelStore();
@@ -98,7 +99,7 @@
 			if (model?.texture && noClipObjectIds.includes(model?.texture)) {
 				handleNoClipObject(model, position);
 				return false;
-			} else if (model?.texture) return true;
+			} else if (model?.texture && model.component === "Object") return true;
 
 			const doorCheck = isDoor(
 				{ pushwall, secret, model, position: wallPosition, rotation, surfaces },
@@ -160,6 +161,10 @@
 			if (model.texture === ItemPickups.DogFood) {
 				PlayerState.giveHealth(4);
 			}
+
+			if (model.texture === ItemPickups.Food) {
+				PlayerState.giveHealth(10);
+			}
 			if (model.texture === ItemPickups.Medkit) {
 				PlayerState.giveHealth(25);
 			}
@@ -198,17 +203,12 @@
 		};
 
 		const updateTileAt = (row: number, column: number, data: ExtendedEntity) => {
-			console.log("BEFORE UPDATE TILE AT ", { row, column }, TILES[row][column]);
-			console.log("BEFORE UPDATE DATA", data);
-
 			update((u) => {
 				u = [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
 				return u;
 			});
 
 			TILES[row][column] = data;
-			console.log("AFTER UPDATE TILE AT", TILES[row][column]);
-			console.log({ row, column });
 		};
 		return {
 			subscribe,
@@ -259,6 +259,7 @@
 	} from "$lib/utils/engine/objects";
 	import Dog from "./Dog/Dog.svelte";
 	import Pushwall from "./Pushwall.svelte";
+	import Elevator from "./Elevator.svelte";
 
 	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
@@ -294,17 +295,15 @@
 	}
 	onMount(() => {
 		worldRef = document.getElementById("world")!;
-		// Create an ExtendedWorld and remove connected surfaces
+
 		const extendedRoom = createExtendedWorld(level);
-		const rm = removeConnectedSurfaces(extendedRoom);
-		console.log(extendedRoom, rm);
+		removeConnectedSurfaces(extendedRoom);
+
 		CurrentLevel.set(extendedRoom);
+
 		gameLoop = frameLoop.add(update);
 		gameLoop.start();
-		console.log($CurrentLevel);
-		setTimeout(() => {
-			console.log(GameObjects);
-		}, 4000);
+
 		return () => {
 			gameLoop.stop();
 			frameLoop.dispose();
@@ -312,13 +311,6 @@
 	});
 	$: console.log($CurrentLevel);
 </script>
-
-<svelte:window
-	on:keydown={(e) => {
-		if (e.ctrlKey && e.key.toLowerCase() === "w") e.preventDefault();
-		// if (e.key === " ") console.log(Math.min(34, Math.max(12, rand.rnd() / 8)));
-	}}
-/>
 
 <div id="scene">
 	{#if mode !== "generating"}
@@ -345,6 +337,14 @@
 									{offset}
 									{section}
 									bind:this={GameObjects.doors[GameObjects.doors.length]}
+									{item}
+								/>
+							{:else if item.model.component === "Elevator"}
+								<svelte:component
+									this={MODEL_MAP[item.model.component]}
+									{offset}
+									{section}
+									bind:this={GameObjects.elevators[GameObjects.elevators.length]}
 									{item}
 								/>
 							{:else}
@@ -382,30 +382,23 @@
 <style lang="scss">
 	#scene {
 		perspective: calc(var(--perspective));
-		// transform: perspective(1000px);
 		position: absolute;
 		will-change: transform, contents;
 		width: 100%;
 		inset: 0;
-		// overflow: hidden;
 		height: 100%;
 		backface-visibility: hidden;
-		// transform-style: preserve-3d;
 	}
 
 	#world {
 		position: absolute;
 		top: 50% !important;
 		left: 50% !important;
-		// /* // transform-origin: center; */
 		inset: 0;
-		// overflow: hidden;
 
 		backface-visibility: hidden;
 		will-change: transform;
-		// width: 100%;
-		// height: 100%;
-		// contain: layout style size;
+
 		transform-style: preserve-3d;
 	}
 </style>

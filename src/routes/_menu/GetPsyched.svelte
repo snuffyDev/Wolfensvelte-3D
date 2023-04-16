@@ -27,7 +27,7 @@
 	out:fade={{ duration: 1500, delay: 250 }}
 >
 	<div
-		class="splashscreen"
+		class="splashscreen-container"
 		style="--z-index: {zIndex}; --aspect-ratio: 16/9"
 	>
 		<div
@@ -41,13 +41,26 @@
 <style lang="scss">
 	.splashscreen {
 		position: absolute;
-		min-height: 6rem;
+		min-height: 11rem;
+		height: 100%;
 		z-index: var(--z-index);
 		background-image: var(--img);
 		background-repeat: no-repeat;
-		min-width: 29rem;
+		// min-width: 32rem;
 		// min-height: 100%;
-		max-width: 50vw;
+		width: 100%;
+		max-width: 55vw;
+		background-size: 100%;
+	}
+	.splashscreen-container {
+		position: absolute;
+		min-height: 7rem;
+		z-index: var(--z-index);
+		background-image: var(--img);
+		background-repeat: no-repeat;
+		min-width: 32rem;
+		// min-height: 100%;
+		max-width: 55vw;
 		background-size: 100%;
 	}
 	.splash-wrapper {

@@ -1,4 +1,3 @@
-import type { Texture } from "../../types/core";
 import { objectKeys } from "../object";
 
 export const textureData = () => TEXTURES;

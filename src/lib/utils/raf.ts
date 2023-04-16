@@ -20,7 +20,6 @@ function requestFrame() {
 		for (let idx = 0; idx < asyncTasks.length; idx++) {
 			const task = asyncTasks[idx];
 			task(now);
-			// _tasks.push(task(now));
 		}
 		await Promise.allSettled(_tasks);
 	};

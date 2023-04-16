@@ -155,4 +155,3 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 		}
 	};
 }
-

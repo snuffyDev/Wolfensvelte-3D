@@ -6,16 +6,15 @@
 	import Level, { CurrentLevel } from "../lib/components/Level.svelte";
 	import E1M1Music from "../lib/music/E1M1.mp3?url";
 	import MenuMusic from "../lib/music/menu.mp3?url";
-	import { dev } from "$app/environment";
 	import MenuImg from "../lib/sprites/menu/wolf_menu.BMP?url";
 	import GetPsychedImg from "../lib/sprites/menu/get_psyched.BMP?url";
-	import { fade } from "svelte/transition";
 	import Fizzlefade from "$lib/components/Fizzlefade.svelte";
 	import { PlayerState, playerHealth } from "$lib/stores/player";
 	import { frameLoop } from "$lib/utils/raf";
 	import { GameObjects } from "$lib/utils/manager";
-	import Splash from "./_menu/Splash.svelte";
 	import GetPsyched from "./_menu/GetPsyched.svelte";
+	import { LevelHandler } from "$lib/stores/stats";
+	import { fade } from "svelte/transition";
 
 	const isPlaying = writable(false);
 
@@ -26,6 +25,7 @@
 	let initialized = false;
 
 	$: if ($isPlaying) menuMusicPlayer.pause();
+
 	const showSplashscreen = () => {
 		frameLoop.dispose();
 		if (!initialized) initialized = true;
@@ -36,9 +36,6 @@
 		get_psyched_promise = new Promise((r) => {
 			setTimeout(r, 2500);
 		});
-		// setTimeout(() => {
-		// 	// resolve();
-		// });
 	};
 
 	$: if ($isPlaying && !initialized) showSplashscreen();
@@ -69,21 +66,35 @@
 />
 {#if $isPlaying}
 	<div class="game-container">
-		<div class="level">
-			{#await get_psyched_promise}
-				<GetPsyched
-					--aspect-ratio="16/9"
-					imgUrl={new URL(GetPsychedImg, import.meta.url).toString()}
-					loadPromise={get_psyched_promise}
-					zIndex={1000}
+		{#if !$LevelHandler.isComplete}
+			<div
+				class="level"
+				out:fade
+			>
+				{#await get_psyched_promise}
+					<GetPsyched
+						--aspect-ratio="16/9"
+						imgUrl={new URL(GetPsychedImg, import.meta.url).toString()}
+						loadPromise={get_psyched_promise}
+						zIndex={1000}
+					/>
+				{:then _}
+					{#if $PlayerState.health <= 0}
+						<Fizzlefade />
+					{/if}
+					<Level level={E1M1} />
+				{/await}
+			</div>
+		{:else}<div
+				class="level"
+				style="background-color: #0000 !important; position:absolute; inset: 0;"
+			>
+				<div
+					class="end-splash"
+					style="background-image: url(/src/lib/sprites/menu/EndScreen.BMP); background-repeat: no-repeat; background-size: 100%; width: 300px; height: 300px; position: absolute; top: 0; left: 0; background-color: #0000;"
 				/>
-			{:then _}
-				{#if $PlayerState.health <= 0}
-					<Fizzlefade />
-				{/if}
-				<Level level={E1M1} />
-			{/await}
-		</div>
+			</div>
+		{/if}
 		<div class="ui">
 			<Ui />
 		</div>
@@ -177,18 +188,12 @@
 	.game-container {
 		display: flex;
 		flex-direction: column;
-		// flex-directin: column;
-		// position: absolute;
 		min-height: 100%;
-		// will-change: transform;
 		background-color: #003e3e;
 		max-width: 57vw;
-		aspect-ratio: 4/3;
 		margin: 0 auto;
 
-		// contain: strict;
 		contain: content;
-		// max-width: 100%;
 		width: 100%;
 		inset: 0;
 		// grid-template-rows: 1fr 15vh;

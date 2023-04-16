@@ -146,11 +146,14 @@
 							...TILE_MAP[x][y].data,
 							model: { component: "Object", texture: +chunked[x][y] }
 						};
-					} else if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) {
+					} else if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103 && +chunked[x][y] !== 25) {
 						col.surfaces = +chunked[x][y] === 0 ? null : +chunked[x][y];
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, surfaces: col.surfaces };
 					} else {
-						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, model: { component: "Door" } };
+						TILE_MAP[x][y].data = {
+							...TILE_MAP[x][y].data,
+							model: { component: "Door", texture: +chunked[x][y] }
+						};
 					}
 				}
 			}
@@ -165,18 +168,18 @@
 						TILE_MAP[x]?.[y + 1]?.data.surfaces
 					];
 
-					if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103) continue;
 					if (specialObjects.includes(+chunked[x][y])) continue;
-
-					TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
-
-					if (topBottom.every((o) => typeof o === "number")) {
+					if (+chunked[x][y] === 99 || +chunked[x][y] === 103 || +chunked[x][y] === 25) {
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
+
+						if (topBottom.every((o) => typeof o === "number")) {
+							TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
+						}
+						if (leftRight.every((o) => typeof o === "number")) {
+							TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 90, z: 0 } };
+						}
+						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data };
 					}
-					if (leftRight.every((o) => typeof o === "number")) {
-						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 90, z: 0 } };
-					}
-					TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data };
 				}
 			}
 			if (objectLayer) {
@@ -191,6 +194,12 @@
 							surfaces: +object.gid,
 							secret: true,
 							pushwall: true,
+							rotation: undefined
+						};
+					} else if (object.type === "Elevator") {
+						TILE_MAP[x][z].data = {
+							surfaces: +object.gid,
+							model: { component: "Elevator" },
 							rotation: undefined
 						};
 					}

@@ -9,7 +9,7 @@ export type WallFace = "front" | "left" | "back" | "right";
 export type Surface = Texture;
 
 export type Model = {
-	component: "Guard" | "Dog" | "Door" | "Object";
+	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator";
 	texture?: number;
 	attributes?: {
 		score: number | null;

@@ -20,7 +20,7 @@ export type PlayerControls = {
 
 export type Weapons = "pistol" | "knife" | "smg";
 
-const WEAPON_KEYS: Weapons[] = ["knife", "pistol", "smg"] as const;
+const WEAPON_KEYS = ["knife", "pistol", "smg"] as const;
 
 const isValidWeaponKey = (input: unknown): input is Weapons => {
 	return typeof input === "string" && ArrayUtils.includesUnknown(WEAPON_KEYS, input);
@@ -74,7 +74,7 @@ function _playerState() {
 		subscribe,
 		set,
 		init() {
-			state = DEFAULT_STATE(state.lives - 1);
+			state = DEFAULT_STATE(state.lives - 1) as Required<IPlayerState>;
 			set(state);
 		},
 		get() {
@@ -82,7 +82,9 @@ function _playerState() {
 		},
 		giveHealth(health: 25 | 4 | 10) {
 			state.health += health;
+
 			if (state.health >= 100) state.health = 100;
+
 			update((u) => ({ ...u, health: state.health }));
 		},
 		giveWeapon(weapon: Weapons) {
@@ -100,6 +102,7 @@ function _playerState() {
 		},
 		changeWeapon(key: number) {
 			if (key > WEAPON_KEYS.length) return;
+
 			const toWeapon = WEAPON_KEYS[key - 1];
 			if (state.weapons.active === toWeapon) return;
 
@@ -110,7 +113,7 @@ function _playerState() {
 		},
 		takeDamage(n?: number | undefined) {
 			if (typeof n !== "number") {
-				n = rand.nextInt(9, 18);
+				n = rand.nextInt(9, 15);
 			}
 			state.health -= n;
 			state.health = state.health < 0 ? 0 : state.health;
@@ -151,8 +154,6 @@ function _playerState() {
 			}
 			if (input.leftarrow) this.rotate("left");
 			if (input.rightarrow) this.rotate("right");
-
-			// state.canMove = canMove = true;
 		},
 		moveTo(position: Position2D) {
 			const current = state.position;
@@ -162,12 +163,12 @@ function _playerState() {
 			};
 
 			const localTarget = getLocalPositionFromRealPosition(toMove);
-			// const localCurrent = getLocalPositionFromRealPosition(current);
+
 			if (!CurrentLevel.checkCollisionWithWorld(localTarget)) {
-				// console.log({ localCurrent, localTarget });
 				state.position.x = +toMove.x;
 				state.position.z = +toMove.z;
 			}
+
 			update((u) => {
 				u.position = state.position;
 				return u;
@@ -223,6 +224,7 @@ function _playerState() {
 		// ACTIONS
 		async attack(e: Guard) {
 			e.setState("hurt");
+
 			if (e) await e?.takeDamage();
 		}
 	};
@@ -232,6 +234,8 @@ const playerRotation = derived(PlayerState, (state) => state.rotation.y);
 const playerHealth = derived(PlayerState, (state) => state.health);
 const playerScore = derived(PlayerState, (state) => state.score);
 const playerPosition = derived(PlayerState, (state) => state.position);
+const playerAmmo = derived(PlayerState, (state) => state.weapons.ammo);
+const playerLives = derived(PlayerState, (state) => state.lives);
 
-export { playerRotation, playerHealth, playerScore, playerPosition };
+export { playerRotation, playerHealth, playerScore, playerPosition, playerAmmo, playerLives };
 export { _playerState as AIBaseStore };

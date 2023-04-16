@@ -7,7 +7,7 @@
 	export function testLineOfSight(world: WorldState, start: Position2D, end: Position2D): boolean {
 		const dx = end.x - start.x;
 		const dz = end.z - start.z;
-		const distance = Math.sqrt(dx * dx + dz * dz);
+		const distance = getDistanceFromPoints(start, end);
 		const stepX = dx / distance;
 		const stepZ = dz / distance;
 
@@ -23,7 +23,9 @@
 				world[tileZ][tileX].model?.component === "Door" ||
 				(world[tileZ][tileX] &&
 					world[tileZ][tileX].surfaces &&
-					world[tileZ][tileX].surfaces != null)
+					world[tileZ][tileX].surfaces != null) ||
+				(typeof world[tileZ][tileX].surfaces === "object" &&
+					Object.values(world[tileZ][tileX].surfaces ?? {}).some((v) => v != null))
 			) {
 				return false;
 			}
@@ -102,13 +104,10 @@
 		if (shouldAttackEnemy) {
 			await attackClosestEnemy(position);
 		}
-		// state = "idle";
 	}
 
-	// Returns true or false, to indicate whether the user should shoot or not (confusing, I know)
-	async function interactWithDoor(position: Position2D) {
-		if (!GameObjects.doors) return;
-		const playerLocal = getLocalPositionFromRealPosition(position);
+	function getTileDirectlyInFrontOfPlayer(playerPosition: Position2D) {
+		const playerLocal = getLocalPositionFromRealPosition(playerPosition);
 		let toPosition: Position2D = {} as Position2D;
 
 		const direction = getFacingDirection($PlayerState.rotation.y);
@@ -128,17 +127,38 @@
 			default:
 				break;
 		}
-		for (const door of GameObjects.doors) {
-			const localPosition = door?.getLocalPosition();
-			if (
-				(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
-				(localPosition.x - 1 === toPosition.x && localPosition.z === toPosition.z)
-			) {
-				door.toggleOpen();
-				return false;
+		return toPosition;
+	}
+
+	// Returns true or false, to indicate whether the user should shoot or not (confusing, I know)
+	async function interactWithDoor(position: Position2D) {
+		if (!GameObjects.doors) return;
+
+		const toPosition = getTileDirectlyInFrontOfPlayer(position);
+
+		if (
+			$CurrentLevel[toPosition.z][toPosition.x].model &&
+			$CurrentLevel[toPosition.z][toPosition.x].model?.component === "Elevator"
+		) {
+			for (const elevator of GameObjects.elevators) {
+				const localPosition = elevator?.getLocalPosition();
+				if (localPosition.x === toPosition.x && localPosition.z === toPosition.z) {
+					elevator.toggleAction();
+					return false;
+				}
+			}
+		} else {
+			for (const door of GameObjects.doors) {
+				const localPosition = door?.getLocalPosition();
+				if (
+					(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
+					(localPosition.x - 1 === toPosition.x && localPosition.z === toPosition.z)
+				) {
+					door.toggleAction();
+					return false;
+				}
 			}
 		}
-
 		return true;
 	}
 
@@ -147,9 +167,10 @@
 
 		if ($PlayerState.weapons.active) audioManager.play($PlayerState.weapons.active);
 
-		if (!$PlayerState.weapons.ammo) {
-			$PlayerState.weapons.ammo -= 1;
+		if ($PlayerState.weapons.ammo <= 0) {
+			return;
 		}
+		$PlayerState.weapons.ammo -= 1;
 		state = "shoot";
 		await tick();
 

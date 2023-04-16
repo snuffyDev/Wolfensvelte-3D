@@ -152,8 +152,8 @@
 
 			const seen = isVisibleToPlayer(getPosition(), 45);
 			const playerPosition = getLocalPositionFromRealPosition({
-				x: 1 - $PlayerState.position.x,
-				z: 1 - $PlayerState.position.z
+				x: -$PlayerState.position.x,
+				z: -$PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
 			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1000) {

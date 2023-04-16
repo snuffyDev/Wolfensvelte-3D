@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { dev } from "$app/environment";
 	import { page } from "$app/stores";
-	import { PlayerState, playerHealth, playerScore } from "$lib/stores/player";
+	import {
+		PlayerState,
+		playerAmmo,
+		playerHealth,
+		playerLives,
+		playerScore
+	} from "$lib/stores/player";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onDestroy, onMount } from "svelte";
 
@@ -67,15 +73,22 @@
 	<div class="stats">
 		<div class="col">
 			<b />
-			<span>{1}</span>
+			<span class="font-{1}" />
 		</div>
 		<div class="col">
 			<b />
-			<span>{$playerScore}</span>
+
+			<div class="numbers">
+				{#each $playerScore.toString() as num}
+					<span class="font-{num}" />
+				{/each}
+			</div>
 		</div>
 		<div class="col">
 			<b />
-			<span>{$PlayerState.lives}</span>
+			<div class="numbers">
+				<span class="font-{$playerLives}" />
+			</div>
 		</div>
 		<div class="col">
 			{#each FACE_MAP[PORTRAIT_STATE] as img, idx}
@@ -89,11 +102,20 @@
 		</div>
 		<div class="col">
 			<b />
-			<span>{$playerHealth}</span>
+			<div class="numbers pad">
+				{#each $playerHealth.toString() as num}
+					<span class="font-{num}" />
+				{/each}
+			</div>
 		</div>
 		<div class="col">
 			<b />
-			<span>{$PlayerState.weapons.ammo}</span>
+
+			<div class="numbers">
+				{#each $playerAmmo.toString() as num}
+					<span class="font-{num}" />
+				{/each}
+			</div>
 		</div>
 	</div>
 	<!-- <div /> -->
@@ -102,6 +124,36 @@
 
 <style lang="scss">
 	$FACES: (full, low_hp, beat_up, dying, near_death, hurt, dead);
+	$BASE_URL: unquote("../sprites/hud/");
+
+	@for $num from 0 through 9 {
+		.font-#{$num} {
+			background-image: url(#{$BASE_URL}#{$num}.BMP);
+			background-repeat: no-repeat;
+			background-size: contain;
+			width: 0.9em;
+			// display: inline-block;
+			// position: absolute;
+			// inset: 0;
+			height: 1.75em;
+		}
+	}
+
+	.numbers {
+		// padding: 1em;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		position: absolute;
+		inset: 0;
+
+		justify-content: center;
+		margin-top: 2rem;
+		&.pad {
+			margin-right: 2rem;
+		}
+	}
+
 	.portrait {
 		position: absolute;
 		inset: 0;

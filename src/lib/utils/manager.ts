@@ -1,10 +1,11 @@
 import type Door from "$lib/components/Door.svelte";
+import type Elevator from "$lib/components/Elevator.svelte";
 import type Guard from "$lib/components/Guard/Guard.svelte";
 import type MapObject from "$lib/components/MapObject.svelte";
 import type Pushwall from "$lib/components/Pushwall.svelte";
 import type Wall from "$lib/components/Wall.svelte";
 
-type Model = Door | Guard | MapObject;
+type Model = Door | Guard | MapObject | Elevator;
 
 class ObjectManager {
 	walls: Wall[] = [];
@@ -12,6 +13,7 @@ class ObjectManager {
 	enemies: Guard[] = [];
 	models: Exclude<Model, Door>[] = [];
 	doors: Model[] = [];
+	elevators: Elevator[] = [];
 
 	constructor() {
 		//
@@ -30,7 +32,14 @@ class ObjectManager {
 	}
 
 	*[Symbol.iterator]() {
-		const arr = [this.walls, this.pushwalls, this.doors, this.enemies, this.models].flat();
+		const arr = [
+			this.walls,
+			this.pushwalls,
+			this.elevators,
+			this.doors,
+			this.enemies,
+			this.models
+		].flat();
 		for (const entry of arr) {
 			yield entry;
 		}
@@ -42,6 +51,7 @@ class ObjectManager {
 		this.enemies = [];
 		this.models = [];
 		this.doors = [];
+		this.elevators = [];
 	}
 }
 
