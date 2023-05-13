@@ -3,7 +3,8 @@ import {
 	createExtendedWorld,
 	removeConnectedSurfaces
 } from "$lib/components/Level.svelte";
-
+export const prerender = false;
+export const ssr = false;
 export const load = async ({ params, depends }) => {
 	depends("map:load");
 	// Asynchronously load here to ensure the map is ready to go
