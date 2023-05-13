@@ -3,6 +3,7 @@ import { PlayerState, type IPlayerState } from "../../stores/player";
 import type { Position, Position2D } from "../../types/position";
 import { tweened } from "svelte/motion";
 import {
+	getDistanceFromPoints,
 	getLocalPositionFromRealPosition,
 	getRealPositionFromLocalPosition
 } from "../../utils/position";
@@ -18,7 +19,31 @@ export interface EnemyState extends Omit<IPlayerState, "score" | "rotation" | "p
 	position: Position2D;
 	rotation: Pick<Position, "y">;
 }
+class PromisePool {
+	private waitingQueue: (() => void)[] = [];
+	private queue: (() => Promise<void>)[] = [];
+	private activeTasks = 0;
+	constructor() {
+		//
+	}
 
+	async add(promise: () => Promise<void>) {
+		if (this.activeTasks >= 1) {
+			await new Promise<void>((resolve) => {
+				this.waitingQueue.push(() => resolve());
+			});
+		}
+		this.activeTasks += 1;
+		try {
+			return await promise();
+			// return task;
+		} finally {
+			this.waitingQueue.shift()!();
+			this.activeTasks -= 1;
+		}
+	}
+}
+const pool = new PromisePool();
 export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: Partial<T>) {
 	const state: EnemyState = {
 		health: 25,
@@ -33,7 +58,10 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 	}
 	const { subscribe, update, set } = writable<EnemyState>(state);
 
-	const tween = tweened<Position2D>({ x: state.position.x, z: state.position.z });
+	const tween = tweened<Position2D>(
+		{ x: state.position.x, z: state.position.z },
+		{ duration: 388, delay: 0 }
+	);
 	const { subscribe: tSubscribe, set: tSet, update: tUpdate } = tween;
 
 	let AC: AbortController;
@@ -43,12 +71,14 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 		AC = new AbortController();
 	};
 
+	setupAbortController();
 	return {
 		subscribe,
 		set,
 		tween: {
 			subscribe: tSubscribe,
 			cancel() {
+				AC?.abort();
 				tSet(get(tween), { duration: 0 });
 			}
 		},
@@ -67,49 +97,55 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 				// Get the shortest (unblocked) path to the player
 				let paths = findPath(ourPosition, playerPosition);
 				if (!Array.isArray(paths)) return;
-
-				// console.log(paths, playerPosition);
+				console.log(paths, playerPosition);
 				let count = 0;
 				for (const path of paths) {
-					AC.signal.throwIfAborted();
-					if (state.state === "dead") break;
-					if (!path) return;
-					// console.log(path);
-					state.state = "walk";
-					update((u) => ({ ...u, state: state.state }));
-
+					AC?.signal.throwIfAborted();
 					// Current path point is blocked by something, skip to next just in case.
-					if (CurrentLevel.checkCollisionWithWorld(path)) {
-						if (count === 2) return;
+					if (CurrentLevel.checkCollisionWithWorld(path, true)) {
+						if (count === 2) break;
 						count += 1;
 						console.log(CurrentLevel.get()[path.x][path.z]);
 						paths = findPath(ourPosition, playerPosition);
 						continue;
 					}
+					if (state.state === "dead") continue;
+					state.state = "walk";
 
-					const realPosition = getRealPositionFromLocalPosition(path);
+					await new Promise<void>((resolve) => {
+						// console.log(path);
+						if (!path) resolve();
 
-					// All 'real' positions are inverted, relative to the camera
-					const tX = 1 - realPosition.x;
-					const tZ = 1 - realPosition.z;
+						const realPosition = getRealPositionFromLocalPosition(path);
 
-					state.position = { x: tX, z: tZ };
-					// Tween to the next position
-					await tUpdate(() => ({ x: tX, z: tZ }), { duration: 668 }).then(() => {
-						update((u) => ({ ...u, position: { x: tX, z: tZ } }));
+						// All 'real' positions are inverted, relative to the camera
+						const tX = 1 - realPosition.x;
+						const tZ = 1 - realPosition.z;
+
+						const distance = getDistanceFromPoints({ x: tX, z: tZ }, state.position);
+						console.log(distance);
+						state.position = { x: tX, z: tZ };
+						// Tween to the next position
+						tUpdate(() => ({ x: tX, z: tZ }), { duration: distance * 10 }).then(() => {
+							resolve();
+						});
+					}).then(() => {
+						update((u) => ({ ...u, ...state }));
 					});
 				}
+
 				// Ensure we go back to an 'idle' state before starting the next task
-				queueMicrotask(() => {
-					state.state = "idle";
-					update((u) => ({ ...u, ...state }));
-				});
+				state.state = "idle";
+				update((u) => ({ ...u, ...state }));
 			} catch {
 				// We abort the tween here if there's an error, since we
 				// will want to stop moving, probably.
 				// (an error can be from the AbortController, or an actual error, even
 				// though real ones *should not* happen)
 				this.tween.cancel();
+				AC.abort();
+				state.state = "idle";
+				update((u) => ({ ...u, ...state }));
 				setupAbortController();
 			}
 		},
@@ -150,7 +186,7 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 					}
 				}
 				update((u) => ({ ...u, state: state.state }));
-				setTimeout(res, 1000);
+				setTimeout(res, 500);
 			});
 		}
 	};

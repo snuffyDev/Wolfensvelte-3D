@@ -45,7 +45,7 @@
 	import { isWallFace } from "$lib/utils/validation";
 	import { createEventDispatcher, getContext } from "svelte";
 	import { objectKeys } from "$lib/utils/object";
-	import { ctxKey, type TextureContext } from "../../key";
+	import { ctxKey, type WSContext } from "../../key";
 	import type { MapItem, Texture } from "../../../lib/types/core";
 	const identity = {};
 	export let data: MapItem = {} as MapItem;
@@ -53,7 +53,7 @@
 
 	let isSelected = false;
 
-	const { textures }: TextureContext = getContext(ctxKey);
+	const { textures }: WSContext = getContext(ctxKey);
 
 	const dispatch = createEventDispatcher<{
 		selected: { multi: boolean; state: boolean };

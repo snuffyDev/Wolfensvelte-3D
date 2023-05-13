@@ -22,21 +22,23 @@
 	});
 </script>
 
-<div
-	class="splash-wrapper"
-	out:fade={{ duration: 1500, delay: 250 }}
->
+{#if !loaded}
 	<div
-		class="splashscreen-container"
-		style="--z-index: {zIndex}; --aspect-ratio: 16/9"
+		class="splash-wrapper"
+		out:fade={{ duration: 1500, delay: 250 }}
 	>
 		<div
-			class="splashscreen"
-			style="--img: url({`${imgUrl}`}); --z-index: {zIndex};"
-		/>
-		<Progress loading={!loaded} />
+			class="splashscreen-container"
+			style="--z-index: {zIndex}; --aspect-ratio: 16/9"
+		>
+			<div
+				class="splashscreen"
+				style="--img: url({`${imgUrl}`}); --z-index: {zIndex};"
+			/>
+			<Progress loading={!loaded} />
+		</div>
 	</div>
-</div>
+{/if}
 
 <style lang="scss">
 	.splashscreen {

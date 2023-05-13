@@ -21,7 +21,7 @@ export type Model = {
 
 export type Entity = {
 	position?: Position2D | undefined;
-	rotation: Position | undefined;
+	rotation?: Position | undefined;
 	model?: Model;
 	surfaces: [front: Surface, right: Surface, back: Surface, left: Surface] | null;
 };

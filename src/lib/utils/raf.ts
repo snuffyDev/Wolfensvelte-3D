@@ -1,91 +1,56 @@
 // Set of callback fns that will run on each animation frame
-const tasks = new Set<(now: number) => void>();
-const asyncTasks = new Array<(now: number) => Promise<void>>();
+
+import { browser } from "$app/environment";
 
 const yieldMicrotask = () => new Promise<void>(queueMicrotask);
 /**
  * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
  * Why a single frameloop? Imagine the map, each enemy, the player, etc. all calling RAF individually... Yeah, no bueno.
  */
-export const frameLoop = requestFrame();
 
-function requestFrame() {
-	let frame: number;
-	let running = false;
-	let then: number;
+export interface Task {
+	abort(): void;
+	promise: Promise<void>;
+}
 
-	const _tasks: Promise<void>[] = [];
+type TaskCallback = (now: number) => boolean | void;
+type TaskEntry = { c: TaskCallback; f: () => void };
 
-	const processAsync = async (now: number) => {
-		for (let idx = 0; idx < asyncTasks.length; idx++) {
-			const task = asyncTasks[idx];
-			task(now);
+const tasks = new Set<TaskEntry>();
+
+function run_tasks(now: number) {
+	tasks.forEach((task) => {
+		if (!task.c(now)) {
+			tasks.delete(task);
+			task.f();
 		}
-		await Promise.allSettled(_tasks);
-	};
+	});
 
-	const run = async () => {
-		const frameRate = 30;
-		const timeout = 1000 / frameRate;
-		const frameRequest = (now: number) => {
-			for (const task of tasks.values()) {
-				queueMicrotask(() => task(now));
-			}
-		};
+	if (tasks.size !== 0) requestAnimationFrame(run_tasks);
+}
 
-		while (running) {
-			const now = await new Promise(requestAnimationFrame);
-			if (!then) then = now;
+/**
+ * For testing purposes only!
+ */
+export function clear_loops() {
+	tasks.clear();
+}
 
-			const elapsed = now - then;
+/**
+ * Creates a new task that runs on each raf frame
+ * until it returns a falsy value or is aborted
+ */
+export function frameLoop(callback: TaskCallback): Task {
+	let task: TaskEntry;
 
-			if (elapsed >= timeout) {
-				frameRequest(now);
-				processAsync(now).then(() => {
-					_tasks.length = 0;
-					then = now - (elapsed % timeout);
-				});
-			}
-		}
-	};
+	if (tasks.size === 0) requestAnimationFrame(run_tasks);
 
 	return {
-		/** Initialize a new callback to add the loop */
-		add: (cb: (now: number) => void | Promise<void>, async?: boolean) => ({
-			/** Adds the provided callback to the loop */
-			start: function () {
-				if (async) {
-					asyncTasks.push(cb as (now: number) => Promise<void>);
-				} else {
-					tasks.add(cb);
-				}
-				if (!running) {
-					running = true;
-					run();
-				}
-				return this;
-			},
-			/** Removes the provided callback from the loop */
-			stop: function () {
-				if (async) {
-					const hasCb = asyncTasks.findIndex(cb as () => Promise<void>);
-					if (hasCb) asyncTasks.splice(hasCb, 1);
-				} else {
-					tasks.delete(cb);
-				}
-				if (tasks.size < 1 && asyncTasks.length < 1) {
-					running = false;
-					cancelAnimationFrame(frame);
-				}
-				return this;
-			}
+		promise: new Promise((fulfill) => {
+			tasks.add((task = { c: callback, f: fulfill }));
 		}),
-		/** Kills all callbacks, removing them from the loop, and kills the loop globally. */
-		dispose: () => {
-			running = false;
-			cancelAnimationFrame(frame);
-			tasks.clear();
-			asyncTasks.length = 0;
+		abort() {
+			tasks.delete(task);
 		}
 	};
 }

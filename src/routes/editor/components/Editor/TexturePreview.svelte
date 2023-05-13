@@ -3,10 +3,10 @@
 	import { getContext } from "svelte";
 	import type { Texture } from "../../../../lib/types/core";
 	import { TEXTURE_KEYS } from "../../../../lib/utils/engine/textures";
-	import { ctxKey, type TextureContext } from "../../../key";
+	import { ctxKey, type WSContext } from "../../../key";
 
 	export let selected: Texture | undefined;
-	const { textures }: TextureContext = getContext(ctxKey);
+	const { textures }: WSContext = getContext(ctxKey);
 
 	const items = TEXTURE_KEYS.map((t) => ({ key: t, active: false }));
 	let current: number;

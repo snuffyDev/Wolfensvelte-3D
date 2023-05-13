@@ -19,8 +19,8 @@
 		Elevator: Elevator
 	} as const;
 
-	export const CurrentLevel = _levelStore();
-	function createExtendedWorld(world: World): ExtendedEntity[][] {
+	export let CurrentLevel = _levelStore();
+	export function createExtendedWorld(world: World): ExtendedEntity[][] {
 		return world.map((row) => {
 			return row.map((entity) => {
 				if (entity.surfaces !== null) {
@@ -39,7 +39,7 @@
 		});
 	}
 
-	function removeConnectedSurfaces(world: ExtendedEntity[][]): void {
+	export function removeConnectedSurfaces(world: ExtendedEntity[][]): void {
 		const numRows = world.length;
 		const numCols = world[0].length;
 
@@ -216,7 +216,7 @@
 				return TILES;
 			},
 			set(level: typeof TILES) {
-				TILES = level;
+				TILES = [...level];
 				set(TILES);
 			},
 			updateTileAt,
@@ -233,10 +233,10 @@
 </script>
 
 <script lang="ts">
-	import { frameLoop } from "$lib/utils/raf";
+	import { frameLoop, type Task } from "$lib/utils/raf";
 	import { getDistanceFromPoints } from "$lib/utils/position";
 	import { ArrayUtils, isValidTexture } from "../utils/validation";
-	import { onMount } from "svelte";
+	import { getContext, onMount } from "svelte";
 	import { PlayerState } from "$lib/stores/player";
 	import { writable, type Updater } from "svelte/store";
 
@@ -260,24 +260,28 @@
 	import Dog from "./Dog/Dog.svelte";
 	import Pushwall from "./Pushwall.svelte";
 	import Elevator from "./Elevator.svelte";
+	import { ctxKey, type WSContext } from "../../routes/key";
 
-	export let level: World = [];
 	export let mode: "editor" | "generating" | "play" = "play";
 
-	let worldRef: HTMLElement;
+	export let worldRef: HTMLElement;
 
-	let gameLoop: ReturnType<(typeof frameLoop)["add"]>;
-
+	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
+	let gameLoop: Task;
 	function update() {
-		if (!worldRef) return;
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
-
+		// if (!worldRef) return true;
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+		if ($isLoadingNextLevel) return true;
+
 		for (const obj of GameObjects) {
-			if (!obj) continue;
+			if (!obj) {
+				// console.log(!!obj);
+				continue;
+			}
 			const pos = obj.getPosition?.();
 			if (!pos) continue;
-			const visible = isVisibleToPlayer(obj, -180);
+			const visible = isVisibleToPlayer(obj, -30);
 			const distance = getDistanceFromPoints(
 				{ x: pos.x - 50, z: pos.z },
 				{ x, y, z } /* playerPosition */
@@ -292,92 +296,85 @@
 				obj.setVisibility(true);
 			}
 		}
+		return true;
 	}
 	onMount(() => {
-		worldRef = document.getElementById("world")!;
-
-		const extendedRoom = createExtendedWorld(level);
-		removeConnectedSurfaces(extendedRoom);
-
-		CurrentLevel.set(extendedRoom);
-
-		gameLoop = frameLoop.add(update);
-		gameLoop.start();
-
+		queueMicrotask(() => {
+			gameLoop = frameLoop(update);
+		});
 		return () => {
-			gameLoop.stop();
-			frameLoop.dispose();
+			GameObjects.set(
+				Object.fromEntries(
+					Object.entries($GameObjects).map(([key, value]) => [
+						key,
+						value.map((v) => {
+							v.$destroy();
+							return null;
+						})
+					])
+				)
+			);
+			gameLoop.abort();
 		};
 	});
 	$: console.log($CurrentLevel);
 </script>
 
-<div id="scene">
-	{#if mode !== "generating"}
-		<Player>
-			<div
-				bind:this={worldRef}
-				class="world"
-				id="world"
-			>
-				{#each $CurrentLevel as group, section}
-					{#each group as item, offset}
-						{#if item.model?.component}
-							{#if item.model.component === "Guard" || item.model.component === "Dog"}
-								<svelte:component
-									this={MODEL_MAP[item.model.component]}
-									{offset}
-									{section}
-									bind:this={GameObjects.enemies[GameObjects.enemies.length]}
-									{item}
-								/>
-							{:else if item.model.component === "Door"}
-								<svelte:component
-									this={MODEL_MAP[item.model.component]}
-									{offset}
-									{section}
-									bind:this={GameObjects.doors[GameObjects.doors.length]}
-									{item}
-								/>
-							{:else if item.model.component === "Elevator"}
-								<svelte:component
-									this={MODEL_MAP[item.model.component]}
-									{offset}
-									{section}
-									bind:this={GameObjects.elevators[GameObjects.elevators.length]}
-									{item}
-								/>
-							{:else}
-								<svelte:component
-									this={MODEL_MAP[item.model.component]}
-									{offset}
-									{section}
-									bind:this={GameObjects.models[GameObjects.models.length]}
-									{item}
-								/>
-							{/if}
-						{:else if item.pushwall}
-							<Pushwall
-								bind:this={GameObjects.doors[GameObjects.doors.length]}
-								{item}
-								{section}
-								{offset}
-							/>
-						{:else if item.surfaces}
-							<Wall
-								bind:this={GameObjects.walls[GameObjects.walls.length]}
-								{item}
-								{section}
-								{offset}
-							/>
-						{/if}
-					{/each}
-				{/each}
-				<div class="floor" />
-			</div></Player
-		>
-	{/if}
-</div>
+{#if mode !== "generating"}
+	{#each $CurrentLevel as group, section}
+		{#each group as item, offset}
+			{#if item.model?.component}
+				{#if item.model.component === "Guard" || item.model.component === "Dog"}
+					<svelte:component
+						this={MODEL_MAP[item.model.component]}
+						{offset}
+						{section}
+						bind:this={$GameObjects.enemies[$GameObjects.enemies.length]}
+						{item}
+					/>
+				{:else if item.model.component === "Door"}
+					<svelte:component
+						this={MODEL_MAP[item.model.component]}
+						{offset}
+						{section}
+						bind:this={$GameObjects.doors[$GameObjects.doors.length]}
+						{item}
+					/>
+				{:else if item.model.component === "Elevator"}
+					<svelte:component
+						this={MODEL_MAP[item.model.component]}
+						{offset}
+						{section}
+						bind:this={$GameObjects.elevators[$GameObjects.elevators.length]}
+						{item}
+					/>
+				{:else}
+					<svelte:component
+						this={MODEL_MAP[item.model.component]}
+						{offset}
+						{section}
+						bind:this={$GameObjects.models[$GameObjects.models.length]}
+						{item}
+					/>
+				{/if}
+			{:else if item.pushwall}
+				<Pushwall
+					bind:this={$GameObjects.doors[$GameObjects.doors.length]}
+					{item}
+					{section}
+					{offset}
+				/>
+			{:else if item.surfaces}
+				<Wall
+					bind:this={$GameObjects.walls[$GameObjects.walls.length]}
+					{item}
+					{section}
+					{offset}
+				/>
+			{/if}
+		{/each}
+	{/each}
+{/if}
 
 <style lang="scss">
 	#scene {

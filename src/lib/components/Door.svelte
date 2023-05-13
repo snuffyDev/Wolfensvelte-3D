@@ -7,7 +7,7 @@
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
 	import { CurrentLevel } from "./Level.svelte";
-	import { ctxKey, type TextureContext } from "../../routes/key";
+	import { ctxKey, type WSContext } from "../../routes/key";
 	import { compare } from "../utils/compare";
 	import { AudioManager } from "$lib/helpers/audio";
 
@@ -20,7 +20,7 @@
 	let shouldMute = true;
 	let count = 0;
 
-	const { textures }: TextureContext = getContext(ctxKey);
+	const { textures }: WSContext = getContext(ctxKey);
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);

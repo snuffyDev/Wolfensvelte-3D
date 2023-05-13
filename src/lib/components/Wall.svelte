@@ -34,7 +34,7 @@
 	import { WALL_FACES, isValidTexture } from "$lib/utils/validation";
 	import { getContext } from "svelte";
 	import { CurrentLevel } from "./Level.svelte";
-	import { ctxKey, type TextureContext } from "../../routes/key";
+	import { ctxKey, type WSContext } from "../../routes/key";
 	import type { ExtendedEntity, Texture, WallFace } from "../types/core";
 </script>
 
@@ -67,10 +67,12 @@
 	export const sides: { [dir in WallFace]: Texture } = Object.fromEntries(
 		WALL_FACES.map((dir) => [dir, item.surfaces])
 	) as any;
-
+	/**
+	 * Just making TS Happy...
+	 */
 	/** Returns an array of DOM elements for each wall face */
 	export const boundSides: HTMLDivElement[] = [];
-	const { textures }: TextureContext = getContext(ctxKey);
+	const { textures }: WSContext = getContext(ctxKey);
 </script>
 
 {#if isVisible}
@@ -114,7 +116,8 @@
 		/* backface-visibility: hidden !important; */
 		font-size: 1rem;
 		color: white;
-		backface-visibility: visible !important;
+		backface-visibility: hidden !important;
+		z-index: -1;
 
 		/* image-rendering: ; */
 		/* opacity: 1; */

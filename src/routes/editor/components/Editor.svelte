@@ -4,7 +4,7 @@
 	import { WALL_FACES } from "$lib/utils/validation";
 	import { getContext } from "svelte";
 	import type { TiledJSON } from "../../../lib/types/tiled";
-	import { ctxKey, type TextureContext } from "../../key";
+	import { ctxKey, type WSContext } from "../../key";
 	import Cell from "./Cell.svelte";
 	import TexturePreview from "./Editor/TexturePreview.svelte";
 	import Level from "../../../lib/components/Level.svelte";
@@ -16,7 +16,7 @@
 	} from "$lib/utils/engine/objects";
 	import { getLocalPositionFromRealPosition } from "$lib/utils/position";
 
-	const { textures }: TextureContext = getContext(ctxKey);
+	const { textures }: WSContext = getContext(ctxKey);
 
 	let TILE_MAP: {
 		active: boolean;

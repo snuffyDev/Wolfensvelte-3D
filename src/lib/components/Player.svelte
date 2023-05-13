@@ -15,18 +15,12 @@
 		let z = start.z;
 		for (let i = 0; i < distance; i++) {
 			// Round x and z to the nearest integer to get the coordinates of the tile
-			const tileX = Math.round(x);
-			const tileZ = Math.round(z);
+			const tileX = Math.ceil(x - 0.5);
+			const tileZ = Math.floor(z + 0.5);
 
 			// Check if the tile at (tileX, tileZ) contains a MapItem
-			if (
-				world[tileZ][tileX].model?.component === "Door" ||
-				(world[tileZ][tileX] &&
-					world[tileZ][tileX].surfaces &&
-					world[tileZ][tileX].surfaces != null) ||
-				(typeof world[tileZ][tileX].surfaces === "object" &&
-					Object.values(world[tileZ][tileX].surfaces ?? {}).some((v) => v != null))
-			) {
+			const tile = world[tileZ][tileX];
+			if (CurrentLevel.checkCollisionWithWorld({ x: tileX, z: tileZ }, false)) {
 				return false;
 			}
 
@@ -35,6 +29,39 @@
 		}
 
 		return true;
+	}
+
+	export class Cache<T> {
+		private declare current: T;
+		private declare previous: T;
+		private declare self: Map<T, T>;
+		constructor() {
+			this.self = new Map();
+		}
+
+		has(value: T) {
+			return this.self.has(value);
+		}
+
+		get(value: T) {
+			const r = this.self.get(value);
+			if (r && r !== this.current) this.current = r;
+			return r;
+		}
+
+		set(value: T) {
+			if (this.self.size >= 5 && this.previous !== value) {
+				this.self.delete(this.previous);
+				this.previous = this.current;
+			}
+			this.current = value;
+			return this.self.set(value, value);
+		}
+
+		setIfNotFound(value: T) {
+			if (this.has(value)) return;
+			this.set(value);
+		}
 	}
 </script>
 
@@ -48,7 +75,7 @@
 		getLocalPositionFromRealPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
-	import { onDestroy, tick } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import type Guard from "./Guard/Guard.svelte";
 	import { AudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
@@ -57,7 +84,7 @@
 	import { CurrentLevel, type WorldState } from "./Level.svelte";
 
 	let state: "shoot" | "idle" = "idle";
-
+	let windowWidth: number;
 	let buttonsPressed: PlayerControls = {
 		w: false,
 		shift: false,
@@ -78,24 +105,24 @@
 
 	let cssText = ``;
 	let start: number;
+	const cache = new Cache<string>();
 
-	const f = frameLoop.add((now) => {
+	const f = frameLoop((now) => {
 		if (!start) start = now;
 		const elapsed = now - start;
+		const { x: a, y: b, z: c } = $PlayerState.rotation;
 		if (elapsed > 8) {
 			start = now;
-			const { x: a, y: b, z: c } = $PlayerState.rotation;
 
 			PlayerState.update(buttonsPressed);
-
-			cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
 		}
+		cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
+		// const key = `${a}${b}${c}`;
+		return true;
 	});
 
-	f.start();
-
 	onDestroy(() => {
-		f.stop();
+		f.abort();
 	});
 
 	async function primaryAction() {
@@ -132,7 +159,7 @@
 
 	// Returns true or false, to indicate whether the user should shoot or not (confusing, I know)
 	async function interactWithDoor(position: Position2D) {
-		if (!GameObjects.doors) return;
+		if (!$GameObjects.doors) return;
 
 		const toPosition = getTileDirectlyInFrontOfPlayer(position);
 
@@ -140,7 +167,7 @@
 			$CurrentLevel[toPosition.z][toPosition.x].model &&
 			$CurrentLevel[toPosition.z][toPosition.x].model?.component === "Elevator"
 		) {
-			for (const elevator of GameObjects.elevators) {
+			for (const elevator of $GameObjects.elevators) {
 				const localPosition = elevator?.getLocalPosition();
 				if (localPosition.x === toPosition.x && localPosition.z === toPosition.z) {
 					elevator.toggleAction();
@@ -148,7 +175,8 @@
 				}
 			}
 		} else {
-			for (const door of GameObjects.doors) {
+			for (const door of $GameObjects.doors) {
+				console.log(GameObjects, door, toPosition);
 				const localPosition = door?.getLocalPosition();
 				if (
 					(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
@@ -176,13 +204,13 @@
 
 		const enemiesInRange: Guard[] = [];
 
-		for (const e of GameObjects.enemies) {
+		for (const e of $GameObjects.enemies) {
 			const distance = getDistanceFromPoints(e?.getPosition(), {
 				x: -position.x,
 				z: -position.z
 			});
 			if (
-				isVisibleToPlayer(e?.getPosition(), 5) &&
+				isVisibleToPlayer(e?.getPosition(), 35) &&
 				testLineOfSight(
 					$CurrentLevel,
 					getLocalPositionFromRealPosition({
@@ -300,24 +328,28 @@
 />
 
 <div
+	class="player camera "
+	style={cssText}
+	on:touchstart={() => {
+		primaryAction();
+	}}
+	bind:clientWidth={windowWidth}
+>
+	<slot />
+</div>
+<div
 	class="player-gun {state} {$PlayerState.weapons.active}"
 	on:animationend|capture={() => {
 		state = "idle";
 	}}
 />
 
-<div
-	class="player camera "
-	style={cssText}
->
-	<slot />
-</div>
-
 <style lang="scss">
 	.player-gun {
 		position: absolute;
 		bottom: 0;
 		margin: 0 auto;
+		pointer-events: none;
 		z-index: 1000;
 		left: 0;
 		max-width: 24.125rem;
@@ -336,6 +368,7 @@
 		background-size: cover;
 		transition: inherit;
 		transition-delay: 0s;
+		pointer-events: none;
 
 		z-index: 1000;
 	}
@@ -414,9 +447,9 @@
 		position: absolute;
 		perspective: var(--perspective);
 		inset: 0;
-
-		// contain: layout size style;
-		// transform: translateZ(0);
+		pointer-events: all;
+		transform: translateZ(0);
+		// overflow: hidden;
 		backface-visibility: hidden;
 		transform-style: preserve-3d;
 		will-change: transform;

@@ -10,45 +10,16 @@
 			name="viewport"
 			content="width=device-width"
 		/>
+		<style>
+			html {
+				background-color: #0d0d0e;
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 
 	<body data-sveltekit-preload-data="hover">
 		%sveltekit.body%
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			version="1.1"
-			width="0"
-			height="0"
-		>
-			<defs>
-				<filter
-					id="pixelate"
-					x="0"
-					y="0"
-				>
-					<feFlood
-						x="2"
-						y="2"
-						height="1"
-						width="1"
-					/>
-					<feComposite
-						width="5"
-						height="5"
-					/>
-					<feTile result="a" />
-					<feComposite
-						in="SourceGraphic"
-						in2="a"
-						operator="in"
-					/>
-					<feMorphology
-						operator="dilate"
-						radius="2.5"
-					/>
-				</filter>
-			</defs>
-		</svg>
+
 	</body>
 </html>

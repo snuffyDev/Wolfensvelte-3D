@@ -2,12 +2,12 @@
 
 <script lang="ts">
 	import { getContext } from "svelte";
-	import { type TextureContext, ctxKey } from "../../routes/key";
+	import { type WSContext, ctxKey } from "../../routes/key";
 	import type { Entity, ExtendedEntity } from "$lib/types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { PlayerState, playerRotation } from "$lib/stores/player";
 
-	const { textures }: TextureContext = getContext(ctxKey);
+	const { textures }: WSContext = getContext(ctxKey);
 
 	export let item: ExtendedEntity;
 	export let offset: number;

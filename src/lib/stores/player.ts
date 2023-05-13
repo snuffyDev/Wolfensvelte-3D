@@ -6,7 +6,8 @@ import type Guard from "../components/Guard/Guard.svelte";
 import { rand } from "$lib/utils/engine";
 import { ArrayUtils } from "$lib/utils/validation";
 
-export const PlayerState = _playerState();
+export const createPlayerState = (initialState: Partial<IPlayerState>) =>
+	_playerState(initialState);
 
 export type PlayerControls = {
 	w: boolean;
@@ -38,7 +39,7 @@ const CONSTANTS = {
 	speed: 5.875
 } as const;
 
-const DEFAULT_STATE = (lives = 3): IPlayerState => ({
+const DEFAULT_STATE = (lives: number | undefined = 3, atPosition?: Position2D): IPlayerState => ({
 	health: 100,
 	weapons: {
 		ammo: 8,
@@ -47,39 +48,37 @@ const DEFAULT_STATE = (lives = 3): IPlayerState => ({
 		pistol: { acquired: true },
 		smg: { acquired: false }
 	},
-	lives,
+	lives: typeof lives !== "number" ? 3 : lives,
 	score: 0,
-	position: { x: 1794, z: 3008, y: 0 },
+	position: atPosition ? { ...atPosition, y: 0 } : { x: 1794, z: 3008, y: 0 },
 	rotation: { x: 0, y: 270, z: 0 }
 });
 
-function _playerState() {
+export const PlayerState = _playerState(DEFAULT_STATE(3, undefined));
+
+function _playerState(initialState: Partial<IPlayerState> = {}) {
 	let state: Required<IPlayerState> = {
-		health: 100,
-		weapons: {
-			ammo: 8,
-			active: "pistol",
-			knife: { acquired: true },
-			pistol: { acquired: true },
-			smg: { acquired: false }
-		},
-		lives: 3,
-		score: 0,
-		position: { x: 1794, z: 3008, y: 0 },
-		rotation: { x: 0, y: 270, z: 0 }
+		...DEFAULT_STATE(initialState?.lives ?? 3, initialState.position),
+		...initialState
 	};
 	const { subscribe, set, update } = writable<IPlayerState>(state);
 
 	return {
 		subscribe,
 		set,
-		init() {
-			state = DEFAULT_STATE(state.lives - 1) as Required<IPlayerState>;
+		init(newState: Partial<IPlayerState>, dead = false) {
+			state = {
+				...DEFAULT_STATE(dead === true ? state.lives - 1 : state.lives, newState?.position),
+				...newState
+			} as Required<IPlayerState>;
 			set(state);
 		},
 		get() {
 			return state;
 		},
+		// reset(args: Partial<IPlayerState> = {}) {
+
+		// },
 		giveHealth(health: 25 | 4 | 10) {
 			state.health += health;
 
@@ -113,7 +112,7 @@ function _playerState() {
 		},
 		takeDamage(n?: number | undefined) {
 			if (typeof n !== "number") {
-				n = rand.nextInt(9, 15);
+				n = rand.nextInt(5, 13);
 			}
 			state.health -= n;
 			state.health = state.health < 0 ? 0 : state.health;

@@ -33,13 +33,15 @@
 	import { PlayerState, playerRotation } from "$lib/stores/player";
 	import type { Position2D } from "$lib/types/position";
 	import {
+		comparePositions,
+		diffPositions,
 		getDistanceFromPoints,
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
-	import { onMount, tick } from "svelte";
-	import type { ExtendedEntity, MapItem } from "../../types/core";
+	import { getContext, onMount, tick } from "svelte";
+	import type { ExtendedEntity } from "../../types/core";
 	import BarkSound from "$lib/sounds/dog/bark.WAV?url";
 	import DeathSound from "$lib/sounds/dog/death.WAV?url";
 	import { AudioManager } from "$lib/helpers/audio";
@@ -47,12 +49,15 @@
 	import { testLineOfSight } from "../Player.svelte";
 	import { rand } from "$lib/utils/engine";
 	import { dogState } from "./state";
+	import { ctxKey, type WSContext } from "../../../routes/key";
 
 	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
+
+	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
 	const state = dogState({
 		position: { x: -position.x, z: -position.z },
@@ -65,6 +70,7 @@
 	});
 
 	let isVisible = false;
+	let hasTakenDamage = false;
 
 	const tween = state.tween;
 
@@ -81,7 +87,7 @@
 		await state.giveDamage();
 		if ($state.health <= 0) {
 			tween.cancel();
-			stateLoop.stop();
+			stateLoop.abort();
 			audioManager.play("death");
 			state.setState("dead");
 		}
@@ -96,15 +102,16 @@
 	let playerLastSeenAt: number;
 	let playerJustSeen = false;
 
-	const stateLoop = frameLoop.add(async (now) => {
-		if (isVisible) return;
+	const stateLoop = frameLoop((now) => {
+		if ($isLoadingNextLevel) return true;
 		if ($state.state === "dead") {
-			return;
+			return true;
 		}
 		if (!startFrame) startFrame = now;
 		const elapsed = now - startFrame;
 
-		if (!busy && elapsed > 400 + rand.nextByte()) {
+		if (elapsed > 211 + rand.nextInt(129, 188)) {
+			if (busy) return true;
 			startFrame = now;
 
 			const distance = getDistanceFromPoints(
@@ -113,32 +120,42 @@
 			);
 
 			const playerPosition = getLocalPositionFromRealPosition({
-				x: 1 - $PlayerState.position.x,
-				z: 1 - $PlayerState.position.z
+				x: -$PlayerState.position.x,
+				z: -$PlayerState.position.z
 			});
-
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
-
-			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1000) {
-				busy = true;
+			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1500) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("bark");
 				}
+				const r = rand.nextInt(0, 10);
+				console.log(r);
+				if ((distance >= 55 && distance < 128 && !(r % 5)) || hasTakenDamage) {
+					if (busy) return true;
+					if (!busy) busy = true;
+					tick().then(() => {
+						audioManager.play("bark");
+						tween.cancel();
 
-				if (distance >= 5 && distance < 95) {
-					tween.cancel();
-
-					previousAnimationState = "attack";
-					state.setState("attack").then(() => {
+						previousAnimationState = "attack";
+						state.setState("attack");
 						busy = false;
 					});
-				} else if (distance > 74 && distance < 750) {
+				} else if (distance > 74) {
+					if (busy) return true;
+					if (!busy) busy = true;
 					previousAnimationState = "walk";
+					state.setState("walk");
+					const posDiff = diffPositions($PlayerState.position, ourPosition);
+					const posCmp = comparePositions($PlayerState.position, ourPosition);
 					state
 						.moveTo(
 							getPositionFromDistance(
-								{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
+								{
+									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -32 : 32),
+									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -32 : 32)
+								},
 								$state.position
 							)
 						)
@@ -146,26 +163,27 @@
 							busy = false;
 						});
 				} else {
-					// if (distance > 1000) playerJustSeen = false;
+					if (distance > 1000) playerJustSeen = false;
+					// busy = false;
 					state.setState("idle");
 				}
 			} else {
-				// if (distance > 1000) playerJustSeen = false;
-				busy = false;
-				previousAnimationState = "idle";
-				state.setState("idle");
+				if (distance > 1000) playerJustSeen = false;
+				if (!busy) {
+					previousAnimationState = "idle";
+					state.setState("idle");
+				}
 			}
+			return true;
 		}
-	}, true);
-
+	});
 	onMount(() => {
-		stateLoop.start();
 		return () => {
-			stateLoop.stop();
+			stateLoop.abort();
 		};
 	});
 
-	$: if ($state.state === "dead") stateLoop.stop();
+	$: if ($state.state === "dead") stateLoop.abort();
 </script>
 
 <div
@@ -271,7 +289,7 @@
 		}
 
 		&.hurt {
-			animation: hurtAnimation 0.6s steps(1) infinite;
+			animation: hurtAnimation 0.4s steps(1);
 		}
 
 		&.walk {

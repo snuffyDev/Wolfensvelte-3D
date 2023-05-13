@@ -23,7 +23,7 @@ export type Entity = {
 	position?: Position2D | undefined;
 	rotation: Position | undefined;
 	model?: Model;
-	surfaces: Surface;
+	surfaces: Surface | null;
 	secret?: boolean;
 	pushwall?: boolean;
 };

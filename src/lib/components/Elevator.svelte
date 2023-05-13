@@ -5,7 +5,9 @@
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { WALL_FACES } from "$lib/utils/validation";
+	import { getContext } from "svelte";
 	import Wall from "./Wall.svelte";
+	import { ctxKey, type WSContext } from "../../routes/key";
 
 	export let offset: number;
 	export let section: number;
@@ -24,13 +26,13 @@
 		z: section
 	});
 
+	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 	export const toggleAction = () => {
-		console.log("ACTIVE");
 		state = "active";
-		frameLoop.dispose();
+		LevelHandler.levelComplete(true);
 		setTimeout(() => {
-			LevelHandler.levelComplete(true);
-		}, 3000);
+			$isLoadingNextLevel = true;
+		}, 0);
 	};
 
 	$: if (state === "active") {

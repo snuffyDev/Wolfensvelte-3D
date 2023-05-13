@@ -14,8 +14,8 @@ export const getDistanceFromPoints = (
  */
 export function getRealPositionFromLocalPosition({ x, z }: Position | Omit<Position, "y">) {
 	return {
-		x: Math.round(x * 64),
-		z: Math.round(z * 64)
+		x: Math.floor(x) * 64,
+		z: Math.floor(z + 0.5) * 64
 	};
 }
 
@@ -29,6 +29,7 @@ export function getLocalPositionFromRealPosition({ x, z }: Position | Omit<Posit
 		z: (Math.ceil((z - 32) / 64) + (z >> 31)) ^ (z >> 31)
 	};
 }
+
 /** Utility for getting the direction the player is currently facing */
 export function getFacingDirection(angle: number): "front" | "right" | "back" | "left" {
 	angle = angle < 0 ? 360 + angle : angle;
@@ -41,4 +42,33 @@ export function getFacingDirection(angle: number): "front" | "right" | "back" | 
 	} else {
 		return "left";
 	}
+}
+
+export function diffPositions(a: Position2D, b: Position2D) {
+	const result: Position2D = {
+		x: 0,
+		z: 0
+	};
+	result.x += a.x < b.x ? -1 : 0;
+	result.z += a.z < b.z ? -1 : 0;
+	return result;
+}
+
+export function comparePositions(a: Position2D, b: Position2D): Position2D {
+	const tolerance = 0.001; // Adjust this value to change the acceptable tolerance
+
+	const xDiff = Math.abs(a.x - b.x);
+	const zDiff = Math.abs(a.z - b.z);
+
+	let xResult = 0;
+	if (xDiff > tolerance) {
+		xResult = a.x > b.x ? 1 : -1;
+	}
+
+	let zResult = 0;
+	if (zDiff > tolerance) {
+		zResult = a.z > b.z ? 1 : -1;
+	}
+
+	return { x: xResult, z: zResult };
 }

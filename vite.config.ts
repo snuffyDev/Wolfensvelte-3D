@@ -4,7 +4,7 @@ import autoprefixer from "autoprefixer";
 
 export default defineConfig({
 	assetsInclude: ["**/*.png"],
-	build: {},
+	build: { minify: true },
 	experimental: {},
 	css: { postcss: { plugins: [autoprefixer()] } },
 	esbuild: { drop: ["debugger", "console"] },

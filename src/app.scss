@@ -8,7 +8,10 @@
 }
 :root {
 	--perspective: 960px;
-	font-size: 16px;
+	font-size: 10px;
+	@media screen and (min-width: 719px) {
+		font-size: 16px;
+	}
 	user-select: none;
 }
 
@@ -36,14 +39,16 @@ body {
 	overflow: hidden;
 	margin: 0;
 	transform-style: preserve-3d;
+	touch-action: none;
 }
 
 .surface {
 	transform-style: preserve-3d;
 	position: absolute;
-	// inset: 0;
-	width: 64px;
-	height: 64px;
+	inset: 0;
+	display: inline;
+	width: 4rem;
+	height: 4rem;
 	transform-origin: center;
 	opacity: 1;
 	backface-visibility: hidden;
@@ -60,6 +65,7 @@ body {
 	position: absolute;
 	width: 64px;
 	height: 64px;
+	display: flex;
 	//
 	top: 0;
 	left: 0;
@@ -95,9 +101,9 @@ body {
 .floor {
 	position: fixed;
 	overflow: hidden;
-	width: 4096px;
-	height: 4096px;
-	contain: layout style paint;
+	width: 640px;
+	height: 640px;
+	// contain: layout style paint;
 	backface-visibility: hidden;
 	min-width: 100%;
 

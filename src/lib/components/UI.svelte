@@ -8,19 +8,10 @@
 		playerLives,
 		playerScore
 	} from "$lib/stores/player";
+	import { MapHandler } from "$lib/stores/stats";
 	import { frameLoop } from "$lib/utils/raf";
-	import { onDestroy, onMount } from "svelte";
+	import { getContext, onDestroy, onMount } from "svelte";
 
-	let SECTIONS = [
-		["Floor", 1],
-		["Score", 0],
-		["Lives", 3],
-		["Player", "@"],
-		["Health", $PlayerState.health],
-		["Ammo", 8],
-		["", ""],
-		["Gun", "[insert gun here]"]
-	];
 	const FACE_MAP = $page.data.FACES;
 	let PORTRAIT_STATE: keyof typeof FACE_MAP = "full";
 	let CURRENT_IDX: number = 0;
@@ -30,7 +21,18 @@
 
 	let start: number | null = null;
 
-	const loop = frameLoop.add(async (now) => {
+	$: HUD_SECTIONS = [
+		["level", $MapHandler],
+		["score", $playerScore],
+		["lives", $playerLives],
+		["portrait", null],
+		["health", $playerHealth],
+		["ammo", $playerAmmo],
+		["gap", null],
+		["weapon", null]
+	] as const;
+
+	const loop = frameLoop((now) => {
 		if (!start) start = now;
 		const elapsed = now - start;
 
@@ -38,10 +40,11 @@
 			start = now;
 			CURRENT_IDX = (CURRENT_IDX + 1) % 3;
 		}
+		return true;
 	});
 
 	onMount(() => {
-		loop.start();
+		return () => loop.abort();
 	});
 
 	function getFacingDirection(angle: number): string {
@@ -60,9 +63,6 @@
 
 {#if dev}
 	<div class="debug">
-		{#key $PlayerState.position}
-			<p>pos: {JSON.stringify($PlayerState.position)}</p>
-		{/key}
 		{#key $PlayerState.rotation.y}
 			<p>rot: {JSON.stringify($PlayerState.rotation.y)}</p>
 			<p>{getFacingDirection($PlayerState.rotation.y)}</p>
@@ -71,7 +71,31 @@
 {/if}
 <div class="hud">
 	<div class="stats">
-		<div class="col">
+		{#each HUD_SECTIONS as [name, value] (name)}
+			<div class="col {name}">
+				{#if name === "portrait"}
+					{#each FACE_MAP[PORTRAIT_STATE] as img, idx (img)}
+						<div
+							role="img"
+							class="portrait {PORTRAIT_STATE}"
+							class:show={PORTRAIT_STATE === "dead" ? true : idx === CURRENT_IDX}
+							style={FACE_MAP[PORTRAIT_STATE][idx]}
+						/>
+					{/each}
+				{:else if value !== null}
+					<b />
+					{#if name.match(/lives|score|ammo|health/g)}
+						<div class="numbers {name === 'health' ? 'pad' : ''}">
+							{#each value.toString() as num}
+								<span class="font-{num}" />
+							{/each}
+						</div>
+					{/if}
+					<div />
+				{/if}
+			</div>
+		{/each}
+		<!-- <div class="col">
 			<b />
 			<span class="font-{1}" />
 		</div>
@@ -117,9 +141,9 @@
 				{/each}
 			</div>
 		</div>
+	</div> -->
+		<!-- <div /> -->
 	</div>
-	<!-- <div /> -->
-	<!-- </div> -->
 </div>
 
 <style lang="scss">
@@ -131,26 +155,24 @@
 			background-image: url(#{$BASE_URL}#{$num}.BMP);
 			background-repeat: no-repeat;
 			background-size: contain;
-			width: 0.9em;
-			// display: inline-block;
-			// position: absolute;
-			// inset: 0;
-			height: 1.75em;
+			width: 0.75em;
+
+			display: inline-block;
+
+			height: 1.5em;
 		}
 	}
 
 	.numbers {
-		// padding: 1em;
+		// padding: 1rem;
 		display: flex;
+
 		flex-direction: row;
 		align-items: center;
-		position: absolute;
-		inset: 0;
 
-		justify-content: center;
-		margin-top: 2rem;
+		justify-content: flex-end;
 		&.pad {
-			margin-right: 2rem;
+			margin-right: 2em;
 		}
 	}
 
@@ -168,7 +190,7 @@
 		background-repeat: no-repeat;
 		background-image: var(--img);
 		background-position: center;
-		// max-height: 4rem;
+
 		justify-self: center;
 		place-self: center;
 		height: 100%;
@@ -183,32 +205,20 @@
 		&.show {
 			opacity: 1;
 		}
-		// max-width: 4rem;
 	}
 	.stats {
 		margin: 0 auto;
 		// display: grid;
 		display: grid;
-		grid-template-columns: 1fr 2fr 1fr 1fr 1.25fr 1.25fr 0.25fr 1.95fr;
-		aspect-ratio: 5/3; // grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 0.1fr 2fr;
-		// display: flex;
-		// flex: 1 1 auto;
-		height: inherit;
+		display: grid;
+		grid-template-columns: 0.9fr 1.5fr 0.9fr 0.9fr 1fr 0.9fr 0.2fr 1.7fr;
+		grid-template-rows: 1fr;
+		gap: 0px 0em;
+		grid-template-areas: "level score lives player health ammo gap weapon";
 
+		height: inherit;
 		width: 100%;
-		// ju-items: center;
 		text-align: center;
-		gap: 4px;
-		margin: 0 auto;
-		max-width: 60vw;
-		padding: 1rem 2rem;
-		> :not(:first-child) {
-			// margin-left: 0.5em;
-		}
-		> :not(:last-child) {
-			// margin-right: 0em;
-			// margin-right: 0.5em;
-		}
 
 		background-image: url(../sprites/hud/main.BMP);
 		background-repeat: no-repeat;
@@ -216,7 +226,6 @@
 		background-position: center;
 		> :nth-last-child(2) {
 			margin: 0em;
-			// width: 0;
 		}
 	}
 	.col {
@@ -224,30 +233,25 @@
 		grid-template-columns: 1fr;
 		contain: layout style paint;
 
-		// grid-template-rows: 1fr 2fr;
-		// max-width: 100%;
 		position: relative;
 		width: 100%;
+		justify-content: center;
 		display: grid;
 		grid-template-rows: 0.25fr 1fr;
+		justify-items: center;
 
-		// flex: 1 0 auto;
-		// max-width: 5rem;
-		// justify-content: center;
-		// min-width: 1rem;
-		line-height: 1.2;
+		line-height: 1;
 		font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
 			Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-		&:not(:nth-last-child(2)) {
-			// width: 100%;
-		}
-		max-width: 100%;
-		// background: #00009e;
-		// text-align: center;
-		font-size: 2rem;
-		// max-height: 1.1rem;
+
+		font-size: 1.5em;
+
 		align-content: center;
-		place-items: center;
+		place-items: flex-end;
+
+		place-items: flex-end;
+		justify-items: center;
+		align-items: center;
 	}
 	.hud {
 		position: relative;
@@ -255,19 +259,18 @@
 		right: 0;
 		bottom: 0;
 		text-align: center;
-		// display: flex;
-		// height: 100%;
+
+		height: 100%;
 		max-height: 100%;
-		// justify-content: center;
-		width: 100%;
-		aspect-ratio: 2/7;
+
 		color: white;
+
 		image-rendering: pixelated;
-		// background-color: #003e3e;
-		font-size: 16px;
+
+		font-size: 75%;
 		font-weight: 500;
-		contain: strict;
-		// height: 100%;
+
+		height: 100%;
 		height: 15vh;
 	}
 
@@ -282,5 +285,29 @@
 		color: #fff;
 		width: auto;
 		height: 3rem;
+	}
+	.weapon {
+		grid-area: weapon;
+	}
+	.gap {
+		grid-area: gap;
+	}
+	.ammo {
+		grid-area: ammo;
+	}
+	.health {
+		grid-area: health;
+	}
+	.player {
+		grid-area: player;
+	}
+	.lives {
+		grid-area: lives;
+	}
+	.score {
+		grid-area: score;
+	}
+	.level {
+		grid-area: level;
 	}
 </style>

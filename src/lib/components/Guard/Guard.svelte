@@ -1,4 +1,7 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script
 	lang="ts"
@@ -30,12 +33,14 @@
 	import { PlayerState, playerRotation } from "$lib/stores/player";
 	import type { Position2D } from "$lib/types/position";
 	import {
+		comparePositions,
+		diffPositions,
 		getDistanceFromPoints,
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
-	import { onMount, tick } from "svelte";
+	import { getContext, onMount, tick } from "svelte";
 	import type { ExtendedEntity, MapItem, WallFace } from "../../types/core";
 	import { isVisibleToPlayer } from "../../utils/angle";
 	import { enemyState } from "./state";
@@ -49,7 +54,9 @@
 	import { testLineOfSight } from "../Player.svelte";
 	import { rand } from "$lib/utils/engine";
 	import { WALL_FACES } from "$lib/utils/validation";
+	import { ctxKey, type WSContext } from "../../../routes/key";
 
+	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 	export let item: ExtendedEntity;
 	export let offset: number;
 	export let section: number;
@@ -70,7 +77,7 @@
 	});
 
 	let isVisible = false;
-
+	let hasTakenDamage = false;
 	export const setState = state.setState;
 
 	export const getPosition = () => $tween;
@@ -81,10 +88,15 @@
 	export const getLocalPosition = (): Position2D => getLocalPositionFromRealPosition($tween);
 
 	export const takeDamage = async () => {
+		hasTakenDamage = true;
 		await state.giveDamage();
+		busy = false;
+		setTimeout(() => {
+			hasTakenDamage = false;
+		}, 125);
 		if ($state.health <= 0) {
 			tween.cancel();
-			stateLoop.stop();
+			stateLoop.abort();
 			audioManager.play(
 				`death_${Math.max(1, Math.min(3, Math.floor(Math.random() * 4))) as 1 | 2 | 3}`
 			);
@@ -131,52 +143,62 @@
 			model: { component: "Object", texture: 143 }
 		});
 
-		stateLoop.stop();
+		stateLoop;
 	}
 
-	const stateLoop = frameLoop.add(async (now) => {
-		if (isVisible) return;
+	const stateLoop = frameLoop((now) => {
+		if ($isLoadingNextLevel) return true;
 		if ($state.state === "dead") {
-			return;
+			return false;
 		}
 		if (!startFrame) startFrame = now;
 		const elapsed = now - startFrame;
 
-		if (!busy && elapsed > 400 + rand.nextByte()) {
+		if (elapsed > 111 + rand.nextInt(162, 231)) {
+			if (busy) return true;
 			startFrame = now;
 
 			const distance = getDistanceFromPoints(
-				{ x: 1 - $PlayerState.position.x, z: 1 - $PlayerState.position.z },
+				{ x: -$PlayerState.position.x, z: -$PlayerState.position.z },
 				$state.position
 			);
 
-			const seen = isVisibleToPlayer(getPosition(), 45);
 			const playerPosition = getLocalPositionFromRealPosition({
 				x: -$PlayerState.position.x,
 				z: -$PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
-			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1000) {
-				busy = true;
+			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1500) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("halt");
 				}
+				const r = rand.nextInt(0, 10);
+				if ((distance >= 55 && distance < 880 && !(r % 5)) || hasTakenDamage) {
+					if (busy) return true;
+					if (!busy) busy = true;
+					tick().then(() => {
+						audioManager.play("shoot");
+						tween.cancel();
 
-				if (distance >= 55 && distance < 680 && Math.random() < 0.6) {
-					audioManager.play("shoot");
-					tween.cancel();
-
-					previousAnimationState = "attack";
-					state.setState("attack").then(() => {
+						previousAnimationState = "attack";
+						state.setState("attack");
 						busy = false;
 					});
-				} else if (distance > 74 && distance < 750) {
+				} else if (distance > 74) {
+					if (busy) return true;
+					if (!busy) busy = true;
 					previousAnimationState = "walk";
+					state.setState("walk");
+					const posDiff = diffPositions($PlayerState.position, ourPosition);
+					const posCmp = comparePositions($PlayerState.position, ourPosition);
 					state
 						.moveTo(
 							getPositionFromDistance(
-								{ x: $PlayerState.position.x - 100, z: $PlayerState.position.z - 100 },
+								{
+									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -32 : 32),
+									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -32 : 32)
+								},
 								$state.position
 							)
 						)
@@ -184,29 +206,33 @@
 							busy = false;
 						});
 				} else {
-					// if (distance > 1000) playerJustSeen = false;
+					if (distance > 1000) playerJustSeen = false;
+					// busy = false;
 					state.setState("idle");
 				}
 			} else {
-				// if (distance > 1000) playerJustSeen = false;
-				busy = false;
-				previousAnimationState = "idle";
-				state.setState("idle");
+				if (distance > 1000) playerJustSeen = false;
+				if (!busy) {
+					previousAnimationState = "idle";
+					state.setState("idle");
+				}
 			}
 		}
-	}, true);
+		return true;
+	});
 
 	onMount(() => {
-		stateLoop.start();
 		return () => {
-			stateLoop.stop();
+			stateLoop.abort();
 		};
 	});
 </script>
 
+<!-- {#if isVisible} -->
 <div
 	on:animationstart={() => {
 		if ($state.state === "hurt" && previousAnimationState !== "hurt") {
+			busy = true;
 			tween.cancel();
 			previousAnimationState = "hurt";
 		}
@@ -220,6 +246,7 @@
 	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$playerRotation}deg);"
 />
 
+<!-- {/if} -->
 <style lang="scss">
 	.sprite {
 		top: 0%;

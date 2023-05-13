@@ -255,7 +255,7 @@
 									this={MODEL_MAP[item.model.component]}
 									{offset}
 									{section}
-									bind:this={GameObjects.enemies[GameObjects.enemies.length]}
+									bind:this={$GameObjects.enemies[$GameObjects.enemies.length]}
 									{item}
 								/>
 							{:else if item.model.component === "Door"}
@@ -263,7 +263,7 @@
 									this={MODEL_MAP[item.model.component]}
 									{offset}
 									{section}
-									bind:this={GameObjects.doors[GameObjects.doors.length]}
+									bind:this={$GameObjects.doors[$GameObjects.doors.length]}
 									{item}
 								/>
 							{:else}
@@ -271,13 +271,13 @@
 									this={MODEL_MAP[item.model.component]}
 									{offset}
 									{section}
-									bind:this={GameObjects.models[GameObjects.models.length]}
+									bind:this={$GameObjects.models[$GameObjects.models.length]}
 									{item}
 								/>
 							{/if}
 						{:else if item.surfaces}
 							<Wall
-								bind:this={GameObjects.walls[GameObjects.walls.length]}
+								bind:this={$GameObjects.walls[$GameObjects.walls.length]}
 								{item}
 								{section}
 								{offset}
