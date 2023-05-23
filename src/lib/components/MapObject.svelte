@@ -1,4 +1,7 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script lang="ts">
 	import { getContext } from "svelte";
@@ -16,15 +19,21 @@
 	let position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
 	let isVisible = true;
-
 	export const getVisibility = () => isVisible;
-	export const setVisibility = (visible: boolean) => (isVisible = visible);
+	let willChange: string | false = false;
+	export const setVisibility = (visible: boolean) => {
+		willChange = "visibility, transform";
+		return () => {
+			isVisible = visible;
+		};
+	};
 
 	export const getPosition = () => {
 		return position;
 	};
 
 	export const getLocalPosition = () => ({ x: offset, z: section });
+	export const type = "object";
 
 	let texture = item.model?.texture;
 </script>
@@ -33,9 +42,9 @@
 	{@const url = `--img: url(${$textures[texture].original});`}
 	<div
 		class="sprite"
-		style="{url} visibility: {isVisible
-			? 'visible'
-			: 'hidden'}; transform: translate3d({-position.x}px, -50%, {-position.z}px) rotateY({-$playerRotation}deg); "
+		style="{willChange
+			? `will-change: ${willChange};`
+			: ''} {url} transform: translate3d({-position.x}px, -50%, {-position.z}px) rotateY({-$playerRotation}deg);"
 	/>
 {/if}
 
@@ -43,18 +52,17 @@
 	.sprite {
 		height: 64px;
 		width: 64px;
-		position: absolute;
+		position: fixed;
 		top: 0;
-		contain: layout;
-		will-change: transform;
-		// content-visibility: auto;
 		left: 0;
 		bottom: 0;
+		transform-style: preserve-3d;
+		will-change: top;
+		z-index: 1;
 		background-image: var(--img);
-		background-clip: border-box;
-		background-size: 100%;
+		background-size: 64px;
+		background-position: top left;
 		image-rendering: pixelated;
-
-		opacity: 1;
+		contain: strict;
 	}
 </style>

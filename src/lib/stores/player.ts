@@ -1,10 +1,11 @@
 import type { Position, Position2D } from "$lib/types/position";
 import { derived, writable } from "svelte/store";
 import { CurrentLevel } from "../components/Level.svelte";
-import { getLocalPositionFromRealPosition } from "../utils/position";
+import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "../utils/position";
 import type Guard from "../components/Guard/Guard.svelte";
 import { rand } from "$lib/utils/engine";
 import { ArrayUtils } from "$lib/utils/validation";
+import type Enemy from "$lib/components/Enemy.svelte";
 
 export const createPlayerState = (initialState: Partial<IPlayerState>) =>
 	_playerState(initialState);
@@ -36,10 +37,10 @@ export interface IPlayerState {
 }
 
 const CONSTANTS = {
-	speed: 5.875
+	speed: 6.875
 } as const;
 
-const DEFAULT_STATE = (lives: number | undefined = 3, atPosition?: Position2D): IPlayerState => ({
+const DEFAULT_STATE = (lives: number | undefined = 3, score = 0): IPlayerState => ({
 	health: 100,
 	weapons: {
 		ammo: 8,
@@ -49,8 +50,8 @@ const DEFAULT_STATE = (lives: number | undefined = 3, atPosition?: Position2D): 
 		smg: { acquired: false }
 	},
 	lives: typeof lives !== "number" ? 3 : lives,
-	score: 0,
-	position: atPosition ? { ...atPosition, y: 0 } : { x: 1794, z: 3008, y: 0 },
+	score,
+	position: { x: 0, y: 0, z: 0 },
 	rotation: { x: 0, y: 270, z: 0 }
 });
 
@@ -62,13 +63,17 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 		...initialState
 	};
 	const { subscribe, set, update } = writable<IPlayerState>(state);
-
+	let startScore = 0;
 	return {
 		subscribe,
 		set,
 		init(newState: Partial<IPlayerState>, dead = false) {
+			if (!dead) {
+				startScore = state.score;
+			}
+
 			state = {
-				...DEFAULT_STATE(dead === true ? state.lives - 1 : state.lives, newState?.position),
+				...DEFAULT_STATE(dead === true ? state.lives : state.lives, startScore),
 				...newState
 			} as Required<IPlayerState>;
 			set(state);
@@ -114,6 +119,7 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			if (typeof n !== "number") {
 				n = rand.nextInt(5, 13);
 			}
+
 			state.health -= n;
 			state.health = state.health < 0 ? 0 : state.health;
 
@@ -163,7 +169,7 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 
 			const localTarget = getLocalPositionFromRealPosition(toMove);
 
-			if (!CurrentLevel.checkCollisionWithWorld(localTarget)) {
+			if (!CurrentLevel.checkCollisionWithWorld(localTarget, false)) {
 				state.position.x = +toMove.x;
 				state.position.z = +toMove.z;
 			}
@@ -221,10 +227,43 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 		},
 
 		// ACTIONS
-		async attack(e: Guard) {
+		async attack(e: Enemy) {
 			e.setState("hurt");
-
-			if (e) await e?.takeDamage();
+			let damage: number | undefined = undefined;
+			switch (state.weapons.active) {
+				case "knife":
+					damage = rand.nextInt(0, 16);
+					break;
+				case "pistol":
+					damage = rand.nextInt(0, 18);
+					break;
+				case "smg":
+					damage = rand.nextInt(0, 21);
+					break;
+				default:
+					break;
+			}
+			const enemyPosition = e.getLocalPosition();
+			const ourPosition = getLocalPositionFromRealPosition(state.position);
+			const distance = getDistanceFromPoints(ourPosition, enemyPosition);
+			const rand1 = rand.nextInt(0, 255);
+			const rand2 = rand.nextInt(0, 255);
+			const hitChance = 160 - distance * 16;
+			console.log({
+				rand1,
+				rand2,
+				distance
+			});
+			if (4 < distance && rand1 / 12 < distance) {
+				damage = 0;
+			} else if (distance < 2) {
+				damage = rand2 / 4;
+				console.log("DISTANCE < 2", damage);
+			} else if (distance >= 2) {
+				damage = rand2 / 6;
+				console.log("DISTANCE >= 2", damage);
+			}
+			if (e) await e?.takeDamage(damage);
 		}
 	};
 }

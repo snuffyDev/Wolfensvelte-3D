@@ -12,7 +12,6 @@ async function getFiles(dir) {
 		const res = resolve(dir, dirent.name);
 		if (dirent.isFile()) {
 			files.push(res);
-			// yield* getFiles(res);
 		}
 	}
 	return files.reverse();
@@ -35,6 +34,6 @@ for (let idx = 0; idx < files.length; idx++) {
 
 	parts[0] = `${pathParts.join("/")}/${parseInt(fileName) + 1}`;
 	const newFilePath = parts.join(".");
-	// console.log(newFilePath);
+
 	await rename(originalFilePath, newFilePath);
 }

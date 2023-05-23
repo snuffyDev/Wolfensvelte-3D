@@ -14,10 +14,10 @@
 	#scene {
 		width: 100%;
 		height: 100%;
-		// perspective: 64px;
+
 		overflow: hidden;
 		backface-visibility: hidden;
-		// position: absolute;
+
 		/* Sky texture */
 	}
 	*,
@@ -67,8 +67,7 @@
 	#world {
 		position: fixed;
 		inset: 0;
-		// top: 150% !important;
-		// left: 50% !important;
+
 		width: 100%;
 		height: 100%;
 		transform-style: preserve-3d;
@@ -79,7 +78,7 @@
 		left: 50%;
 		top: 50%;
 		backface-visibility: hidden;
-		// background-size: ;
+
 		/* For the instruction text */
 		font-family: sans-serif;
 		font-size: 3em;

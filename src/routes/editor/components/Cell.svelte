@@ -155,7 +155,7 @@
 		isolation: isolate;
 		border: 1px hsla(0, 0%, 100%, 0.72) solid;
 		&.active {
-			border: none; // border: 1px hsla(0, 0%, 100%, 0.212) solid;
+			border: none;
 		}
 		&::before {
 			content: "";

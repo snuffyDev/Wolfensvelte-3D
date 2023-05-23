@@ -1,7 +1,8 @@
-import { PlayerState } from "$lib/stores/player";
+import { PlayerState, type IPlayerState } from "$lib/stores/player";
 import type { Position, Position2D } from "../types/position";
 
 export function normalizeAngle(angle: number): number {
+	angle = angle < 0 ? 360 + angle : angle;
 	const range = 360;
 	return ((angle % range) + range) % range;
 }
@@ -17,9 +18,7 @@ export function getAngleBetweenPoints(pos1: Position | Position2D, pos2: Positio
 
 export function isVisibleToPlayer<
 	T extends { getPosition: () => Position | Position2D } | Position2D
->(obj: T, fov = 30) {
-	const playerState = PlayerState.get();
-
+>(playerState: IPlayerState, obj: T, fov = 30) {
 	let position: Position2D;
 
 	if ("getPosition" in obj) {

@@ -12,9 +12,13 @@
 	import {
 		EnemySymbol,
 		enemySymbolIds,
+		SpawnTile,
 		specialObjectIds as specialObjects
 	} from "$lib/utils/engine/objects";
-	import { getLocalPositionFromRealPosition } from "$lib/utils/position";
+	import {
+		getLocalPositionFromRealPosition,
+		getRealPositionFromLocalPosition
+	} from "$lib/utils/position";
 
 	const { textures }: WSContext = getContext(ctxKey);
 
@@ -22,6 +26,8 @@
 		active: boolean;
 		data: MapItem;
 	}[][] = [[]];
+
+	let SPAWN_COORDS: { x: number; z: number } = { x: 0, z: 0 };
 
 	TILE_MAP = [...Array(64).keys()].map(() =>
 		[...Array(64).keys()].map(() => ({
@@ -101,7 +107,7 @@
 				)
 			)
 		);
-		await navigator.clipboard.writeText(JSON.stringify(mapped));
+		await navigator.clipboard.writeText(JSON.stringify({ spawn: SPAWN_COORDS, data: mapped }));
 		return mapped;
 	};
 
@@ -124,7 +130,7 @@
 			}
 			return chunks as T[][];
 		};
-
+		const ENEMY_SYMBOLS = objectEntries(EnemySymbol);
 		reader.onloadend = () => {
 			const jsonString = reader.result as string;
 			jsonFile = JSON.parse(jsonString);
@@ -136,23 +142,43 @@
 			for (let x = 0; x < TILE_MAP.length; x++) {
 				for (let y = 0; y < TILE_MAP[x].length; y++) {
 					let col = TILE_MAP[x][y].data;
-					if (enemySymbolIds.includes(+chunked[x][y])) {
+					const tile = +chunked[x][y];
+
+					if (enemySymbolIds.includes(tile as never)) {
+						let enemyType: "Guard" | "Dog" | "SS" | null = null;
+						switch (tile as (typeof enemySymbolIds)[keyof typeof enemySymbolIds]) {
+							case 168:
+								enemyType = "Dog";
+								break;
+							case 169:
+								enemyType = "Guard";
+								break;
+							case 173:
+								enemyType = "SS";
+								break;
+							default:
+								break;
+						}
+						if (!enemyType) continue;
 						TILE_MAP[x][y].data = {
 							...TILE_MAP[x][y].data,
-							model: { component: +chunked[x][y] === EnemySymbol.Guard ? "Guard" : "Dog" }
+							model: { component: enemyType }
 						};
-					} else if (specialObjects.includes(+chunked[x][y])) {
+					} else if (tile === SpawnTile) {
+						SPAWN_COORDS = getRealPositionFromLocalPosition({ x: y, z: x });
+						console.log(SPAWN_COORDS, tile, getRealPositionFromLocalPosition({ x, z: y }));
+					} else if (specialObjects.includes(tile)) {
 						TILE_MAP[x][y].data = {
 							...TILE_MAP[x][y].data,
-							model: { component: "Object", texture: +chunked[x][y] }
+							model: { component: "Object", texture: tile }
 						};
-					} else if (+chunked[x][y] !== 99 && +chunked[x][y] !== 103 && +chunked[x][y] !== 25) {
-						col.surfaces = +chunked[x][y] === 0 ? null : +chunked[x][y];
+					} else if (tile !== 99 && tile !== 103 && tile !== 25) {
+						col.surfaces = tile === 0 ? null : tile;
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, surfaces: col.surfaces };
 					} else {
 						TILE_MAP[x][y].data = {
 							...TILE_MAP[x][y].data,
-							model: { component: "Door", texture: +chunked[x][y] }
+							model: { component: "Door", texture: tile }
 						};
 					}
 				}
@@ -338,12 +364,9 @@
 								// for (const [row, col] of multiSelectNodes) {
 								// 	for (const side of CARDINAL_DIRECTION) {
 								// 		if (TILE_MAP[row- 1][col].data.surfaces[getOppositeDirection(side)].active) {
-								// 			TILE_MAP[row][col].data.surfaces[side].active = false;
-								// 			TILE_MAP[row][col].data.surfaces[side].key = undefined;
+
 								// 		}
 								// 		if (TILE_MAP[row][col + 1].data.surfaces[getOppositeDirection(side)].active) {
-								// 			TILE_MAP[row][col].data.surfaces[side].active = false;
-								// 			TILE_MAP[row][col].data.surfaces[side].key = undefined;
 
 								// 		}
 								// 	}
@@ -405,8 +428,7 @@
 		width: 100%;
 		// grid-
 		align-content: center;
-		// min-height: 1rem;
-		// grid-auto-flow: column dense;
+
 		min-height: 16px;
 		grid-template-columns: repeat(auto-fill, minmax(16px, 1fr));
 	}
@@ -438,10 +460,9 @@
 		min-height: 100vh;
 		padding: 1em 1.5em;
 		background: #121212;
-		// background-blend-mode: luminosity;
+
 		color: #f3f3f3;
-		// mix-blend-mode: multiply;
-		// ?		mix-blend-mode: multiply;
+
 		backdrop-filter: blur(2px) brightness(0.1) opacity(1);
 	}
 	.editor {
@@ -455,8 +476,7 @@
 		top: 50%;
 		left: 50%;
 		transform-origin: top left;
-		// flex-direction: column;
-		// grid-auto-flow: row dense;
+
 		grid-template-rows: repeat(auto-fill, minmax(16px, 1fr));
 
 		color: #fff;

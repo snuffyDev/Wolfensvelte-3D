@@ -1,6 +1,6 @@
 <svelte:options
 	accessors={true}
-	immutable={true}
+	immutable={false}
 />
 
 <script
@@ -55,6 +55,7 @@
 	import { rand } from "$lib/utils/engine";
 	import { WALL_FACES } from "$lib/utils/validation";
 	import { ctxKey, type WSContext } from "../../../routes/key";
+	import { ENEMY_INIT } from "$lib/core/ai";
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 	export let item: ExtendedEntity;
@@ -63,10 +64,14 @@
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
-	const state = enemyState({
-		position: { x: -position.x, z: -position.z },
-		state: "idle"
-	});
+	const state = enemyState(
+		{
+			position: { x: -position.x, z: -position.z },
+			state: "idle"
+		},
+		ENEMY_INIT[item.model!.component! as keyof typeof ENEMY_INIT]
+	);
+
 	const tween = state.tween;
 	const audioManager = new AudioManager({
 		halt: new URL(HaltSound, import.meta.url).toString(),
@@ -93,6 +98,7 @@
 		busy = false;
 		setTimeout(() => {
 			hasTakenDamage = false;
+			// state.setState("idle");
 		}, 125);
 		if ($state.health <= 0) {
 			tween.cancel();
@@ -146,7 +152,7 @@
 		stateLoop;
 	}
 
-	const stateLoop = frameLoop((now) => {
+	const stateLoop = frameLoop(async (now) => {
 		if ($isLoadingNextLevel) return true;
 		if ($state.state === "dead") {
 			return false;
@@ -154,7 +160,7 @@
 		if (!startFrame) startFrame = now;
 		const elapsed = now - startFrame;
 
-		if (elapsed > 111 + rand.nextInt(162, 231)) {
+		if (elapsed > 151 + rand.nextInt(162, 231)) {
 			if (busy) return true;
 			startFrame = now;
 
@@ -168,23 +174,27 @@
 				z: -$PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
-			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1500) {
+			if (testLineOfSight($CurrentLevel, playerPosition, ourPosition) && distance < 1500) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("halt");
 				}
-				const r = rand.nextInt(0, 10);
-				if ((distance >= 55 && distance < 880 && !(r % 5)) || hasTakenDamage) {
+				const r = rand.nextInt(distance / 2, distance);
+				console.log(r, r < distance * Math.random());
+				if ((distance >= 55 && r < distance * Math.random()) || hasTakenDamage) {
 					if (busy) return true;
 					if (!busy) busy = true;
-					tick().then(() => {
-						audioManager.play("shoot");
-						tween.cancel();
+					await tick()
+						.then(() => {
+							audioManager.play("shoot");
+							tween.cancel();
 
-						previousAnimationState = "attack";
-						state.setState("attack");
-						busy = false;
-					});
+							previousAnimationState = "attack";
+							return state.setState("attack");
+						})
+						.finally(() => {
+							busy = false;
+						});
 				} else if (distance > 74) {
 					if (busy) return true;
 					if (!busy) busy = true;
@@ -192,12 +202,12 @@
 					state.setState("walk");
 					const posDiff = diffPositions($PlayerState.position, ourPosition);
 					const posCmp = comparePositions($PlayerState.position, ourPosition);
-					state
+					await state
 						.moveTo(
 							getPositionFromDistance(
 								{
-									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -32 : 32),
-									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -32 : 32)
+									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -16 : 16),
+									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -16 : 16)
 								},
 								$state.position
 							)
@@ -207,7 +217,7 @@
 						});
 				} else {
 					if (distance > 1000) playerJustSeen = false;
-					// busy = false;
+
 					state.setState("idle");
 				}
 			} else {
@@ -228,7 +238,6 @@
 	});
 </script>
 
-<!-- {#if isVisible} -->
 <div
 	on:animationstart={() => {
 		if ($state.state === "hurt" && previousAnimationState !== "hurt") {
@@ -246,7 +255,6 @@
 	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$playerRotation}deg);"
 />
 
-<!-- {/if} -->
 <style lang="scss">
 	.sprite {
 		top: 0%;

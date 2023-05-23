@@ -4,7 +4,7 @@ export const textureData = () => TEXTURES;
 
 export type TextureEntry = Awaited<ReturnType<typeof textureData>>;
 
-const textureUrls = import.meta.glob("./../../textures/*.png", { as: "url", eager: true });
+const textureUrls = import.meta.glob("./../../textures/*.*", { as: "url", eager: true });
 
 const TEXTURES = Object.fromEntries(
 	Object.entries(textureUrls).map<[number, { name: number; original: string }]>(([k, p]) => {

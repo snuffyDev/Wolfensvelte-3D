@@ -10,8 +10,8 @@ Live Site: https://wolfensvelte-3d.vercel.app/
 
 <div align="center">
 
-|<img src="https://user-images.githubusercontent.com/72365477/232335697-ff217511-9e75-455f-b892-8452bab6d0d1.png" width="300" height="300" />    |  <img src="https://user-images.githubusercontent.com/72365477/232335679-c8401c92-34ac-49e4-9502-222c8e42cd4d.png" width="300" height="300" />  |  <img src="https://user-images.githubusercontent.com/72365477/232335652-eb53ae65-30b8-4701-a0b1-473d06047d1e.png" width="300" height="300" />  |
-|---|---|---|
+| <img src="https://user-images.githubusercontent.com/72365477/232335697-ff217511-9e75-455f-b892-8452bab6d0d1.png" width="300" height="300" /> | <img src="https://user-images.githubusercontent.com/72365477/232335679-c8401c92-34ac-49e4-9502-222c8e42cd4d.png" width="300" height="300" /> | <img src="https://user-images.githubusercontent.com/72365477/232335652-eb53ae65-30b8-4701-a0b1-473d06047d1e.png" width="300" height="300" /> |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 
 </div>
 

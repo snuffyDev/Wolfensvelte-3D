@@ -19,8 +19,7 @@
 			const tileZ = Math.floor(z + 0.5);
 
 			// Check if the tile at (tileX, tileZ) contains a MapItem
-			const tile = world[tileZ][tileX];
-			if (CurrentLevel.checkCollisionWithWorld({ x: tileX, z: tileZ }, false)) {
+			if (CurrentLevel.checkCollisionWithWorld({ x: tileX, z: tileZ }, null)) {
 				return false;
 			}
 
@@ -31,6 +30,116 @@
 		return true;
 	}
 
+	export function testLineOfSight2(
+		world: ExtendedEntity[][],
+		start: Position2D,
+		end: Position2D
+	): boolean {
+		let dx = Math.abs(end.x - start.x);
+		let dy = Math.abs(end.z - start.z);
+		let x = start.x;
+		let z = start.z;
+		let n = 1 + dx + dy;
+		let x_inc = end.x > start.x ? 1 : -1;
+		let y_inc = end.z > start.z ? 1 : -1;
+		let error = dx - dy;
+		dx *= 2;
+		dy *= 2;
+
+		for (; n > 0; --n) {
+			// check if current tile is valid and doesn't have a model
+			if (
+				x < 0 ||
+				x >= world.length ||
+				z < 0 ||
+				z >= world[0].length ||
+				CurrentLevel.checkCollisionWithWorld({ x, z }, null)
+			) {
+				return false;
+			}
+
+			if (error > 0) {
+				x += x_inc;
+				error -= dy;
+			} else {
+				z += y_inc;
+				error += dx;
+			}
+		}
+
+		return true;
+	}
+
+	function isBlocking(entity: ExtendedEntity | undefined): boolean {
+		if (!entity) {
+			return false;
+		}
+
+		// Doors are blocking if they exist and are closed
+		if (
+			entity.model &&
+			entity.model?.component !== "Door" &&
+			entity.model.attributes?.state !== "closed"
+		) {
+			return false; // adjust this to check if the door is actually closed
+		}
+		// Walls are blocking if they have any surfaces
+		if (entity.surfaces && Object.values(entity.surfaces).some((surface) => surface === null)) {
+			return true;
+		}
+
+		return false;
+	}
+	type Model = InstanceType<
+		typeof Door | typeof Guard | typeof MapObject | typeof Elevator | typeof Enemy
+	>;
+
+	export function testLineOfSightSkipWalls(
+		world: ExtendedEntity[][],
+		viewer: Position2D,
+		target: Model
+	): boolean {
+		const targetPos = target.getLocalPosition();
+		let dx = Math.abs(targetPos.x - viewer.x);
+		let dz = Math.abs(targetPos.z - viewer.z);
+
+		let sx = targetPos.x < viewer.x ? 1 : -1;
+		let sz = targetPos.z < viewer.z ? 1 : -1;
+
+		let err = dx - dz;
+
+		while (true) {
+			const x = Math.ceil(targetPos.x - 0.5);
+			const z = Math.ceil(targetPos.z - 0.5);
+			const entity = world[z]?.[x];
+
+			if ((x !== targetPos.x || z !== targetPos.z) && isBlocking(entity)) {
+				return false;
+			}
+			if (target.type !== "wall" && isBlocking(entity)) {
+				// If we encounter a blocking entity (not a wall) before reaching the target, the target is not visible
+				return false;
+			}
+
+			if (viewer.x === x && z === viewer.z) {
+				break;
+			}
+
+			const e2 = 2 * err;
+
+			if (e2 > -dz) {
+				err -= dz;
+				targetPos.x += sx;
+			}
+
+			if (e2 < dx) {
+				err += dx;
+				targetPos.z += sz;
+			}
+		}
+
+		return true;
+	}
 	export class Cache<T> {
 		private declare current: T;
 		private declare previous: T;
@@ -66,10 +175,16 @@
 </script>
 
 <script lang="ts">
-	import { PlayerState, type PlayerControls } from "$lib/stores/player";
+	import {
+		PlayerState,
+		type PlayerControls,
+		type IPlayerState,
+		playerHealth
+	} from "$lib/stores/player";
 	import { isVisibleToPlayer } from "$lib/utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
 	import {
+		comparePositions,
 		getDistanceFromPoints,
 		getFacingDirection,
 		getLocalPositionFromRealPosition
@@ -80,11 +195,16 @@
 	import { AudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
 	import type { ExtendedEntity, World } from "$lib/types/core";
-	import type { Position2D } from "$lib/types/position";
+	import type { Position, Position2D } from "$lib/types/position";
 	import { CurrentLevel, type WorldState } from "./Level.svelte";
+	import type Enemy from "./Enemy.svelte";
+	import type Door from "./Door.svelte";
+	import type MapObject from "./MapObject.svelte";
+	import type Elevator from "./Elevator.svelte";
 
 	let state: "shoot" | "idle" = "idle";
 	let windowWidth: number;
+	let camera: HTMLDivElement;
 	let buttonsPressed: PlayerControls = {
 		w: false,
 		shift: false,
@@ -107,17 +227,19 @@
 	let start: number;
 	const cache = new Cache<string>();
 
-	const f = frameLoop((now) => {
+	const f = frameLoop(async (now) => {
 		if (!start) start = now;
 		const elapsed = now - start;
 		const { x: a, y: b, z: c } = $PlayerState.rotation;
-		if (elapsed > 8) {
+		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
+
+		if (elapsed > 8 && $playerHealth > 0) {
 			start = now;
+			cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg) perspective(var(--perspective));`;
 
 			PlayerState.update(buttonsPressed);
 		}
-		cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg);`;
-		// const key = `${a}${b}${c}`;
+
 		return true;
 	});
 
@@ -176,7 +298,6 @@
 			}
 		} else {
 			for (const door of $GameObjects.doors) {
-				console.log(GameObjects, door, toPosition);
 				const localPosition = door?.getLocalPosition();
 				if (
 					(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
@@ -193,16 +314,19 @@
 	async function attackClosestEnemy(position: Position2D) {
 		if (state === "shoot" && $PlayerState.weapons.active !== "smg") return;
 
-		if ($PlayerState.weapons.active) audioManager.play($PlayerState.weapons.active);
-
-		if ($PlayerState.weapons.ammo <= 0) {
+		if ($PlayerState.weapons.ammo <= 0 && $PlayerState.weapons.active !== "knife") {
 			return;
 		}
-		$PlayerState.weapons.ammo -= 1;
+
 		state = "shoot";
+		if ($PlayerState.weapons.active !== "knife") {
+			$PlayerState.weapons.ammo -= 1;
+			if ($PlayerState.weapons.active) audioManager.play($PlayerState.weapons.active);
+		}
+
 		await tick();
 
-		const enemiesInRange: Guard[] = [];
+		const enemiesInRange: Enemy[] = [];
 
 		for (const e of $GameObjects.enemies) {
 			const distance = getDistanceFromPoints(e?.getPosition(), {
@@ -210,8 +334,8 @@
 				z: -position.z
 			});
 			if (
-				isVisibleToPlayer(e?.getPosition(), 35) &&
-				testLineOfSight(
+				isVisibleToPlayer($PlayerState, e?.getPosition(), 35) &&
+				testLineOfSight2(
 					$CurrentLevel,
 					getLocalPositionFromRealPosition({
 						x: position.x,
@@ -249,12 +373,42 @@
 		if (!target) return;
 
 		const enemyPosition = getLocalPositionFromRealPosition(target.getPosition());
-		const canShoot = testLineOfSight($CurrentLevel, playerPos, enemyPosition)!;
+		const canShoot = testLineOfSight2($CurrentLevel, playerPos, enemyPosition)!;
 
 		if (canShoot) {
 			await PlayerState.attack(target);
 		}
+		let timeout = 0;
+		switch ($PlayerState.weapons.active) {
+			case "smg":
+				timeout = 125;
+				break;
+			case "pistol":
+				timeout = 625;
+				break;
+			case "knife":
+				timeout = 125;
+				break;
+			default:
+				break;
+		}
+
+		setTimeout(() => {
+			state = "idle";
+		}, timeout);
 	}
+
+	const handleTouchStart = (e: TouchEvent) => {
+		if (!camera) return;
+
+		if (
+			(e.target as HTMLDivElement).contains(camera) ||
+			camera.isSameNode(e.target as HTMLElement)
+		) {
+			console.log(e.target);
+			primaryAction();
+		}
+	};
 </script>
 
 <svelte:window
@@ -327,12 +481,11 @@
 	}}
 />
 
+<svelte:body on:touchstart={handleTouchStart} />
 <div
 	class="player camera "
 	style={cssText}
-	on:touchstart={() => {
-		primaryAction();
-	}}
+	bind:this={camera}
 	bind:clientWidth={windowWidth}
 >
 	<slot />
@@ -346,17 +499,17 @@
 
 <style lang="scss">
 	.player-gun {
-		position: absolute;
+		position: fixed;
 		bottom: 0;
 		margin: 0 auto;
 		pointer-events: none;
 		z-index: 1000;
 		left: 0;
 		max-width: 24.125rem;
-		contain: style size layout;
+		// contain: strict;
 		right: 0;
-
-		transform: translate(0px, 0px);
+		inset: 0;
+		transform: translateZ(0px);
 	}
 	.player-gun::after {
 		content: "";
@@ -364,8 +517,11 @@
 		width: 24.125rem;
 		height: 24.125rem;
 		bottom: 0;
+		// contain: strict;
 		background: var(--url);
-		background-size: cover;
+		perspective: var(--perspective);
+		background-size: calc(24.125rem * 4);
+		background-repeat: no-repeat no-repeat;
 		transition: inherit;
 		transition-delay: 0s;
 		pointer-events: none;
@@ -389,6 +545,7 @@
 	.pistol {
 		--url: url(../sprites/PISTOL.png) no-repeat;
 		--shoot-speed-anim: 0.6125s;
+
 		@keyframes shooting {
 			0% {
 				background-position-x: -0px;
@@ -445,12 +602,13 @@
 
 	.camera {
 		position: absolute;
-		perspective: var(--perspective);
 		inset: 0;
 		pointer-events: all;
-		transform: translateZ(0);
-		// overflow: hidden;
+		perspective: var(--perspective);
 		backface-visibility: hidden;
+		contain: layout style size;
+		width: 100%;
+		height: 100%;
 		transform-style: preserve-3d;
 		will-change: transform;
 	}

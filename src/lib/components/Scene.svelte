@@ -6,7 +6,7 @@
 	import Level, { type WorldState } from "./Level.svelte";
 	import Player from "./Player.svelte";
 	import { frameLoop } from "$lib/utils/raf";
-	import { PlayerState } from "$lib/stores/player";
+	import { PlayerState, playerLives } from "$lib/stores/player";
 
 	let offsetWidth: number;
 	let worldRef: HTMLElement | null = null;
@@ -18,29 +18,35 @@
 			return cb(...args);
 		};
 	};
-	onMount(() => {
+
+	let MO: MutationObserver;
+
+	const getMutationCallback = () => {
 		let once = false;
 		let firstValue: string | null = null;
 		let count = -1;
-		const MO = new MutationObserver(
-			skipFirstInvocation((entries) => {
-				for (const entry of entries) {
-					const target = entry.target as HTMLElement;
-					if (firstValue === null) {
-						firstValue = target.getAttribute("style");
-						++count;
-					} else {
-						if (++count > 2) MO.disconnect();
+		return skipFirstInvocation((entries) => {
+			for (const entry of entries) {
+				const target = entry.target as HTMLElement;
+				if (firstValue === null) {
+					firstValue = target.getAttribute("style");
+					++count;
+				} else {
+					if (++count > 2) MO.disconnect();
 
-						if (entry.oldValue === firstValue) {
-							worldRef = document.querySelector("#world");
-							const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
-							if (worldRef) worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
-						}
+					if (entry.oldValue === firstValue) {
+						worldRef = document.querySelector("#world");
+						const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
+						if (worldRef) worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
 					}
 				}
-			})
-		);
+			}
+		});
+	};
+	let mutationCallback;
+	onMount(() => {
+		mutationCallback = getMutationCallback();
+		MO = new MutationObserver(mutationCallback);
 		tick().then(() => {
 			worldRef = document.querySelector<HTMLElement>("#world");
 
@@ -57,23 +63,24 @@
 	bind:offsetWidth
 	style={offsetWidth < 720 ? "transform: scale(0.6, 0.6)" : ""}
 >
-	<Player>
-		<div
-			class="world"
-			id="world"
-		>
-			<Level bind:worldRef />
-
-			<div class="floor" />
-		</div>
-	</Player>
+	{#key $playerLives}
+		<Player>
+			<div
+				class="world"
+				id="world"
+			>
+				<Level bind:worldRef />
+				<div class="floor" />
+			</div>
+		</Player>
+	{/key}
 </div>
 
 <style lang="scss">
 	#scene {
 		perspective: calc(var(--perspective));
 		position: fixed;
-		will-change: transform;
+		will-change: contents;
 		width: 100%;
 		isolation: isolate;
 		inset: 0;
@@ -87,7 +94,6 @@
 		left: 50% !important;
 		inset: 0;
 		backface-visibility: hidden;
-		will-change: transform;
 
 		transform-style: preserve-3d;
 	}

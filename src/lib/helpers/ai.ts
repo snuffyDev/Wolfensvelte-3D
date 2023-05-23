@@ -35,7 +35,7 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 	const fScore: Map<string, number> = new Map();
 
 	function posToStr(pos: Position2D): string {
-		return `${pos.x},${pos.z}`;
+		return `${Math.floor(pos.x)},${Math.floor(pos.z)}`;
 	}
 
 	world.forEach((row, x) => {
@@ -63,7 +63,7 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 				path.unshift(temp);
 			}
 
-			return path;
+			return Array.from(new Map(path.map((v) => [posToStr(v), v] as const)).values());
 		}
 
 		openSet.splice(openSet.indexOf(current), 1);

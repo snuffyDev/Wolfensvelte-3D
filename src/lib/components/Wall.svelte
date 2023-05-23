@@ -46,8 +46,10 @@
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
-	let isVisible = true;
+	let isVisible = false;
+	let willChange: string | false = false;
 
+	export const type = "wall";
 	/** Position for the component instance */
 	export const getPosition = () => position;
 
@@ -58,7 +60,12 @@
 	export const getVisibility = () => isVisible;
 
 	/** Sets the visibility state  */
-	export const setVisibility = (visible: boolean) => (isVisible = visible);
+	export const setVisibility = (visible: boolean) => {
+		willChange = "visibility, transform";
+		return () => {
+			isVisible = visible;
+		};
+	};
 
 	export const checkCollisionWithWorld = () =>
 		CurrentLevel.checkCollisionWithWorld(getLocalPosition());
@@ -70,8 +77,6 @@
 	/**
 	 * Just making TS Happy...
 	 */
-	/** Returns an array of DOM elements for each wall face */
-	export const boundSides: HTMLDivElement[] = [];
 	const { textures }: WSContext = getContext(ctxKey);
 </script>
 
@@ -89,11 +94,12 @@
 
 					<div
 						class="wall {direction}"
-						bind:this={boundSides[i]}
 						data-x={-position.x}
 						data-z={positionZ}
 						data-rotation={DIRECTION_MAP[direction]}
-						style="--height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
+						style="{willChange
+							? `will-change: ${willChange};`
+							: ''} --height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
 							direction
 						]}deg);"
 					>
@@ -118,8 +124,7 @@
 		color: white;
 		backface-visibility: hidden !important;
 		z-index: -1;
-
+		/* opacity: 0.25; */
 		/* image-rendering: ; */
-		/* opacity: 1; */
 	}
 </style>

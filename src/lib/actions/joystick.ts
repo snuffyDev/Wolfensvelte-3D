@@ -72,25 +72,23 @@ export function joystick(
 				new CustomEvent("move", { detail: { type: coordinates.type, x: touchX, y: touchY } })
 			);
 			// if ((angleDeg >= 180 && angleDeg < 225) || (angleDeg >= 0 && angleDeg < 45)) {
-			// 	emitEvent("forward", coordinates);
+
 			// } else if (angleDeg >= 45 && angleDeg < 90) {
-			// 	emitEvent("forward-right", coordinates);
+
 			// } else if (angleDeg >= 90 && angleDeg < 135) {
-			// 	emitEvent("right", coordinates);
+
 			// } else if (angleDeg >= 135 && angleDeg < 180) {
-			// 	emitEvent("backward-right", coordinates);
+
 			// } else if (angleDeg >= 225 && angleDeg < 270) {
-			// 	emitEvent("backward", coordinates);
+
 			// } else if (angleDeg >= 270 && angleDeg < 315) {
-			// 	emitEvent("backward-left", coordinates);
+
 			// } else if (angleDeg >= 315 && angleDeg < 360) {
-			// 	emitEvent("left", coordinates);
+
 			// } else if (angleDeg >= 225 && angleDeg < 270) {
-			// 	emitEvent("forward-left", coordinates);
+
 			// }
 		} else {
-			// startX = touchX;
-			// startY = touchY;
 		}
 	};
 	function handlepointerup(event) {
@@ -98,7 +96,7 @@ export function joystick(
 		isDragging = false;
 		window.removeEventListener("pointermove", handlepointerMove, { capture: true });
 		node.dispatchEvent(new CustomEvent("stop", { detail: { type: event } }));
-		// emitEvent("stop", null);
+
 		startX = 0;
 		startY = 0;
 	}

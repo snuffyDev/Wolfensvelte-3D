@@ -1,4 +1,7 @@
-<svelte:options immutable={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script
 	context="module"
@@ -12,15 +15,16 @@
 	) => input.slice(0, start).concat(...items, input.slice(start + deleteCount));
 
 	const MODEL_MAP = {
-		Guard: Guard,
-		Dog: Dog,
+		Guard: Enemy,
+		Dog: Enemy,
 		Door: Door,
 		Object: MapObject,
-		Elevator: Elevator
+		Elevator: Elevator,
+		SS: Enemy
 	} as const;
 
 	export let CurrentLevel = _levelStore();
-	export function createExtendedWorld(world: World): ExtendedEntity[][] {
+	export function createExtendedWorld(world: World | ExtendedEntity[][]): ExtendedEntity[][] {
 		return world.map((row) => {
 			return row.map((entity) => {
 				if (entity.surfaces !== null) {
@@ -42,7 +46,7 @@
 	export function removeConnectedSurfaces(world: ExtendedEntity[][]): void {
 		const numRows = world.length;
 		const numCols = world[0].length;
-
+		console.log("RCS: ", structuredClone(world));
 		for (let row = 0; row < numRows; row++) {
 			for (let col = 0; col < numCols; col++) {
 				const currentEntity = world[row][col];
@@ -80,13 +84,17 @@
 		}
 	}
 
-	export type WorldState = ExtendedEntity[][];
+	export type WorldState = { spawn: { x: number; z: number }; data: ExtendedEntity[][] };
 
 	function _levelStore() {
-		let TILES: WorldState = [];
-		const { subscribe, set, update } = writable<WorldState>([]);
+		let TILES: WorldState["data"] = [];
+		const { subscribe, set, update } = writable<WorldState["data"]>([]);
 
-		const checkCollisionWithWorld = (position: Position | Position2D, isBot = false) => {
+		const checkCollisionWithWorld = (
+			position: Position | Position2D,
+			isBot: boolean | null = false,
+			skipWalls = false
+		) => {
 			const {
 				pushwall = false,
 				secret = false,
@@ -97,6 +105,7 @@
 			} = TILES[position!.z][position!.x];
 
 			if (model?.texture && noClipObjectIds.includes(model?.texture)) {
+				if (isBot === null || isBot === true) return false;
 				handleNoClipObject(model, position);
 				return false;
 			} else if (model?.texture && model.component === "Object") return true;
@@ -107,6 +116,7 @@
 			);
 			if (doorCheck) return doorCheck;
 			if (
+				!skipWalls &&
 				isWall(
 					{ position: wallPosition, secret, rotation, pushwall, model, surfaces },
 					wallPosition
@@ -144,7 +154,7 @@
 			model: NonNullable<ExtendedEntity["model"]>,
 			position: Position2D
 		) => {
-			if (!ArrayUtils.includesUnknown(ItemPickupIds, model.texture)) return;
+			if (!ArrayUtils.includesUnknown(ItemPickupIds as never, model.texture)) return;
 
 			if (model.texture === ItemPickups.Smg) {
 				PlayerState.giveWeapon("smg");
@@ -233,17 +243,22 @@
 </script>
 
 <script lang="ts">
-	import { frameLoop, type Task } from "$lib/utils/raf";
-	import { getDistanceFromPoints } from "$lib/utils/position";
+	import { frameLoop, type Task, type TaskCallback } from "$lib/utils/raf";
+	import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "$lib/utils/position";
 	import { ArrayUtils, isValidTexture } from "../utils/validation";
 	import { getContext, onMount } from "svelte";
-	import { PlayerState } from "$lib/stores/player";
+	import { playerPosition, PlayerState } from "$lib/stores/player";
 	import { writable, type Updater } from "svelte/store";
 
 	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
 	import Guard from "$lib/components/Guard/Guard.svelte";
-	import Player from "$lib/components/Player.svelte";
+	import Enemy from "$lib/components/Enemy.svelte";
+	import Player, {
+		testLineOfSight,
+		testLineOfSight2,
+		testLineOfSightSkipWalls
+	} from "$lib/components/Player.svelte";
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
@@ -268,63 +283,78 @@
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 	let gameLoop: Task;
-	function update() {
+	let start: number;
+
+	const INTERVAL = 1000 / 60;
+
+	const update: TaskCallback = (now: number, scheduler) => {
+		if (!start) start = now;
+		const elapsed = now - start;
+
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
-		// if (!worldRef) return true;
-		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+
 		if ($isLoadingNextLevel) return true;
+		const hasWillChange = worldRef.style.willChange;
+		if (!hasWillChange) worldRef.style.willChange = "transform";
+		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+		if (elapsed > 320) {
+			start = now % INTERVAL;
+			const playerLocal = getLocalPositionFromRealPosition({ x, y, z });
+			for (const obj of GameObjects) {
+				if (!obj) {
+					continue;
+				}
+				// console.log(obj);
+				const pos = obj.getPosition?.();
+				// console.log(pos);
+				if (!pos) continue;
 
-		for (const obj of GameObjects) {
-			if (!obj) {
-				// console.log(!!obj);
-				continue;
+				const visible = testLineOfSightSkipWalls($CurrentLevel, playerLocal, obj);
+				const distance = getDistanceFromPoints(
+					{ x: pos.x - 50, z: pos.z },
+					{ x: x, y: y, z: z } /* playerPosition */
+				);
+
+				const isVisibleAlready = obj.getVisibility();
+
+				if (
+					(isVisibleAlready !== true && visible === true) ||
+					((obj.type === "wall" || obj.type === "door") &&
+						visible === true &&
+						isVisibleAlready !== true &&
+						distance < 1568)
+				) {
+					const setVisibility = obj.setVisibility(true);
+					scheduler(() => setVisibility());
+					continue;
+				} else if (visible === false && isVisibleAlready !== false && distance > 2048) {
+					const setVisibility = obj.setVisibility(false);
+					scheduler(() => setVisibility());
+				}
 			}
-			const pos = obj.getPosition?.();
-			if (!pos) continue;
-			const visible = isVisibleToPlayer(obj, -30);
-			const distance = getDistanceFromPoints(
-				{ x: pos.x - 50, z: pos.z },
-				{ x, y, z } /* playerPosition */
-			);
-
-			const isVisibleAlready = obj.getVisibility();
-
-			if (visible !== true && isVisibleAlready && distance > 1500) {
-				obj.setVisibility(false);
-				continue;
-			} else if (!isVisibleAlready && distance < 1500 && visible === true) {
-				obj.setVisibility(true);
-			}
+			if (hasWillChange) worldRef.style.willChange = "";
 		}
 		return true;
-	}
+	};
 	onMount(() => {
 		queueMicrotask(() => {
 			gameLoop = frameLoop(update);
 		});
 		return () => {
-			GameObjects.set(
-				Object.fromEntries(
-					Object.entries($GameObjects).map(([key, value]) => [
-						key,
-						value.map((v) => {
-							v.$destroy();
-							return null;
-						})
-					])
-				)
-			);
+			GameObjects.reset();
 			gameLoop.abort();
 		};
 	});
 	$: console.log($CurrentLevel);
 </script>
 
+s
+
 {#if mode !== "generating"}
 	{#each $CurrentLevel as group, section}
 		{#each group as item, offset}
 			{#if item.model?.component}
-				{#if item.model.component === "Guard" || item.model.component === "Dog"}
+				{#if item.model.component === "Guard" || item.model.component === "Dog" || item.model.component === "SS"}
 					<svelte:component
 						this={MODEL_MAP[item.model.component]}
 						{offset}
@@ -375,27 +405,3 @@
 		{/each}
 	{/each}
 {/if}
-
-<style lang="scss">
-	#scene {
-		perspective: calc(var(--perspective));
-		position: absolute;
-		will-change: transform, contents;
-		width: 100%;
-		inset: 0;
-		height: 100%;
-		backface-visibility: hidden;
-	}
-
-	#world {
-		position: absolute;
-		top: 50% !important;
-		left: 50% !important;
-		inset: 0;
-
-		backface-visibility: hidden;
-		will-change: transform;
-
-		transform-style: preserve-3d;
-	}
-</style>

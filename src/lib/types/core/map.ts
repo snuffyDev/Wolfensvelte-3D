@@ -9,9 +9,10 @@ export type WallFace = "front" | "left" | "back" | "right";
 export type Surface = Texture;
 
 export type Model = {
-	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator";
+	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator" | "SS";
 	texture?: number;
 	attributes?: {
+		state?: "open" | "closed";
 		score: number | null;
 		health: number | null;
 		weapon: "chaingun" | "smg" | null;

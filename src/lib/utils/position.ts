@@ -5,7 +5,7 @@ export const getDistanceFromPoints = (
 	p1: Position | Position2D,
 	p2: Position | Position2D
 ): number => {
-	return Math.sqrt((p2.x - p1.x) ** 2 + (p2.z - p1.z) ** 2);
+	return Math.sqrt(Math.abs(p2.x - p1.x) ** 2 + Math.abs(p2.z - p1.z) ** 2);
 };
 
 /**

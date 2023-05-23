@@ -15,13 +15,19 @@
 
 	let state: "open" | "closed" = "closed";
 	let hasOpenedOnce = false;
-	let visibility = true;
+	let visibility = false;
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);
 
 	export const getVisibility = () => visibility;
-	export const setVisibility = (visible: boolean) => (visibility = visible);
+	let willChange: string | false = false;
+	export const setVisibility = (visible: boolean) => {
+		willChange = "visibility, transform";
+		return () => {
+			visibility = visible;
+		};
+	};
 
 	export const toggleAction = async () => {
 		if (state === "open" || hasOpenedOnce) return;
@@ -59,7 +65,7 @@
 		} while ($CurrentLevel[toPosition.z][toPosition.x].surfaces === null);
 
 		let currentState = $CurrentLevel[section][offset];
-		// if (!currentState.position) currentState.position = {} as Position2D;
+
 		currentState.position = toPosition;
 
 		CurrentLevel.updateTileAt(toPosition.z, toPosition.x, {
@@ -81,6 +87,8 @@
 			state = "open";
 		});
 	};
+	export const type = "pushwall";
+
 	export const getPosition = () => $position;
 	export const getLocalPosition = (): Omit<Position, "y"> =>
 		state === "open" && item.position
@@ -93,7 +101,7 @@
 
 <div
 	class="pushwall  {state}"
-	style="visibility: {visibility
+	style="{willChange ? `will-change: ${willChange};` : ''} visibility: {visibility
 		? 'visible'
 		: 'hidden'};  --pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {0}deg;"
 >
@@ -102,11 +110,12 @@
 
 <style lang="scss">
 	.pushwall {
-		position: absolute;
+		position: fixed;
 		width: 64px;
 		height: 64px;
 		transform: translate3d(var(--pX), 0%, var(--pZ)) rotateY(var(--rotation));
-		// contain: content;
+		top: 0;
+		will-change: top;
 		backface-visibility: hidden;
 		transform-style: preserve-3d;
 	}

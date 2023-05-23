@@ -235,7 +235,8 @@
 <svelte:window
 	on:keydown={(e) => {
 		if (e.ctrlKey && e.key.toLowerCase() === "w") e.preventDefault();
-		// if (e.key === " ") console.log(Math.min(34, Math.max(12, rand.rnd() / 8)));
+
+
 	}}
 />
 
@@ -296,27 +297,33 @@
 		perspective: calc(var(--perspective));
 
 		will-change: contents;
-		// transform: perspective(1000px);
+
+
 		width: 100%;
 		inset: 0;
 		overflow: hidden;
 		height: 100%;
 		backface-visibility: hidden;
-		// transform-style: preserve-3d;
+
+
 	}
 
 	#world {
 		position: absolute;
 		top: 50% !important;
 		left: 50% !important;
-		// /* // transform-origin: center; */
+
+ */
 		inset: 0;
-		// overflow: hidden;
+
+
 
 		backface-visibility: hidden;
 		will-change: transform, contents;
-		// width: 100%;
-		// height: 100%;
+
+
+
+
 		contain: layout style size;
 		transform-style: preserve-3d;
 	}

@@ -50,6 +50,7 @@
 	import { rand } from "$lib/utils/engine";
 	import { dogState } from "./state";
 	import { ctxKey, type WSContext } from "../../../routes/key";
+	import { ENEMY_INIT } from "$lib/core/ai";
 
 	export let item: ExtendedEntity;
 	export let offset: number;
@@ -59,10 +60,13 @@
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
-	const state = dogState({
-		position: { x: -position.x, z: -position.z },
-		state: "idle"
-	});
+	const state = dogState(
+		{
+			position: { x: -position.x, z: -position.z },
+			state: "idle"
+		},
+		ENEMY_INIT["Dog"]
+	);
 
 	const audioManager = new AudioManager({
 		bark: new URL(BarkSound, import.meta.url).toString(),
@@ -105,17 +109,17 @@
 	const stateLoop = frameLoop((now) => {
 		if ($isLoadingNextLevel) return true;
 		if ($state.state === "dead") {
-			return true;
+			return false;
 		}
 		if (!startFrame) startFrame = now;
 		const elapsed = now - startFrame;
 
-		if (elapsed > 211 + rand.nextInt(129, 188)) {
+		if (elapsed > 111 + rand.nextInt(162, 231)) {
 			if (busy) return true;
 			startFrame = now;
 
 			const distance = getDistanceFromPoints(
-				{ x: 1 - $PlayerState.position.x, z: 1 - $PlayerState.position.z },
+				{ x: -$PlayerState.position.x, z: -$PlayerState.position.z },
 				$state.position
 			);
 
@@ -124,14 +128,13 @@
 				z: -$PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
-			if (testLineOfSight($CurrentLevel, ourPosition, playerPosition) && distance < 1500) {
+			if (testLineOfSight($CurrentLevel, playerPosition, ourPosition) && distance < 1500) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("bark");
 				}
 				const r = rand.nextInt(0, 10);
-				console.log(r);
-				if ((distance >= 55 && distance < 128 && !(r % 5)) || hasTakenDamage) {
+				if ((distance >= 0 && distance < 84 && !(r % 5)) || hasTakenDamage) {
 					if (busy) return true;
 					if (!busy) busy = true;
 					tick().then(() => {
@@ -142,7 +145,7 @@
 						state.setState("attack");
 						busy = false;
 					});
-				} else if (distance > 74) {
+				} else if (distance > 32) {
 					if (busy) return true;
 					if (!busy) busy = true;
 					previousAnimationState = "walk";
@@ -153,8 +156,8 @@
 						.moveTo(
 							getPositionFromDistance(
 								{
-									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -32 : 32),
-									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -32 : 32)
+									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -16 : 16),
+									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -16 : 16)
 								},
 								$state.position
 							)
@@ -164,7 +167,7 @@
 						});
 				} else {
 					if (distance > 1000) playerJustSeen = false;
-					// busy = false;
+
 					state.setState("idle");
 				}
 			} else {
@@ -174,8 +177,8 @@
 					state.setState("idle");
 				}
 			}
-			return true;
 		}
+		return true;
 	});
 	onMount(() => {
 		return () => {
@@ -203,54 +206,6 @@
 />
 
 <style lang="scss">
-	@keyframes attackAnimation {
-		0% {
-			background-position: -0px -64px;
-		}
-		50% {
-			background-position: -0px -0px;
-		}
-		100% {
-			background-position: -64px -0px;
-		}
-	}
-
-	@keyframes deadAnimation {
-		0% {
-			background-position: -0px -128px;
-		}
-		100% {
-			background-position: -64px -64px;
-		}
-	}
-
-	@keyframes hurtAnimation {
-		0% {
-			background-position: -64px -128px;
-		}
-		100% {
-			background-position: -128px -0px;
-		}
-	}
-
-	@keyframes runAnimation {
-		0% {
-			background-position: -128px -64px;
-		}
-		25% {
-			background-position: -128px -128px;
-		}
-		50% {
-			background-position: -0px -192px;
-		}
-		75% {
-			background-position: -64px -192px;
-		}
-		100% {
-			background-position: -128px -64px;
-		}
-	}
-
 	.sprite {
 		top: 0%;
 		position: absolute;
@@ -294,6 +249,54 @@
 
 		&.walk {
 			animation: runAnimation 0.625s steps(1) infinite;
+		}
+
+		@keyframes attackAnimation {
+			0% {
+				background-position: -0px -64px;
+			}
+			50% {
+				background-position: -0px -0px;
+			}
+			100% {
+				background-position: -64px -0px;
+			}
+		}
+
+		@keyframes deadAnimation {
+			0% {
+				background-position: -0px -128px;
+			}
+			100% {
+				background-position: -64px -64px;
+			}
+		}
+
+		@keyframes hurtAnimation {
+			0% {
+				background-position: -64px -128px;
+			}
+			100% {
+				background-position: -128px -0px;
+			}
+		}
+
+		@keyframes runAnimation {
+			0% {
+				background-position: -128px -64px;
+			}
+			25% {
+				background-position: -128px -128px;
+			}
+			50% {
+				background-position: -0px -192px;
+			}
+			75% {
+				background-position: -64px -192px;
+			}
+			100% {
+				background-position: -128px -64px;
+			}
 		}
 	}
 </style>

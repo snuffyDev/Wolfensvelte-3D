@@ -22,7 +22,6 @@ export function boundingRect(node: HTMLElement): {
 	};
 }
 export function updateDetail(event: PointerEvent, detail: Detail) {
-	// detail.deltaY = detail.clientY - event.pageY;
 	detail.clientX = Math.floor(event.clientX);
 	detail.clientY = Math.floor(event.clientY);
 }
@@ -45,7 +44,6 @@ export function calculateVelocity(event: PointerEvent, detail: Detail) {
 		detail.velocityX = distanceX * 0.7 + detail.velocityX! * 0.3;
 		detail.velocityY = distanceY * 0.7 + detail.velocityY! * 0.3;
 	}
-	// detail.deltaY = (currentY - detail.startY) - lastY;
 }
 
 export type EventHandler<T> = (event: T) => void;

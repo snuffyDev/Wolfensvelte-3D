@@ -12,6 +12,7 @@ import { rand } from "$lib/utils/engine";
 import { tick } from "svelte";
 
 import { findPath } from "$lib/helpers/ai";
+import type { EnemyBehavior } from "$lib/core/ai";
 
 export interface EnemyState extends Omit<IPlayerState, "score" | "rotation" | "position"> {
 	playerIsVisible: boolean;
@@ -36,7 +37,6 @@ class PromisePool {
 		this.activeTasks += 1;
 		try {
 			return await promise();
-			// return task;
 		} finally {
 			this.waitingQueue.shift()!();
 			this.activeTasks -= 1;
@@ -44,7 +44,10 @@ class PromisePool {
 	}
 }
 const pool = new PromisePool();
-export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: Partial<T>) {
+export function enemyState<T extends Partial<EnemyState | IPlayerState>>(
+	init: Partial<T>,
+	behavior: EnemyBehavior
+) {
 	const state: EnemyState = {
 		health: 25,
 		playerIsVisible: false,
@@ -97,7 +100,7 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 				// Get the shortest (unblocked) path to the player
 				let paths = findPath(ourPosition, playerPosition);
 				if (!Array.isArray(paths)) return;
-				console.log(paths, playerPosition);
+
 				let count = 0;
 				for (const path of paths) {
 					AC?.signal.throwIfAborted();
@@ -105,7 +108,6 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 					if (CurrentLevel.checkCollisionWithWorld(path, true)) {
 						if (count === 2) break;
 						count += 1;
-						console.log(CurrentLevel.get()[path.x][path.z]);
 						paths = findPath(ourPosition, playerPosition);
 						continue;
 					}
@@ -113,7 +115,6 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 					state.state = "walk";
 
 					await new Promise<void>((resolve) => {
-						// console.log(path);
 						if (!path) resolve();
 
 						const realPosition = getRealPositionFromLocalPosition(path);
@@ -159,7 +160,7 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 			update((u) => ({ ...u, state: "hurt" }));
 
 			if (typeof n !== "number") {
-				n = Math.abs(rand.nextInt(5, 20));
+				n = Math.abs(rand.nextInt(...behavior.damage));
 			}
 
 			state.health -= n;
@@ -169,7 +170,7 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 			if (state.health <= 0) {
 				state.state = "dead";
 				previousState = "dead";
-				PlayerState.givePoints(100);
+				PlayerState.givePoints(behavior.pointValue);
 			}
 			// Update our health and return our state to the previous state
 			update((u) => ({ ...u, health: state.health, state: previousState }));
@@ -179,14 +180,38 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(init?: 
 			return new Promise((res) => {
 				// 80% chance of doing damage so it doesn't feel too predictable
 				if (state.state === "attack") {
-					if (Math.random() < 0.8) {
-						tick().then(() => {
-							PlayerState.takeDamage();
-						});
-					}
+					// if (Math.random() < 0.8) {
+					const [minAttack, maxAttack] = behavior.damage;
+
+					const playerPosition = getLocalPositionFromRealPosition(PlayerState.get().position);
+					const ourPosition = getLocalPositionFromRealPosition(state.position);
+					const distance = getDistanceFromPoints(ourPosition, playerPosition);
+					const rand1 = rand.nextInt(0, 255);
+					const rand2 = rand.nextInt(0, 255);
+					const hitChance = 255 - distance * 16;
+					tick().then(() => {
+						let damage: number | undefined = undefined;
+
+						if (rand1 < hitChance && distance < 2) {
+							damage = rand1 / 4;
+							console.log("DISTANCE < 2", { distance, rand1, hitChance, damage });
+						} else if (rand1 < hitChance && distance > 2 && distance < 4) {
+							damage = rand1 / 8;
+							console.log(" DISTANCE < 4 > 2", { distance, rand1, hitChance, damage });
+						} else if (rand1 < hitChance && 4 < distance) {
+							damage = rand1 / 16;
+							console.log(" DISTANCE > 4", { distance, rand1, hitChance, damage });
+						} else {
+							damage = rand.nextInt(minAttack, maxAttack);
+							console.log("ELSE", { distance, rand1, hitChance, damage });
+						}
+						damage = Math.floor(damage);
+						PlayerState.takeDamage(damage);
+					});
+					// }
 				}
 				update((u) => ({ ...u, state: state.state }));
-				setTimeout(res, 500);
+				setTimeout(res, rand.nextInt(250, 1000));
 			});
 		}
 	};

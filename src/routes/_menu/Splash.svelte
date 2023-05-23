@@ -28,7 +28,7 @@
 		background-image: var(--img);
 		background-repeat: no-repeat;
 		min-width: 29rem;
-		// min-height: 100%;
+
 		max-width: 50vw;
 		background-size: 100%;
 	}

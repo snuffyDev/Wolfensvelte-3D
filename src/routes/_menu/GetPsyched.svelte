@@ -48,8 +48,7 @@
 		z-index: var(--z-index);
 		background-image: var(--img);
 		background-repeat: no-repeat;
-		// min-width: 32rem;
-		// min-height: 100%;
+
 		width: 100%;
 		max-width: 55vw;
 		background-size: 100%;
@@ -61,7 +60,7 @@
 		background-image: var(--img);
 		background-repeat: no-repeat;
 		min-width: 32rem;
-		// min-height: 100%;
+
 		max-width: 55vw;
 		background-size: 100%;
 	}

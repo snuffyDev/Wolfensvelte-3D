@@ -38,7 +38,7 @@ body {
 	background-color: black !important;
 	overflow: hidden;
 	margin: 0;
-	transform-style: preserve-3d;
+	transform-style: flat;
 	touch-action: none;
 }
 
@@ -46,17 +46,14 @@ body {
 	transform-style: preserve-3d;
 	position: absolute;
 	inset: 0;
-	display: inline;
+	transform-origin: center;
 	width: 4rem;
 	height: 4rem;
 	transform-origin: center;
-	opacity: 1;
 	backface-visibility: hidden;
 }
 
 .hidden {
-	display: none;
-
 	visibility: hidden;
 	opacity: 0;
 }
@@ -69,6 +66,7 @@ body {
 	//
 	top: 0;
 	left: 0;
+	perspective: var(--perspective);
 	transform-style: preserve-3d;
 	backface-visibility: hidden !important;
 	image-rendering: pixelated;
@@ -82,14 +80,12 @@ body {
 	}
 	&.back {
 		transform: rotateY(180deg);
-		// background-position-x: 51px;
 
 		transform-origin: center;
 	}
 	&.left {
 		transform-origin: right;
 		transform: rotateY(-90deg);
-		// background-position-x: 51px;
 	}
 }
 
@@ -103,7 +99,7 @@ body {
 	overflow: hidden;
 	width: 640px;
 	height: 640px;
-	// contain: layout style paint;
+	will-change: top;
 	backface-visibility: hidden;
 	min-width: 100%;
 

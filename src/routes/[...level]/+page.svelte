@@ -18,46 +18,49 @@
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import Scene from "$lib/components/Scene.svelte";
-	import { beforeNavigate, goto, invalidate } from "$app/navigation";
+	import { afterNavigate, beforeNavigate, goto, invalidate } from "$app/navigation";
 	import { ctxKey, type WSContext } from "../key";
 	import { page as _page } from "$app/stores";
-	import type { Position } from "$lib/types/position";
+	import type { Position, Position2D } from "$lib/types/position";
 	import Joystick from "$lib/components/Controls/Joystick.svelte";
-	import { CurrentLevel } from "$lib/components/Level.svelte";
+	import Level, {
+		CurrentLevel,
+		createExtendedWorld,
+		removeConnectedSurfaces
+	} from "$lib/components/Level.svelte";
 	export let data;
 
-	$: ({ level, page } = data);
+	$: ({ page } = data);
 	const isPlaying = writable(false);
 
 	let menuMusicPlayer: HTMLAudioElement;
 	let get_psyched_promise: Promise<void>;
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
-	// const PlayerState = createPlayerState({});
+
+	let spawn: Partial<Position2D> = {};
+
 	let initialized = false;
 	const showSplashscreen = async () => {
 		// $CurrentLevel = [];
 		// if (!initialized) initialized = true;
 		// if (initialized) return;
-		const promise = goto(MapHandler.currentMapName);
-		await promise.then(() => {
-			get_psyched_promise = new Promise((r) => {
-				// $isPlaying = true;
-				setTimeout(r, 2500);
-			});
+		get_psyched_promise = new Promise((r) => {
+			// $isPlaying = true;
+			setTimeout(r, 2500);
 		});
+		if (page !== MapHandler.currentMapName) {
+			goto(MapHandler.currentMapName);
+		}
 	};
 
 	$: if ($LevelHandler.isComplete === true) {
+		LevelHandler.reset();
 		isLoadingNextLevel.set(true);
 		setTimeout(() => {
 			MapHandler.nextMap();
-
-			LevelHandler.reset();
+			GameObjects.reset();
 			tick().then(() => {
-				PlayerState.init({
-					position: { ...getRealPositionFromLocalPosition({ x: 15, z: 55 }), y: 0 }
-				});
 				showSplashscreen();
 			});
 		}, 4000);
@@ -69,27 +72,56 @@
 			showSplashscreen();
 
 			tick().then(() => {
-				PlayerState.init({});
+				PlayerState.init(
+					{
+						rotation: { ...$PlayerState.rotation, y: page === "E1M1" ? 270 : 180 },
+						position: { ...(spawn as Position2D), y: 0 },
+						lives: $PlayerState.lives! - 1
+					},
+					true
+				);
 			});
 		}, 4500);
 	}
 
-	beforeNavigate(({}) => {
+	afterNavigate((data) => {
+		if (data.from?.route?.id === "/menu") return;
 		clear_loops();
+		GameObjects.reset();
+		LevelHandler.reset();
 	});
 
-	const onMounted = () => {
-		clear_loops();
-		queueMicrotask(() => {
-			isLoadingNextLevel.set(false);
+	const onMounted = async () => {
+		MusicManager.play(page, true);
+		console.log(page);
+		// Asynchronously load here to ensure the map is ready to go
+		spawn = await import("$lib/utils/map")
+			.then((mod) => mod[$_page.params.level as keyof typeof mod])
+			.then((level) => {
+				const extendedRoom = createExtendedWorld(level["data"]);
+
+				removeConnectedSurfaces(extendedRoom);
+				return { spawn: level.spawn, extendedRoom };
+			})
+			.then((level) => {
+				CurrentLevel.set(level.extendedRoom);
+				return level.spawn;
+			})
+			.finally(() => {
+				isLoadingNextLevel.set(false);
+			});
+		PlayerState.init({
+			...$PlayerState,
+			position: { ...(spawn as Position2D), y: 0 }
 		});
 	};
 
-	$: $_page.data, onMounted();
+	$: page, onMounted();
 
 	onMount(() => {
 		isLoadingNextLevel.set(false);
-		MusicManager.loadAudioFile("menu", new URL(MenuMusic, import.meta.url).toString(), true, true);
+		MapHandler.changeMap(page);
+		MusicManager.play(page, true);
 	});
 </script>
 
@@ -106,6 +138,9 @@
 			{#if !$LevelHandler.isComplete}
 				<div class="level-wrapper">
 					<div class="level">
+						{#if $playerHealth <= 0}
+							<Fizzlefade />
+						{/if}
 						<Scene />
 					</div>
 				</div>
@@ -124,8 +159,14 @@
 			</div>
 
 			<div class="joystick">
-				<Joystick type="move" />
-				<Joystick type="look" />
+				<Joystick
+					style="justify-self:flex-start;"
+					type="move"
+				/>
+				<Joystick
+					style="justify-self:flex-end;"
+					type="turn"
+				/>
 			</div>
 		</div>
 	{/await}
@@ -169,7 +210,10 @@
 	.game-container {
 		display: grid;
 		// flex-direction: column;
-		min-height: 100vh;
+		@media screen and (pointer: fine), screen and (orientation: portrait) and (pointer: coarse) {
+			min-height: 100%;
+		}
+
 		background-color: #003e3e;
 		// max-width: 57vw;
 		// margin: 0 auto;
@@ -177,13 +221,13 @@
 		width: 100%;
 		// margin: 0 auto;
 		inset: 0;
-		grid-template-rows: minmax(15rem, 2fr) 0.3fr 2fr;
+		grid-template-rows: minmax(15rem, 1fr) 0.3fr 1fr;
 		@media screen and (min-width: 720px) {
-			grid-template-rows: 1fr 15vh;
+			grid-template-rows: 1fr max-content;
 		}
 	}
 	.level-wrapper {
-		height: 100%;
+		// height: 100%;
 		display: flex;
 		flex-direction: column;
 		width: 100%;
@@ -197,20 +241,44 @@
 			margin: auto;
 			font-size: 1rem;
 			aspect-ratio: 16/9;
-			min-height: 100%;
-			max-width: 75vw;
-
+			// min-height: 100%;
+			max-width: 78vw;
+			width: 100%;
 			// max-height: 100vh;
+		}
+		@media screen and (pointer: coarse) and (orientation: landscape) {
+			max-width: 100%;
 		}
 	}
 
 	.joystick {
-		padding: 7vw;
-		gap: 10vw;
-		display: flex;
-		justify-content: space-evenly;
-		@media screen and (min-width: 720px) {
+		padding: 10vw;
+		// gap: calc(33% - 3.5vw);
+		width: 80%;
+		display: grid;
+		margin-bottom: 1rem;
+		grid-template-columns: 1fr;
+		grid-template-rows: 1fr 1.5fr;
+		pointer-events: none;
+		// z-index: -1;
+		// isolation: isolate;
+		@media screen and (orientation: landscape) and (pointer: coarse) {
+			display: grid !important;
+			position: fixed;
+			width: 95vw;
+			bottom: 0;
+
+			margin: 0;
+			grid-template-columns: 1.5fr 1fr;
+			grid-template-rows: 1fr;
+		}
+		@media screen and (pointer: fine) and (min-width: 720px) {
 			display: none !important;
+		}
+
+		&:nth-child(1) {
+			// margin-left: 3vw;
+			// margin-bottom: 3vw;
 		}
 	}
 
@@ -223,16 +291,25 @@
 		backface-visibility: hidden;
 		// display: flex;
 		background-color: rgb(52, 52, 52) !important;
-		// width: 97%;
-		// height: 95vh;
+		width: 97%;
+		height: 100%;
 
+		// width: 75vw;
+
+		@media screen and (orientation: landscape) and (pointer: coarse) {
+			height: 100vh;
+			width: 100vw;
+		}
 		position: absolute;
 		// flex-direction: column; // overflow: hidden;
 	}
 	.ui {
 		position: relative;
-		// grid-row: 2;
-		height: 15vh;
+		// grid-row: /2;
+		height: 8vw;
+		// padding: 1vw;
+		display: flex;
+		// flex: 0 1;
 		max-width: 75%;
 		margin: 0 auto;
 		width: 100%;

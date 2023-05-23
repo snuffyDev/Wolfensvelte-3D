@@ -97,8 +97,6 @@ export function draggable(node: HTMLElement) {
 
 			calculateVelocity(event, detail);
 
-			// detail.startX = initialRect.left - detail.clientX + initialRect.width;
-			// detail.startY = initialRect.top - detail.clientY + initialRect.height;
 			detail.deltaX = detail.clientX - detail.startX!;
 			detail.deltaY = detail.clientY - detail.startY!;
 

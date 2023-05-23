@@ -15,11 +15,17 @@
 
 	let visibility: boolean = false;
 	let state: "inactive" | "active" = "inactive";
+	let willChange: string | false = false;
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
 	export const getVisibility = () => visibility;
-	export const setVisibility = (visible: boolean) => (visibility = visible);
+	export const setVisibility = (visible: boolean) => {
+		willChange = "visibility, transform";
+		return () => {
+			visibility = visible;
+		};
+	};
 	export const getPosition = () => position;
 	export const getLocalPosition = (): Position2D => ({
 		x: offset,

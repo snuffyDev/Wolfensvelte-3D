@@ -17,7 +17,7 @@
 	let CURRENT_IDX: number = 0;
 
 	$: PORTRAIT_STATE =
-		$PlayerState.health > 0 ? $page.data.FACE_KEYS[Math.floor($PlayerState.health / 15)] : "dead";
+		$playerHealth > 0 ? $page.data.FACE_KEYS[Math.floor($playerHealth / 15)] : "dead";
 
 	let start: number | null = null;
 
@@ -61,6 +61,7 @@
 	}
 </script>
 
+<!--
 {#if dev}
 	<div class="debug">
 		{#key $PlayerState.rotation.y}
@@ -68,11 +69,11 @@
 			<p>{getFacingDirection($PlayerState.rotation.y)}</p>
 		{/key}
 	</div>
-{/if}
+{/if} -->
 <div class="hud">
 	<div class="stats">
 		{#each HUD_SECTIONS as [name, value] (name)}
-			<div class="col {name}">
+			<div class="col {name === 'portrait' ? 'player' : name}">
 				{#if name === "portrait"}
 					{#each FACE_MAP[PORTRAIT_STATE] as img, idx (img)}
 						<div
@@ -155,24 +156,24 @@
 			background-image: url(#{$BASE_URL}#{$num}.BMP);
 			background-repeat: no-repeat;
 			background-size: contain;
-			width: 0.75em;
+			width: 1.5vw;
+			contain: content;
+			display: block;
 
-			display: inline-block;
-
-			height: 1.5em;
+			max-height: calc(10vh - 3.25rem);
+			height: 5.25vw;
 		}
 	}
 
 	.numbers {
-		// padding: 1rem;
 		display: flex;
-
+		will-change: contents;
 		flex-direction: row;
 		align-items: center;
-
+		contain: style;
 		justify-content: flex-end;
 		&.pad {
-			margin-right: 2em;
+			padding-right: 3vw;
 		}
 	}
 
@@ -182,11 +183,10 @@
 		&::before {
 			background-color: #555;
 			z-index: -1;
-			position: absolute;
 			inset: 0;
 			content: "";
 		}
-		background-size: contain;
+		background-size: 100px 128px;
 		background-repeat: no-repeat;
 		background-image: var(--img);
 		background-position: center;
@@ -208,7 +208,7 @@
 	}
 	.stats {
 		margin: 0 auto;
-		// display: grid;
+
 		display: grid;
 		display: grid;
 		grid-template-columns: 0.9fr 1.5fr 0.9fr 0.9fr 1fr 0.9fr 0.2fr 1.7fr;
@@ -216,20 +216,21 @@
 		gap: 0px 0em;
 		grid-template-areas: "level score lives player health ammo gap weapon";
 
-		height: inherit;
 		width: 100%;
+		max-width: 100%;
 		text-align: center;
+		height: 100%;
 
 		background-image: url(../sprites/hud/main.BMP);
 		background-repeat: no-repeat;
-		background-size: contain;
+		background-size: cover;
 		background-position: center;
+		font-size: 3vh;
 		> :nth-last-child(2) {
 			margin: 0em;
 		}
 	}
 	.col {
-		// display: none;
 		grid-template-columns: 1fr;
 		contain: layout style paint;
 
@@ -244,7 +245,7 @@
 		font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
 			Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 
-		font-size: 1.5em;
+		font-size: 100%;
 
 		align-content: center;
 		place-items: flex-end;
@@ -254,24 +255,26 @@
 		align-items: center;
 	}
 	.hud {
-		position: relative;
+		position: absolute;
 		left: 0;
 		right: 0;
 		bottom: 0;
+		top: 0;
 		text-align: center;
-
+		padding: 0em;
 		height: 100%;
+		margin-bottom: 1rem;
 		max-height: 100%;
 
 		color: white;
 
 		image-rendering: pixelated;
-
+		max-width: 85%;
+		margin: 0 auto;
 		font-size: 75%;
 		font-weight: 500;
 
-		height: 100%;
-		height: 15vh;
+		// height: 100%;
 	}
 
 	.debug {

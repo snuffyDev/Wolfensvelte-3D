@@ -1,15 +1,22 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
 	import type { ExtendedEntity, MapItem } from "../types/core";
-	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
+	import {
+		getLocalPositionFromRealPosition,
+		getRealPositionFromLocalPosition
+	} from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
 	import { CurrentLevel } from "./Level.svelte";
 	import { ctxKey, type WSContext } from "../../routes/key";
 	import { compare } from "../utils/compare";
 	import { AudioManager } from "$lib/helpers/audio";
+	import { PlayerState } from "$lib/stores/player";
 
 	export let item: ExtendedEntity;
 	export let offset: number;
@@ -19,7 +26,7 @@
 	let visibility = true;
 	let shouldMute = true;
 	let count = 0;
-
+	let willChange: string | false = false;
 	const { textures }: WSContext = getContext(ctxKey);
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
@@ -30,7 +37,17 @@
 	});
 
 	export const getVisibility = () => visibility;
-	export const setVisibility = (visible: boolean) => (visibility = visible);
+	export const setVisibility = (visible: boolean) => {
+		willChange = "visibility";
+		return () => {
+			setTimeout(() => {
+				visibility = visible;
+				willChange = false;
+			}, 500);
+		};
+	};
+
+	let timer: ReturnType<typeof setTimeout>;
 
 	export const toggleAction = () => {
 		if (shouldMute && count >= 2) shouldMute = false;
@@ -38,6 +55,7 @@
 		if (shouldMute) count += 1;
 
 		state = state === "open" ? "closed" : "open";
+		const oldState = $position;
 		position.update((u) =>
 			!rotation
 				? {
@@ -46,23 +64,42 @@
 				  }
 				: { z: state === "open" ? _position.z + 64 : _position.z, x: $position.x }
 		);
-
+		if (
+			compare(
+				getLocalPositionFromRealPosition($PlayerState.position),
+				({ x, z }) => $position.x === x && $position.z === z
+			)
+		) {
+			$position = oldState;
+			state = state === "closed" ? "open" : "closed";
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				toggleAction();
+			}, 5000);
+			return;
+		}
 		let currentState = $CurrentLevel[section][offset];
 		if (!currentState.position) currentState.position = {} as Position2D;
 		if (state === "open") {
 			currentState.position = { x: offset + 1, z: section };
+			if (!currentState.model!.attributes) currentState.model!.attributes = {} as any;
+			currentState.model!.attributes!.state = "open";
 		} else {
 			currentState.position = { x: offset, z: section };
+			if (!currentState.model!.attributes) currentState.model!.attributes = {} as any;
+			currentState.model!.attributes!.state = "closed";
 		}
 		CurrentLevel.updateTileAt(section, offset, currentState);
 
 		if (!shouldMute) {
 			if (state === "open") {
 				audioPlayer.play("open");
-				setTimeout(() => {
+				clearTimeout(timer);
+				timer = setTimeout(() => {
 					toggleAction();
 				}, 5000);
 			} else {
+				clearTimeout(timer);
 				audioPlayer.play("close");
 			}
 		}
@@ -72,7 +109,7 @@
 		x: state === "open" ? offset + 1 : offset,
 		z: section
 	});
-
+	export const type = "door";
 	$: rotation = 0;
 
 	onMount(() => {
@@ -102,9 +139,10 @@
 	});
 </script>
 
+<!-- {#if visibility} -->
 <div
 	class="door {state}"
-	style="visibility: {visibility
+	style="{willChange ? `will-change: ${willChange};` : ''} visibility: {visibility
 		? 'visible'
 		: 'hidden'};  --pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {rotation ?? 0}deg;"
 >
@@ -125,6 +163,7 @@
 	{/if}
 </div>
 
+<!-- {/if} -->
 <style lang="scss">
 	.door {
 		position: absolute;
@@ -133,7 +172,7 @@
 		top: 0;
 		left: 0;
 		right: 0;
-		// will-change: transform, visibility;
+
 		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
 
 		backface-visibility: hidden;
