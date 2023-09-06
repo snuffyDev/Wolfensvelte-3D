@@ -62,9 +62,10 @@
 
 	export const toggleAction = async () => {
 		if (item.attributes?.needsKey && !$PlayerState.keys?.[item.attributes.needsKey]) return;
+		if (timer) clearTimeout(timer);
 
-		if (shouldMute && count >= 2) shouldMute = false;
 		if (shouldMute) count += 1;
+		if (shouldMute && count >= 1) shouldMute = false;
 
 		state = state === "open" ? "closed" : "open";
 		const oldState = $position;
@@ -84,6 +85,7 @@
 				({ x, z }) => $position.x === x && $position.z === z
 			)
 		) {
+			console.log("IF");
 			$position = oldState;
 			state = state === "closed" ? "open" : "closed";
 			clearTimeout(timer);
@@ -95,19 +97,21 @@
 		let currentState = $CurrentLevel[section][offset];
 		if (!currentState.position) currentState.position = {} as Position2D;
 		if (count >= 0) {
+			console.log("COUNT>=0");
 			await new Promise((resolve) => {
 				const regions = getTileRegions(
-					getLocalPositionFromRealPosition($position),
+					getLocalPositionFromRealPosition(state === "open" ? $position : $PlayerState.position),
 					CurrentLevel.getPortal()
 				);
 				const visibleTiles = regions.flatMap((regionIndex) => {
 					const region = CurrentLevel.getPortal()[regionIndex];
 					return [
 						region.tiles,
-						...region.connectedRegions.map((v) =>
-							CurrentLevel.getPortal()[v].portals.map((p) => p.position)
-						),
-						region.portals.map(({ position }) => position)
+						...region.connectedRegions.map((v) => {
+							const connectedRegion = CurrentLevel.getPortal()[v];
+
+							return [...connectedRegion.tiles, ...connectedRegion.portals.map((p) => p.position)];
+						})
 					].flat();
 				});
 				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state, isLast) => {
@@ -131,13 +135,14 @@
 		CurrentLevel.updateTileAt(section, offset, currentState);
 
 		if (state === "open" && !shouldMute) {
+			console.log("open");
 			audioPlayer.play("open");
 			clearTimeout(timer);
 			timer = setTimeout(() => {
 				toggleAction();
 			}, 5000);
 		} else if (!shouldMute) {
-			clearTimeout(timer);
+			console.log("close");
 			audioPlayer.play("close");
 		}
 	};

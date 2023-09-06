@@ -191,7 +191,7 @@
 		const visiblePositions: string[] = [];
 
 		let stepSize = 0.1; // This determines the resolution of the raycast
-		let maxSteps = 10000; // This is a safeguard to prevent infinite loops in case of errors
+		let maxSteps = 220; // This is a safeguard to prevent infinite loops in case of errors
 
 		forLoop: for (let step = 0; step < maxSteps; step++) {
 			let index = 0;
@@ -225,7 +225,7 @@
 		const rightRotation = viewerRotation + fov / 2;
 
 		// Calculate the number of rays to cast within the field of view
-		const numRays = ~~Math.ceil(300);
+		const numRays = window.innerWidth;
 
 		const rayVisibleEntities: string[] = [];
 

@@ -413,7 +413,12 @@
 	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
 	import Enemy from "$lib/components/Enemy.svelte";
-	import { buildTree, castRays, type TreeNode } from "$lib/components/Player.svelte";
+	import {
+		buildTree,
+		castRays,
+		testLineOfSightSkipWalls,
+		type TreeNode
+	} from "$lib/components/Player.svelte";
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
@@ -461,7 +466,7 @@
 
 		if ($isLoadingNextLevel) return true;
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
-		if (elapsed > 90) {
+		if (elapsed > 32) {
 			start = now % INTERVAL;
 			const playerLocal = getLocalPositionFromRealPosition({ x, y, z });
 			const { models, ...rest } = $GameObjects;
@@ -484,7 +489,7 @@
 					const visibility = position.setVisibility(state);
 					scheduler(() => visibility());
 				});
-
+			} else {
 				// renderVisibleTiles(
 				// visibleTiles,
 				// [...Object.values($GameObjects).flat()],
@@ -493,6 +498,24 @@
 				// 	scheduler(() => visibility());
 				// }
 				// );
+				const regions = getTileRegions(
+					getLocalPositionFromRealPosition({ x, z }),
+					CurrentLevel.getPortal()
+				);
+				const visibleTiles = regions.flatMap((regionIndex) => {
+					const region = CurrentLevel.getPortal()[regionIndex];
+					return [
+						region.tiles,
+						...region.connectedRegions.map((v) =>
+							CurrentLevel.getPortal()[v].portals.map((p) => p.position)
+						),
+						region.portals.map(({ position }) => position)
+					].flat();
+				});
+				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
+					const visibility = position.setVisibility(state);
+					scheduler(() => visibility());
+				});
 			}
 			// castRays(
 			// 	getLocalPositionFromRealPosition({ x, z }),

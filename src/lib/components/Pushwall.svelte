@@ -37,7 +37,7 @@
 	export const toggleAction = async () => {
 		if (state === "open" || hasOpenedOnce) return;
 		hasOpenedOnce = true;
-
+		const oldPosition = $position;
 		const direction = getFacingDirection($PlayerState.rotation.y);
 		let toPosition: Position2D = getLocalPosition();
 
@@ -80,24 +80,6 @@
 			secret: false,
 			pushwall: true
 		});
-		const regions = getTileRegions(
-			getLocalPositionFromRealPosition($position),
-			CurrentLevel.getPortal()
-		);
-		const visibleTiles = regions.flatMap((regionIndex) => {
-			const region = CurrentLevel.getPortal()[regionIndex];
-			return [
-				region.tiles,
-				...region.connectedRegions.map((v) =>
-					CurrentLevel.getPortal()[v].portals.map((p) => p.position)
-				),
-				region.portals.map(({ position }) => position)
-			].flat();
-		});
-		renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
-			const visibility = position.setVisibility(state);
-			queueMicrotask(() => visibility());
-		});
 
 		CurrentLevel.updateTileAt(section, offset, {
 			surfaces: null,
@@ -108,6 +90,24 @@
 
 		queueMicrotask(() => {
 			state = "open";
+			const regions = getTileRegions(
+				getLocalPositionFromRealPosition(oldPosition),
+				CurrentLevel.getPortal()
+			);
+			const visibleTiles = regions.flatMap((regionIndex) => {
+				const region = CurrentLevel.getPortal()[regionIndex];
+				return [
+					region.tiles,
+					...region.connectedRegions.map((v) =>
+						CurrentLevel.getPortal()[v].portals.map((p) => p.position)
+					),
+					region.portals.map(({ position }) => position)
+				].flat();
+			});
+			renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
+				const visibility = position.setVisibility(state);
+				queueMicrotask(() => visibility());
+			});
 		});
 	};
 	export const type = "pushwall";
