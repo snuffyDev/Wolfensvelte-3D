@@ -27,13 +27,13 @@ class MapManager<T extends typeof MAP_DICT> {
 		return this._currentLevel;
 	}
 	private store = writable<number>();
-	private levelIdx = 0;
+	private levelIdx = 1;
 	private makeLevelKey(index: number) {
 		return `E1M${index}`;
 	}
 	constructor(maps: T) {
 		this.levels = maps;
-		this.levelIdx++;
+
 		this.currentMapName = Object.keys(maps)[0]! as keyof T;
 		this._currentLevel = this.levels[this.currentMapName];
 		this.store.set(this.levelIdx);
@@ -42,6 +42,7 @@ class MapManager<T extends typeof MAP_DICT> {
 	public get subscribe() {
 		return this.store.subscribe;
 	}
+
 	nextMap() {
 		this.levelIdx++;
 		this.currentMapName = this.makeLevelKey(this.levelIdx);
@@ -73,6 +74,50 @@ export const LevelHandler = (() => {
 		reset() {
 			clear_loops();
 			set({ isComplete: false });
+		}
+	};
+})();
+
+export const LevelStatManager = (() => {
+	type Stats = {
+		treasure: number;
+		totalTreasure: number;
+		kills: number;
+		totalKills: number;
+		secrets: number;
+		totalSecrets: number;
+	};
+	type StatKey = keyof Stats;
+	const getDefaultStatObj = (init: Partial<Stats>): Stats =>
+		({
+			treasure: 0,
+			totalTreasure: 0,
+			kills: 0,
+			totalKills: 0,
+			secrets: 0,
+			...init
+		} as Stats);
+	const { subscribe, update, set } = writable<Stats>(getDefaultStatObj({}));
+
+	return {
+		subscribe,
+		add(key: Exclude<StatKey, `total${string}`>) {
+			update((u) => ({ ...u, [key]: u[key]++ }));
+		},
+		addTotalKey(key: Extract<StatKey, `total${string}`>) {
+			update((u) => ({ ...u, [key]: (u[key] !== undefined ? u[key] : 0) + 1 }));
+		},
+		restart() {
+			update((u) => {
+				for (const key in u) {
+					if (key.includes("total")) continue;
+					u[key] = 0;
+				}
+				return u;
+			});
+		},
+		reset() {
+			set(getDefaultStatObj({}));
 		}
 	};
 })();

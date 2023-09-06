@@ -8,37 +8,30 @@ export type WallFace = "front" | "left" | "back" | "right";
 // Alias for Texture
 export type Surface = Texture;
 
-export type Model = {
-	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator" | "SS";
-	texture?: number;
-	attributes?: {
+
+export type EntityV2 = {
+	secret: boolean;
+	pushwall: boolean;
+	blocking: boolean;
+	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator" | "SS" | "Wall";
+
+	rotation: Position2D | null;
+	position: Position2D | undefined;
+	texture: number | null;
+	attributes: {
 		state?: "open" | "closed";
-		score: number | null;
-		health: number | null;
-		weapon: "chaingun" | "smg" | null;
-		ammo: number | null;
-	};
+		pointValue?: number | null;
+		needsKey?: "yellow" | "blue";
+		health?: number | null;
+		weapon?: "chaingun" | "smg" | null;
+		ammo?: number | null;
+		collectable?: boolean;
+	} | null;
 };
 
-export type Entity = {
-	position?: Position2D | undefined;
-	rotation: Position | undefined;
-	model?: Model;
-	surfaces: Surface | null;
-	secret?: boolean;
-	pushwall?: boolean;
-};
-// Updated Entity type
-export type ExtendedEntity = {
-	position?: Position2D | undefined;
-	rotation: Position | undefined;
-	model?: Model;
-	secret?: boolean;
-	pushwall?: boolean;
+export type ExtendedEntityV2 = EntityV2 & {
 	surfaces: Record<WallFace, Surface> | null;
 };
-// Dict containing textures for each cardinal direction
-export type MapItem = Entity;
 
 // A Multidimensional Array with MapItems
-export type World = ReadonlyArray<Entity[]>;
+export type World = ReadonlyArray<ExtendedEntityV2[]>;

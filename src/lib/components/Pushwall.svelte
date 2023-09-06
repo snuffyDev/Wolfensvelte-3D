@@ -3,11 +3,16 @@
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
 	import type { ExtendedEntity } from "../types/core";
-	import { getFacingDirection, getRealPositionFromLocalPosition } from "$lib/utils/position";
+	import {
+		getFacingDirection,
+		getLocalPositionFromRealPosition,
+		getRealPositionFromLocalPosition
+	} from "$lib/utils/position";
 	import { tweened } from "svelte/motion";
-	import { CurrentLevel } from "./Level.svelte";
+	import { CurrentLevel, getTileRegions, renderVisibleTiles } from "./Level.svelte";
 	import Wall from "./Wall.svelte";
 	import { PlayerState } from "$lib/stores/player";
+	import { GameObjects } from "$lib/utils/manager";
 
 	export let item: ExtendedEntity;
 	export let offset: number;
@@ -74,6 +79,24 @@
 			rotation: undefined,
 			secret: false,
 			pushwall: true
+		});
+		const regions = getTileRegions(
+			getLocalPositionFromRealPosition($position),
+			CurrentLevel.getPortal()
+		);
+		const visibleTiles = regions.flatMap((regionIndex) => {
+			const region = CurrentLevel.getPortal()[regionIndex];
+			return [
+				region.tiles,
+				...region.connectedRegions.map((v) =>
+					CurrentLevel.getPortal()[v].portals.map((p) => p.position)
+				),
+				region.portals.map(({ position }) => position)
+			].flat();
+		});
+		renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
+			const visibility = position.setVisibility(state);
+			queueMicrotask(() => visibility());
 		});
 
 		CurrentLevel.updateTileAt(section, offset, {

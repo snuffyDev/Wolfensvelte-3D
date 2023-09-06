@@ -1,6 +1,7 @@
 // Set of callback fns that will run on each animation frame
 
 import { browser } from "$app/environment";
+import { asap } from "./levelManager";
 
 const yieldMicrotask = () => new Promise<void>(queueMicrotask);
 /**
@@ -44,18 +45,17 @@ async function run_async(now: number) {
 function run_tasks(now: number) {
 	if (!then) then = now;
 	const elapsed = now - then;
-
 	if (elapsed > TARGET_FPS) {
 		then = now - (elapsed % TARGET_FPS);
 
 		run_async(now);
-	}
-
-	if (tasks.size !== 0) {
 		while (prerender_queue.length) {
 			const cb = prerender_queue.shift()!;
 			cb();
 		}
+	}
+
+	if (tasks.size !== 0) {
 		requestAnimationFrame(run_tasks);
 	}
 }

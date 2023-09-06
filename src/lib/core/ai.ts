@@ -27,7 +27,7 @@ export interface EnemyBehavior {
 const GuardBehavior: EnemyBehavior = {
 	health: 25,
 	damage: [9, 15],
-	reactionTime: 1551,
+	reactionTime: 1251,
 	pointValue: 100,
 	attackDistance: [55, getPreferredAttackDistance, 900],
 	sounds: {
@@ -43,12 +43,12 @@ const GuardBehavior: EnemyBehavior = {
 const DogBehavior: EnemyBehavior = {
 	health: 15,
 	damage: [8, 14],
-	reactionTime: 100,
+	reactionTime: 400,
 	attackDistance: [1, getPreferredAttackDistance, 64],
 	pointValue: 500,
 	sounds: {
 		playerSeen: new URL(DogBarkSound, import.meta.url).toString(),
-		death_1: new URL(DogDeathSound, import.meta.url).toString(),
+		death: new URL(DogDeathSound, import.meta.url).toString(),
 		attack: ""
 	},
 	dropOnDeath: null
@@ -58,7 +58,7 @@ const SSBehavior: EnemyBehavior = {
 	health: 35,
 	damage: [12, 21],
 	pointValue: 100,
-	reactionTime: 100,
+	reactionTime: 1100,
 	attackDistance: [55, getPreferredAttackDistance, 900],
 	sounds: {
 		playerSeen: new URL(SSPlayerSeen, import.meta.url).toString(),

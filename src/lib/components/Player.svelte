@@ -31,7 +31,7 @@
 	}
 
 	export function testLineOfSight2(
-		world: ExtendedEntity[][],
+		world: ExtendedEntityV2[][],
 		start: Position2D,
 		end: Position2D
 	): boolean {
@@ -79,51 +79,237 @@
 		if (
 			entity.model &&
 			entity.model?.component !== "Door" &&
-			entity.model.attributes?.state !== "closed"
+			["SS", "Guard", "Dog"].includes(entity.model.component) !== true
 		) {
 			return false; // adjust this to check if the door is actually closed
 		}
+		if (
+			entity.model &&
+			entity.model.component === "Door" &&
+			entity.model.attributes?.state &&
+			entity.model.attributes?.state === "closed"
+		) {
+			return true;
+		}
 		// Walls are blocking if they have any surfaces
-		if (entity.surfaces && Object.values(entity.surfaces).some((surface) => surface === null)) {
+		if (entity.surfaces && Object.values(entity.surfaces).length) {
 			return true;
 		}
 
 		return false;
 	}
-	type Model = InstanceType<
-		typeof Door | typeof Guard | typeof MapObject | typeof Elevator | typeof Enemy
-	>;
+	type Model = InstanceType<typeof Door | typeof MapObject | typeof Elevator | typeof Enemy>;
+	export type TracePoint = {
+		position: Position2D;
+		distance: number;
+		normal: number;
+	};
+	function bresenhamLine(x0: number, y0: number, x1: number, y1: number): Position2D[] {
+		const points: Position2D[] = [];
+		const dx = Math.abs(x1 - x0);
+		const dy = Math.abs(y1 - y0);
+		const sx = x0 < x1 ? 1 : -1;
+		const sy = y0 < y1 ? 1 : -1;
+		let err = dx - dy;
+
+		while (true) {
+			points.push({ x: x0, z: y0 });
+
+			if (x0 === x1 && y0 === y1) break;
+
+			let e2 = 2 * err;
+			if (e2 > -dy) {
+				err -= dy;
+				x0 += sx;
+			}
+			if (e2 < dx) {
+				err += dx;
+				y0 += sy;
+			}
+		}
+
+		return points;
+	}
+	export interface TreeNode {
+		partition: ExtendedEntityV2 | null;
+		left: TreeNode | null;
+		right: TreeNode | null;
+	}
+
+	function createNode(partition: ExtendedEntityV2 | null): TreeNode {
+		return {
+			partition: partition,
+			left: null,
+			right: null
+		};
+	}
+
+	export function buildTree(partitions: ExtendedEntityV2[]): TreeNode | null {
+		if (partitions.length === 0) {
+			return null;
+		}
+
+		// split partitions into two halves
+		const midIndex = Math.floor(partitions.length / 2);
+		const node = createNode(partitions[midIndex]);
+
+		// recursively build left and right subtrees
+		node.left = buildTree(partitions.slice(0, midIndex));
+		node.right = buildTree(partitions.slice(midIndex + 1));
+
+		return node;
+	}
+
+	function traverseTree(node: TreeNode | null, callback: (partition: ExtendedEntityV2) => void) {
+		if (node === null) {
+			return;
+		}
+
+		traverseTree(node.left, callback);
+
+		if (node.partition) {
+			callback(node.partition);
+		}
+
+		traverseTree(node.right, callback);
+	}
+
+	function getVisibleEntities(root: TreeNode | null, position: Position2D): ExtendedEntityV2[] {
+		const visibleEntities: ExtendedEntityV2[] = [];
+
+		traverseTree(root, (partition) => {
+			// check if the partition is visible from the given position
+			// visibility check can be based on your specific game logic
+			if (partition.position?.x === position.x && partition.position?.z === position.z) {
+				visibleEntities.push(partition);
+			}
+		});
+
+		return visibleEntities;
+	}
+	export function raycast(origin: Position2D, rotation: number): string[] {
+		const visiblePositions: string[] = [];
+
+		let stepSize = 0.1; // This determines the resolution of the raycast
+		let maxSteps = 10000; // This is a safeguard to prevent infinite loops in case of errors
+
+		forLoop: for (let step = 0; step < maxSteps; step++) {
+			let index = 0;
+			let x = origin.x + step * stepSize * Math.cos(rotation);
+			let z = origin.z + step * stepSize * Math.sin(rotation);
+
+			let tilePos: Position2D = { x: Math.floor(x + 0.5), z: Math.floor(z + 0.5) };
+
+			const entity = CurrentLevel.checkCollisionWithWorld(tilePos, true);
+			if (entity !== null) {
+				visiblePositions.push(`${tilePos.x}${tilePos.z}`);
+				if (entity) {
+					break;
+				}
+				continue;
+			}
+		}
+
+		return visiblePositions;
+	}
+	export function castRays(
+		viewer: Position2D,
+		viewerRotation: number,
+		models: IterableIterator<Model>,
+		fov: number,
+		callback: (model: Model, state: boolean) => void
+	): void {
+		// Calculate the rotation angles for the leftmost and rightmost rays
+		// Calculate the rotation angles for the leftmost and rightmost rays
+		const leftRotation = viewerRotation - fov / 2;
+		const rightRotation = viewerRotation + fov / 2;
+
+		// Calculate the number of rays to cast within the field of view
+		const numRays = ~~Math.ceil(300);
+
+		const rayVisibleEntities: string[] = [];
+
+		// Cast the rays
+		for (let i = 0; i < numRays; i++) {
+			// Interpolate the rotation angle for this ray
+			const rotation = leftRotation + ((rightRotation - leftRotation) * i) / (numRays - 1);
+
+			// add the visible entities to the list
+			rayVisibleEntities.push(...raycast(viewer, rotation));
+		}
+
+		// Check each model's visibility
+		for (const entity of models) {
+			const position = entity.getLocalPosition();
+			const isVisible = rayVisibleEntities.includes(`${position.x}${position.z}`);
+			callback(entity, isVisible);
+		}
+	}
 
 	export function testLineOfSightSkipWalls(
-		world: ExtendedEntity[][],
+		world: ExtendedEntityV2[][],
 		viewer: Position2D,
+		rotation: Position2D,
 		target: Model
 	): boolean {
 		const targetPos = target.getLocalPosition();
-		let dx = Math.abs(targetPos.x - viewer.x);
-		let dz = Math.abs(targetPos.z - viewer.z);
+		const viewerPos = { ...viewer };
+		let dx = Math.abs(targetPos.x - viewerPos.x);
+		let dz = Math.abs(targetPos.z - viewerPos.z);
 
-		let sx = targetPos.x < viewer.x ? 1 : -1;
-		let sz = targetPos.z < viewer.z ? 1 : -1;
+		let sx = targetPos.x < viewerPos.x ? 1 : -1;
+		let sz = targetPos.z < viewerPos.z ? 1 : -1;
 
 		let err = dx - dz;
 
+		let x = Math.floor(viewerPos.x + 0.5);
+		let z = Math.floor(viewerPos.z + 0.5);
+		let steps = 0;
+
 		while (true) {
-			const x = Math.ceil(targetPos.x - 0.5);
-			const z = Math.ceil(targetPos.z - 0.5);
+			x = Math.floor(targetPos.x + 0.5);
+			z = Math.floor(targetPos.z + +0.5);
 			const entity = world[z]?.[x];
+			// Give a little lee-way when checking if a wall is blocked or not by another wall
+			// if (
+			// 	target.type === "wall" &&
+			// 	x !== viewerPos.x &&
+			// 	z !== viewerPos.z &&
+			// 	entity.surfaces &&
+			// 	entity.blocking &&
+			// 	Object.values(entity.surfaces).filter(Boolean).length &&
+			// 	++steps >= 8
+			// ) {
+			// 	return false;
+			// }
 
-			if ((x !== targetPos.x || z !== targetPos.z) && isBlocking(entity)) {
+			// Disable rendering anything besides walls at any position if we're blocked
+			if (
+				target.type !== "wall" &&
+				target.type !== "pushwall" &&
+				target.type !== "door" &&
+				(x !== viewerPos.x || z !== viewerPos.z) &&
+				isBlocking(entity)
+			) {
 				return false;
 			}
-			if (target.type !== "wall" && isBlocking(entity)) {
-				// If we encounter a blocking entity (not a wall) before reaching the target, the target is not visible
+
+			// Disable rendering if the current target is a door and is blocked by another entity
+			if (
+				target.type !== "door" &&
+				target.type !== "object" &&
+				(x !== targetPos.x || z !== targetPos.z) &&
+				isBlocking(entity)
+			) {
 				return false;
 			}
 
-			if (viewer.x === x && z === viewer.z) {
+			// We gucci
+
+			if (viewerPos.x === x && z === viewerPos.z) {
 				break;
-			}
+			} // x = Math.floor(targetPos.x + 0.5);
+			// z = Math.floor(targetPos.z + 0.5);
 
 			const e2 = 2 * err;
 
@@ -175,34 +361,32 @@
 </script>
 
 <script lang="ts">
-	import {
-		PlayerState,
-		type PlayerControls,
-		type IPlayerState,
-		playerHealth
-	} from "$lib/stores/player";
-	import { isVisibleToPlayer } from "$lib/utils/angle";
+	import { PlayerState, type PlayerControls, playerHealth, playerState } from "$lib/stores/player";
+	import { isVisibleToPlayer, normalizeAngle } from "$lib/utils/angle";
 	import { GameObjects } from "$lib/utils/manager";
 	import {
 		comparePositions,
 		getDistanceFromPoints,
 		getFacingDirection,
-		getLocalPositionFromRealPosition
+		getLocalPositionFromRealPosition,
+		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onDestroy, onMount, tick } from "svelte";
 	import type Guard from "./Guard/Guard.svelte";
-	import { AudioManager } from "$lib/helpers/audio";
+	import { AIAudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
-	import type { ExtendedEntity, World } from "$lib/types/core";
+	import type { ExtendedEntity, ExtendedEntityV2, World } from "$lib/types/core";
 	import type { Position, Position2D } from "$lib/types/position";
 	import { CurrentLevel, type WorldState } from "./Level.svelte";
 	import type Enemy from "./Enemy.svelte";
 	import type Door from "./Door.svelte";
 	import type MapObject from "./MapObject.svelte";
 	import type Elevator from "./Elevator.svelte";
+	import { gameData } from "$lib/helpers/maps";
 
-	let state: "shoot" | "idle" = "idle";
+	$: state = $playerState;
+
 	let windowWidth: number;
 	let camera: HTMLDivElement;
 	let buttonsPressed: PlayerControls = {
@@ -217,7 +401,7 @@
 
 	let x: number = 0;
 
-	const audioManager = new AudioManager({
+	const audioManager = new AIAudioManager({
 		pistol: new URL(PistolURL, import.meta.url).toString(),
 		knife: "",
 		smg: new URL("../sounds/smg.WAV", import.meta.url).toString()
@@ -235,9 +419,9 @@
 
 		if (elapsed > 8 && $playerHealth > 0) {
 			start = now;
-			cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg) perspective(var(--perspective));`;
 
 			PlayerState.update(buttonsPressed);
+			cssText = `transform: translate3d(0px, 0px, var(--perspective)) rotateX(${a}deg) rotateY(${b}deg) rotateZ(${c}deg) perspective(var(--perspective));`;
 		}
 
 		return true;
@@ -285,44 +469,34 @@
 
 		const toPosition = getTileDirectlyInFrontOfPlayer(position);
 
-		if (
-			$CurrentLevel[toPosition.z][toPosition.x].model &&
-			$CurrentLevel[toPosition.z][toPosition.x].model?.component === "Elevator"
-		) {
-			for (const elevator of $GameObjects.elevators) {
-				const localPosition = elevator?.getLocalPosition();
-				if (localPosition.x === toPosition.x && localPosition.z === toPosition.z) {
-					elevator.toggleAction();
-					return false;
-				}
-			}
-		} else {
-			for (const door of $GameObjects.doors) {
-				const localPosition = door?.getLocalPosition();
-				if (
-					(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
-					(localPosition.x - 1 === toPosition.x && localPosition.z === toPosition.z)
-				) {
-					door.toggleAction();
-					return false;
-				}
+		for (const door of [
+			...$GameObjects.doors,
+			...$GameObjects.pushwalls,
+			...$GameObjects.elevators
+		]) {
+			const localPosition = door?.getLocalPosition();
+			if (
+				(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
+				(localPosition.x - 1 === toPosition.x && localPosition.z === toPosition.z)
+			) {
+				door.toggleAction();
+				return false;
 			}
 		}
 		return true;
 	}
 
 	async function attackClosestEnemy(position: Position2D) {
-		if (state === "shoot" && $PlayerState.weapons.active !== "smg") return;
-
+		if (state === "attack" && $PlayerState.weapons.active !== "smg") return;
 		if ($PlayerState.weapons.ammo <= 0 && $PlayerState.weapons.active !== "knife") {
 			return;
 		}
 
-		state = "shoot";
 		if ($PlayerState.weapons.active !== "knife") {
 			$PlayerState.weapons.ammo -= 1;
 			if ($PlayerState.weapons.active) audioManager.play($PlayerState.weapons.active);
 		}
+		$PlayerState.state = "attack";
 
 		await tick();
 
@@ -351,6 +525,20 @@
 		}
 
 		if (!enemiesInRange.length) return;
+		let timeout = 0;
+		switch ($PlayerState.weapons.active) {
+			case "smg":
+				timeout = 125;
+				break;
+			case "pistol":
+				timeout = 625;
+				break;
+			case "knife":
+				timeout = 125;
+				break;
+			default:
+				break;
+		}
 
 		const closest = enemiesInRange.sort(
 			(a, b) =>
@@ -369,33 +557,31 @@
 			x: position.x,
 			z: position.z
 		});
-
-		if (!target) return;
+		const distance = getDistanceFromPoints(playerPos, target.getLocalPosition());
+		setTimeout(() => {
+			$PlayerState.state = "idle";
+		}, timeout);
+		console.log({ distance });
+		if (!target) return console.log("NO TARGET");
+		if ($PlayerState.weapons.active === "knife" && distance > 1) return;
 
 		const enemyPosition = getLocalPositionFromRealPosition(target.getPosition());
 		const canShoot = testLineOfSight2($CurrentLevel, playerPos, enemyPosition)!;
+		console.log({
+			canShoot,
+			canShoot2: testLineOfSight2(
+				$CurrentLevel,
+				getLocalPositionFromRealPosition({
+					x: position.x,
+					z: position.z
+				}),
+				enemyPosition
+			)
+		});
 
 		if (canShoot) {
 			await PlayerState.attack(target);
 		}
-		let timeout = 0;
-		switch ($PlayerState.weapons.active) {
-			case "smg":
-				timeout = 125;
-				break;
-			case "pistol":
-				timeout = 625;
-				break;
-			case "knife":
-				timeout = 125;
-				break;
-			default:
-				break;
-		}
-
-		setTimeout(() => {
-			state = "idle";
-		}, timeout);
 	}
 
 	const handleTouchStart = (e: TouchEvent) => {
@@ -490,12 +676,7 @@
 >
 	<slot />
 </div>
-<div
-	class="player-gun {state} {$PlayerState.weapons.active}"
-	on:animationend|capture={() => {
-		state = "idle";
-	}}
-/>
+<div class="player-gun {state} {$PlayerState.weapons.active}" />
 
 <style lang="scss">
 	.player-gun {
@@ -509,7 +690,11 @@
 		// contain: strict;
 		right: 0;
 		inset: 0;
+
 		transform: translateZ(0px);
+		@media screen and (max-width: 949px) {
+			transform: translateZ(0px) scale(1.675);
+		}
 	}
 	.player-gun::after {
 		content: "";
@@ -579,7 +764,7 @@
 			}
 		}
 	}
-	.shoot {
+	.attack {
 		&::after {
 			animation: shooting steps(1) var(--shoot-speed-anim);
 

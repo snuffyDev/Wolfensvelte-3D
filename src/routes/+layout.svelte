@@ -1,26 +1,39 @@
+<script
+	context="module"
+	lang="ts"
+>
+	const levelMusic = import.meta.glob("$lib/music/*", { as: "url" });
+</script>
+
 <script lang="ts">
 	import { onMount, setContext } from "svelte";
 	import { writable } from "svelte/store";
 	import { textureData } from "../lib/utils/engine/textures";
 	import MenuMusic from "../lib/music/menu.mp3?url";
 	import E1M1Music from "../lib/music/E1M1.mp3?url";
+	import Wondering from "../lib/music/Wondering_About_My_Loved_Ones.ogg?url";
 	import E1M2Music from "../lib/music/E1M2.ogg?url";
 	import { ctxKey, type WSContext } from "./key";
 	import "./../app.scss";
-	import { MusicManager } from "$lib/helpers/music";
+	import { AudioEngine } from "$lib/helpers/music";
+	import { page } from "$app/stores";
+	import { gameData } from "$lib/helpers/maps";
 	const textureStore = writable<Awaited<ReturnType<typeof textureData>>>({});
 	const isLoadingNextMap = writable<boolean>(false);
 
 	let loaded = false;
 
 	onMount(async () => {
-		MusicManager.loadAudioFile("menu", new URL(MenuMusic, import.meta.url).toString(), false, true);
-		MusicManager.loadAudioFile("E1M1", new URL(E1M1Music, import.meta.url).toString(), false, true);
-		MusicManager.loadAudioFile("E1M2", new URL(E1M2Music, import.meta.url).toString(), false, true);
-		MusicManager.play("menu", true);
 		let textures: Awaited<ReturnType<typeof textureData>> = await textureData();
 		textureStore.set(await textures);
-		// if ($textureStore) {
+
+		AudioEngine.loadAudioFile("wondering", Wondering, false, true);
+		AudioEngine.loadAudioFile("menu", MenuMusic, true, true);
+		console.time("start - og");
+		await gameData.loadResources();
+		gameData.loadLevel(1);
+		console.log(gameData.get());
+		console.timeEnd("start - og");
 		loaded = true;
 		// }
 	});
@@ -29,12 +42,23 @@
 
 	setContext(ctxKey, { textures: textureStore, isLoadingNextLevel: isLoadingNextMap } as WSContext);
 	let hasAudioPerms = false;
+	$: console.log($page);
 </script>
 
-<svelte:body
-	on:pointerdown={() => {
+<svelte:window
+	on:keydown={() => {
 		if (hasAudioPerms) return;
 		hasAudioPerms = true;
+		if ($page.route.id !== "/[...level]") {
+			AudioEngine.play("menu", true);
+		}
+	}}
+	on:click={() => {
+		if (hasAudioPerms) return;
+		hasAudioPerms = true;
+		if ($page.route.id !== "/[...level]") {
+			AudioEngine.play("menu", true);
+		}
 	}}
 />
 <!-- <Noise /> -->

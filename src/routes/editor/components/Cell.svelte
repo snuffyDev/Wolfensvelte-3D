@@ -61,12 +61,18 @@
 	}>();
 
 	const getCellType = (o: typeof data): "model" | "wall" | "other" => {
-		for (const key of objectKeys(o)) {
-			if (key === "model") {
-				if (o[key]?.texture) return "other";
-				if (o[key]?.component) return "model";
-			} else if (key === "surfaces") {
-				if (typeof o.surfaces === "number") return "wall";
+		for (const key of Reflect.ownKeys(o)) {
+			try {
+				if (key === "model") {
+					if (o[key]?.texture) return "other";
+					if (o[key]?.component) return "model";
+					// if (o[key]?.attributes)
+				} else if (key === "surfaces") {
+					if (typeof o.surfaces === "number") return "wall";
+				}
+			} catch (e) {
+				console.warn(key, o, o[key]);
+				console.error(e);
 			}
 		}
 		return "other";
@@ -120,7 +126,7 @@
 	{:else if CELL_TYPE === "wall"}
 		<span
 			class="edge "
-			style={data.surfaces ? `--img: url(${$textures[data.surfaces].original});` : ""}
+			style={data.surfaces ? `--img: url(${$textures[data.surfaces]?.original});` : ""}
 			class:active={data.surfaces !== 0}
 		/>
 	{:else if data.model?.component}

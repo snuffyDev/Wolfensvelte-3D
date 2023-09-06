@@ -23,9 +23,8 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 				neighbor.x < world.length &&
 				neighbor.z >= 0 &&
 				neighbor.z < world[0].length &&
-				world[neighbor.x][neighbor.z].model !== null &&
-				typeof world[neighbor.x][neighbor.z].model !== "object" &&
-				world[neighbor.x][neighbor.z].surfaces === null
+				world[neighbor.x][neighbor.z].blocking !== true &&
+				world[neighbor.x][neighbor.z].component !== "Object"
 		);
 	}
 
@@ -38,13 +37,14 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 		return `${Math.floor(pos.x)},${Math.floor(pos.z)}`;
 	}
 
-	world.forEach((row, x) => {
-		row.forEach((_, z) => {
+	for (let x = 0; x < world.length; x++) {
+		const row = world[x];
+		for (let z = 0; z < row.length; z++) {
 			const posStr = posToStr({ x, z });
 			gScore.set(posStr, Infinity);
 			fScore.set(posStr, Infinity);
-		});
-	});
+		}
+	}
 
 	gScore.set(posToStr(start), 0);
 	fScore.set(posToStr(start), heuristic(start, goal));

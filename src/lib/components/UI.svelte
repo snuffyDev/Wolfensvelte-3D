@@ -61,15 +61,15 @@
 	}
 </script>
 
-<!--
 {#if dev}
 	<div class="debug">
 		{#key $PlayerState.rotation.y}
 			<p>rot: {JSON.stringify($PlayerState.rotation.y)}</p>
+			<p>rot: {JSON.stringify($PlayerState.position)}</p>
 			<p>{getFacingDirection($PlayerState.rotation.y)}</p>
 		{/key}
 	</div>
-{/if} -->
+{/if}
 <div class="hud">
 	<div class="stats">
 		{#each HUD_SECTIONS as [name, value] (name)}

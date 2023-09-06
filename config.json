@@ -1,0 +1,5 @@
+{
+  "// Note": "This is your Vercel config file. For more information see the global configuration documentation.",
+  "// Docs": "https://vercel.com/docs/project-configuration#global-configuration/config-json",
+  "collectMetrics": true
+}

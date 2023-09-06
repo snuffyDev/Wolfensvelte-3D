@@ -5,20 +5,23 @@
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { ExtendedEntity, MapItem } from "../types/core";
+	import type { ExtendedEntity, ExtendedEntityV2, MapItem } from "../types/core";
 	import {
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
-	import { CurrentLevel } from "./Level.svelte";
+	import { CurrentLevel, getTileRegion, getTileRegions, renderVisibleTiles } from "./Level.svelte";
 	import { ctxKey, type WSContext } from "../../routes/key";
 	import { compare } from "../utils/compare";
-	import { AudioManager } from "$lib/helpers/audio";
+	import { AIAudioManager } from "$lib/helpers/audio";
 	import { PlayerState } from "$lib/stores/player";
+	import { GameObjects } from "$lib/utils/manager";
+	import { getAdjacentRegions, getCurrentRegion } from "./portal";
+	import { asap } from "$lib/utils/levelManager";
 
-	export let item: ExtendedEntity;
+	export let item: ExtendedEntityV2;
 	export let offset: number;
 	export let section: number;
 
@@ -31,31 +34,41 @@
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
 	const position = tweened(_position);
-	const audioPlayer = new AudioManager({
+	const audioPlayer = new AIAudioManager({
 		open: new URL("../sounds/objects/door/door.WAV", import.meta.url).toString(),
 		close: new URL("../sounds/objects/door/door_close.WAV", import.meta.url).toString()
 	});
-
+	$: console.log({ item, offset, section });
 	export const getVisibility = () => visibility;
-	export const setVisibility = (visible: boolean) => {
+	export const setVisibility = (visible: boolean, triggeredByPlayer = false) => {
 		willChange = "visibility";
 		return () => {
-			setTimeout(() => {
+			if (triggeredByPlayer) {
+				setTimeout(
+					() => {
+						visibility = visible;
+						willChange = false;
+					},
+					visible === true ? 0 : 500
+				);
+			} else {
 				visibility = visible;
 				willChange = false;
-			}, 500);
+			}
 		};
 	};
 
 	let timer: ReturnType<typeof setTimeout>;
 
-	export const toggleAction = () => {
-		if (shouldMute && count >= 2) shouldMute = false;
+	export const toggleAction = async () => {
+		if (item.attributes?.needsKey && !$PlayerState.keys?.[item.attributes.needsKey]) return;
 
+		if (shouldMute && count >= 2) shouldMute = false;
 		if (shouldMute) count += 1;
 
 		state = state === "open" ? "closed" : "open";
 		const oldState = $position;
+
 		position.update((u) =>
 			!rotation
 				? {
@@ -64,6 +77,7 @@
 				  }
 				: { z: state === "open" ? _position.z + 64 : _position.z, x: $position.x }
 		);
+
 		if (
 			compare(
 				getLocalPositionFromRealPosition($PlayerState.position),
@@ -80,28 +94,51 @@
 		}
 		let currentState = $CurrentLevel[section][offset];
 		if (!currentState.position) currentState.position = {} as Position2D;
+		if (count >= 0) {
+			await new Promise((resolve) => {
+				const regions = getTileRegions(
+					getLocalPositionFromRealPosition($position),
+					CurrentLevel.getPortal()
+				);
+				const visibleTiles = regions.flatMap((regionIndex) => {
+					const region = CurrentLevel.getPortal()[regionIndex];
+					return [
+						region.tiles,
+						...region.connectedRegions.map((v) =>
+							CurrentLevel.getPortal()[v].portals.map((p) => p.position)
+						),
+						region.portals.map(({ position }) => position)
+					].flat();
+				});
+				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state, isLast) => {
+					const visibility = position.setVisibility(state);
+					queueMicrotask(() => visibility());
+					if (isLast) resolve(undefined);
+				});
+			}).then(() => console.log("RESOLVED"));
+		}
+
 		if (state === "open") {
 			currentState.position = { x: offset + 1, z: section };
-			if (!currentState.model!.attributes) currentState.model!.attributes = {} as any;
-			currentState.model!.attributes!.state = "open";
+			if (!currentState.attributes) currentState.attributes = {} as any;
+			currentState.attributes!.state = "open";
 		} else {
 			currentState.position = { x: offset, z: section };
-			if (!currentState.model!.attributes) currentState.model!.attributes = {} as any;
-			currentState.model!.attributes!.state = "closed";
+			if (!currentState.attributes) currentState.attributes = {} as any;
+			currentState.attributes!.state = "closed";
 		}
+		state = currentState.attributes!.state;
 		CurrentLevel.updateTileAt(section, offset, currentState);
 
-		if (!shouldMute) {
-			if (state === "open") {
-				audioPlayer.play("open");
-				clearTimeout(timer);
-				timer = setTimeout(() => {
-					toggleAction();
-				}, 5000);
-			} else {
-				clearTimeout(timer);
-				audioPlayer.play("close");
-			}
+		if (state === "open" && !shouldMute) {
+			audioPlayer.play("open");
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				toggleAction();
+			}, 5000);
+		} else if (!shouldMute) {
+			clearTimeout(timer);
+			audioPlayer.play("close");
 		}
 	};
 	export const getPosition = () => $position;
@@ -114,8 +151,9 @@
 
 	onMount(() => {
 		let interval: string | number | NodeJS.Timer | undefined;
-		toggleAction();
-		toggleAction();
+		queueMicrotask(() => {
+			// toggleAction();?
+		});
 		try {
 			const isLeftRight =
 				Object.values($CurrentLevel?.[section]?.[offset + 1]?.surfaces ?? {}).some(
@@ -133,10 +171,9 @@
 				);
 			if (isLeftRight) rotation = 0;
 			else if (isTopBottom) rotation = 90;
-
-			visibility = true;
 		} catch {}
 	});
+	$: console.log($textures[item.texture].original);
 </script>
 
 <!-- {#if visibility} -->
@@ -147,16 +184,18 @@
 		: 'hidden'};  --pX: {-$position.x}px; --pZ: {-$position.z}px; --rotation: {rotation ?? 0}deg;"
 >
 	<!---->
-	{#if item.model && item.model.texture}
+	{#if item.texture}
 		<div
 			class=" sprite"
-			style="background-image: url({$textures[item.model.texture].original});"
+			style="background-image: url({$textures[rotation ? item.texture : item.texture - 1]
+				.original});"
 		>
 			<!---->
 		</div>
 		<div
 			class=" sprite"
-			style="background-image: url({$textures[item.model.texture].original});"
+			style="background-image: url({$textures[rotation ? item.texture : item.texture - 1]
+				.original});"
 		>
 			<!---->
 		</div>
@@ -175,7 +214,7 @@
 
 		transform: translate3d(var(--pX), -50%, var(--pZ)) rotateY(var(--rotation));
 
-		backface-visibility: hidden;
+		// backface-visibility: hidden;
 		transform-style: preserve-3d;
 		> :where(.sprite) {
 			background-size: 100%;
@@ -190,7 +229,6 @@
 			position: inherit;
 			top: 0%;
 			//
-			backface-visibility: hidden;
 			left: 0%;
 		}
 		&::before,
@@ -203,7 +241,6 @@
 			background: darkcyan;
 			top: 0;
 			bottom: 0;
-			backface-visibility: hidden;
 			transform: rotateY(90deg);
 		}
 		&::before {

@@ -46,9 +46,10 @@
 
 	const position = getRealPositionFromLocalPosition({ x: offset, z: section });
 
-	let isVisible = false;
+	let isVisible = true;
 	let willChange: string | false = false;
 
+	export let style = "";
 	export const type = "wall";
 	/** Position for the component instance */
 	export const getPosition = () => position;
@@ -101,7 +102,7 @@
 							? `will-change: ${willChange};`
 							: ''} --height: {height}px; {img} transform: translate3d({-position.x}px, -50%, {positionZ}px) rotateY({DIRECTION_MAP[
 							direction
-						]}deg);"
+						]}deg); {style}"
 					>
 						<!-- {direction} -->
 					</div>
@@ -124,7 +125,7 @@
 		color: white;
 		backface-visibility: hidden !important;
 		z-index: -1;
-		/* opacity: 0.25; */
+		opacity: 1;
 		/* image-rendering: ; */
 	}
 </style>

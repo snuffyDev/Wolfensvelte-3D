@@ -6,12 +6,6 @@ No, there's no WebGL, or canvas.
 
 Live Site: https://wolfensvelte-3d.vercel.app/
 
-### Remove at a later time
-
-> I added this to prove I spoke to Kev
-> ![image](https://github.com/snuffyDev/Wolfensvelte-3D/assets/72365477/bbe2b2b1-1fe2-488b-b5f3-b579780ddd8c)
-
-
 ## Screenshots
 
 <div align="center">
@@ -63,6 +57,15 @@ The only tech used can be summed up as: Svelte, HTML, (S)CSS, and TypeScript/Jav
 - Full E1M1 map
 - Player Health
 - Basically, everything you'd expect
+
+### Project's Goals
+
+- Port (nearly) the entirety of Episode 1.
+- Be accurate to the original, where it makes sense (examples below)
+  - Reasonable: _Damage model should be the same as Wolfenstein 3D_
+    - A different damage model would make the game feel "wrong".
+  - Unreasonable: _Fizzlefade on death should match Wolf3D_
+    - Fizzlefade isn't realistic to recreate in a cross-browser way using only CSS and HTML elements.
 
 ### Technical Overview
 

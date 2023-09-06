@@ -6,13 +6,13 @@
 <script lang="ts">
 	import { getContext } from "svelte";
 	import { type WSContext, ctxKey } from "../../routes/key";
-	import type { Entity, ExtendedEntity } from "$lib/types/core";
+	import type { Entity, ExtendedEntity, ExtendedEntityV2 } from "$lib/types/core";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { PlayerState, playerRotation } from "$lib/stores/player";
 
 	const { textures }: WSContext = getContext(ctxKey);
 
-	export let item: ExtendedEntity;
+	export let item: ExtendedEntityV2;
 	export let offset: number;
 	export let section: number;
 
@@ -35,7 +35,7 @@
 	export const getLocalPosition = () => ({ x: offset, z: section });
 	export const type = "object";
 
-	let texture = item.model?.texture;
+	let texture = item.texture;
 </script>
 
 {#if isVisible && texture}

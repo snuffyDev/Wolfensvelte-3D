@@ -38,7 +38,7 @@ body {
 	background-color: black !important;
 	overflow: hidden;
 	margin: 0;
-	transform-style: flat;
+	transform-style: preserve-3d;
 	touch-action: none;
 }
 
@@ -62,6 +62,7 @@ body {
 	position: absolute;
 	width: 64px;
 	height: 64px;
+	// contain: content;
 	display: flex;
 	//
 	top: 0;

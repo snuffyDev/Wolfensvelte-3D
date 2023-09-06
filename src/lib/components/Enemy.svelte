@@ -41,21 +41,22 @@
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { getContext, onMount, tick } from "svelte";
-	import type { ExtendedEntity, WallFace } from "$lib/types/core";
+	import type { ExtendedEntity, ExtendedEntityV2, WallFace } from "$lib/types/core";
 
 	import { enemyState } from "./Guard/state";
 
-	import { AudioManager } from "$lib/helpers/audio";
+	import { AIAudioManager } from "$lib/helpers/audio";
 	import { CurrentLevel } from "./Level.svelte";
 	import { testLineOfSight2 } from "./Player.svelte";
 	import { ItemPickups, rand } from "$lib/utils/engine";
 	import { WALL_FACES } from "$lib/utils/validation";
 	import { ctxKey, type WSContext } from "../../routes/key";
 	import { ENEMY_INIT } from "$lib/core/ai";
+	import { findPath } from "$lib/helpers/ai";
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
-	export let item: ExtendedEntity;
+	export let item: ExtendedEntityV2;
 	export let offset: number;
 	export let section: number;
 
@@ -66,13 +67,13 @@
 			position: { x: -position.x, z: -position.z },
 			state: "idle"
 		},
-		ENEMY_INIT[item.model!.component! as keyof typeof ENEMY_INIT]
+		ENEMY_INIT[item.component! as keyof typeof ENEMY_INIT]
 	);
 	const tween = state.tween;
 
-	const behavior = ENEMY_INIT[item.model!.component as keyof typeof ENEMY_INIT];
+	const behavior = ENEMY_INIT[item.component as keyof typeof ENEMY_INIT];
 
-	const audioManager = new AudioManager<Record<string, string>>(behavior.sounds!);
+	const audioManager = new AIAudioManager<Record<string, string>>(behavior.sounds!);
 
 	let isVisible = false;
 	let hasTakenDamage = false;
@@ -103,9 +104,14 @@
 		if ($state.health <= 0) {
 			tween.cancel();
 			stateLoop.abort();
-			audioManager.play(
-				`death_${Math.max(1, Math.min(3, Math.floor(Math.random() * 4))) as 1 | 2 | 3}`
-			);
+			try {
+				audioManager.play(
+					`death_${Math.max(1, Math.min(3, Math.floor(Math.random() * 4))) as 1 | 2 | 3}`
+				);
+			} catch {
+				audioManager.play("death");
+			}
+
 			state.setState("dead");
 		}
 	};
@@ -117,6 +123,29 @@
 	let playerLastSeenAt: number;
 	let playerJustSeen = false;
 
+	const findEmptyTile = (direction: WallFace, amount = 1) => {
+		let toPosition: Position2D = getLocalPosition() as Position2D;
+
+		switch (direction) {
+			case "left":
+				toPosition = { ...toPosition, x: toPosition.x + amount };
+				break;
+			case "right":
+				toPosition = { ...toPosition, x: toPosition.x - amount };
+				break;
+			case "back":
+				toPosition = { ...toPosition, z: toPosition.z + amount };
+				break;
+			case "front":
+				toPosition = { ...toPosition, z: toPosition.z - amount };
+				break;
+			default:
+				break;
+		}
+		return [CurrentLevel.checkCollisionWithWorld(toPosition, null), toPosition] as const;
+	};
+	let timeSinceLastPatrol = 0;
+	let startPatrolTime = 0;
 	const stateLoop = frameLoop(async (now) => {
 		if ($isLoadingNextLevel) return true;
 		if ($state.state === "dead") {
@@ -126,7 +155,6 @@
 		const elapsed = now - startFrame;
 
 		if (elapsed > behavior.reactionTime + rand.nextInt(162, 231)) {
-			if (busy) return true;
 			startFrame = now;
 
 			const distance = getDistanceFromPoints(
@@ -140,8 +168,8 @@
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
 			const [min, preferred, max] = behavior.attackDistance;
-
-			if (testLineOfSight2($CurrentLevel, playerPosition, ourPosition) && distance < 1500) {
+			const hasLineOfSight = testLineOfSight2($CurrentLevel, ourPosition, playerPosition);
+			if (hasLineOfSight && distance < 800) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("playerSeen");
@@ -150,9 +178,10 @@
 
 				if (
 					(distance >= min &&
-						(item.model?.component === "Dog"
+						(item.component === "Dog"
 							? distance <= max
-							: preferred(distance) < distance * Math.random())) ||
+							: preferred(distance) < max * Math.random()) &&
+						r % 3) ||
 					hasTakenDamage
 				) {
 					if (busy) return true;
@@ -191,11 +220,52 @@
 					state.setState("idle");
 				}
 			} else {
-				if (distance > 1000) playerJustSeen = false;
-				if (!busy) {
-					previousAnimationState = "idle";
-					state.setState("idle");
+				if (!busy && $state.state === "idle") {
+					const timeSinceLastPatrol = now - startPatrolTime;
+					// previousAnimationState = "idle";
+
+					// console.log("BUSY!");
+
+					if (timeSinceLastPatrol > Math.max(16000, (rand.nextByte() * 512) / 4)) {
+						startPatrolTime = now;
+						busy = true;
+						state.setState("walk");
+						previousAnimationState = "idle";
+
+						const directions = [...Array(5).keys()].map(() => WALL_FACES[~~rand.nextInt(0, 3)]);
+						const res = [[true, getLocalPosition()] as const];
+						for (let idx = 0; idx < directions.length; idx++) {
+							const dir = directions[idx];
+							if (item.component === "Guard") {
+								const [canMove, pos] = findEmptyTile(dir, ~~rand.nextInt(1, 7));
+								if (canMove) {
+									res.push([canMove, pos] as const);
+								}
+							}
+						}
+						const [, goToPosition] = res.reduce((acc, curr) => {
+							if (!curr[0]) return acc;
+							const [, accPosition] = acc;
+							const [, currPosition] = curr;
+
+							const diff = comparePositions(currPosition, accPosition);
+							acc[1].x += diff.x;
+							acc[1].z += diff.z;
+							return acc;
+						});
+
+						await Promise.race([
+							new Promise((r) => setTimeout(r, 1000)),
+							state.moveTo(getRealPositionFromLocalPosition(goToPosition))
+						]);
+						busy = false;
+						previousAnimationState = "idle";
+						state.setState("idle");
+					}
 				}
+				playerJustSeen = false;
+				previousAnimationState = "idle";
+				state.setState("idle");
 			}
 		}
 		return true;
@@ -222,7 +292,7 @@
 				default:
 					break;
 			}
-			return [CurrentLevel.checkCollisionWithWorld(toPosition), toPosition] as const;
+			return [CurrentLevel.checkCollisionWithWorld(toPosition, null), toPosition] as const;
 		};
 
 		const [, p] = WALL_FACES.map(findEmptyTile)
@@ -232,11 +302,16 @@
 		if (behavior.dropOnDeath) {
 			CurrentLevel.updateTileAt(p.z, p.x, {
 				...$CurrentLevel[p.z][p.x],
-				model: { component: "Object", texture: ItemPickups[behavior.dropOnDeath] }
+				...{
+					component: "Object",
+					blocking: false,
+					texture: ItemPickups[behavior.dropOnDeath],
+					attributes: { collectable: true }
+				}
 			});
 		}
 
-		stateLoop;
+		stateLoop.abort();
 	}
 	onMount(() => {
 		return () => {
@@ -261,7 +336,7 @@
 	}}
 	class="{willChange
 		? `will-change: ${willChange};`
-		: ''} sprite enemy {item.model?.component.toLocaleLowerCase()} {$state.state} {!isVisible
+		: ''} sprite enemy {item.component.toLocaleLowerCase()} {$state.state} {!isVisible
 		? 'hidden'
 		: ''}"
 	style="transform: translate3d({$tween.x}px, -50%, {$tween.z}px) rotateY({-$playerRotation}deg);"
@@ -365,25 +440,7 @@
 		height: 64px;
 		image-rendering: pixelated;
 		background: url(./../sprites/guard_dog/spritesheet.png) no-repeat;
-
-		&.idle {
-			background-position: -0px -192px;
-		}
-		&.attack {
-			animation: attackAnimation 0.6s steps(1) infinite;
-		}
-
-		&.dead {
-			animation: deadAnimation 1.1s steps(1) infinite;
-		}
-
-		&.hurt {
-			animation: hurtAnimation 0.4s steps(1);
-		}
-
-		&.walk {
-			animation: runAnimation 0.625s steps(1) infinite;
-		}
+		background-size: 192px;
 
 		@keyframes attackAnimation {
 			0% {
@@ -397,15 +454,6 @@
 			}
 		}
 
-		@keyframes deadAnimation {
-			0% {
-				background-position: -0px -128px;
-			}
-			100% {
-				background-position: -64px -64px;
-			}
-		}
-
 		@keyframes hurtAnimation {
 			0% {
 				background-position: -64px -128px;
@@ -415,21 +463,55 @@
 			}
 		}
 
-		@keyframes runAnimation {
-			0% {
-				background-position: -128px -64px;
+		&.idle {
+			background-position: -0px -192px;
+		}
+		&.attack {
+			animation: attackAnimation 0.6s steps(1);
+		}
+
+		&.dead {
+			animation: dogDeadAnimation 0.675s steps(1);
+			background-position: -0px -128px;
+
+			@keyframes dogDeadAnimation {
+				5% {
+					background-position: -64px -128px;
+				}
+				25% {
+					background-position: -128px -0px;
+				}
+				50% {
+					background-position: -64px -64px;
+				}
+				75% {
+					background-position: -0px -128px;
+				}
+				100% {
+					background-position: -0px -128px;
+				}
 			}
-			25% {
-				background-position: -128px -128px;
-			}
-			50% {
-				background-position: -0px -192px;
-			}
-			75% {
-				background-position: -64px -192px;
-			}
-			100% {
-				background-position: -128px -64px;
+		}
+
+		&.hurt {
+			animation: hurtAnimation 0.4s steps(1);
+		}
+
+		&.walk {
+			animation: dogRunAnimation 0.625s steps(1) infinite;
+			@keyframes dogRunAnimation {
+				0% {
+					background-position: -0px -192px;
+				}
+				25% {
+					background-position: -64px -192px;
+				}
+				50% {
+					background-position: -128px -64px;
+				}
+				75% {
+					background-position: -128px -128px;
+				}
 			}
 		}
 	}

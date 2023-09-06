@@ -105,8 +105,16 @@ export function enemyState<T extends Partial<EnemyState | IPlayerState>>(
 				for (const path of paths) {
 					AC?.signal.throwIfAborted();
 					// Current path point is blocked by something, skip to next just in case.
-					if (CurrentLevel.checkCollisionWithWorld(path, true)) {
-						if (count === 2) break;
+					if (CurrentLevel.checkCollisionWithWorld(path, true, null)) {
+						if (count === 2) {
+							// Ensure we go back to an 'idle' state before starting the next task
+							state.state = "idle";
+							update((u) => ({ ...u, ...state }));
+							return;
+						}
+						console.log("BLOCKED");
+						let block = new Error("");
+						console.log(block.stack, block);
 						count += 1;
 						paths = findPath(ourPosition, playerPosition);
 						continue;

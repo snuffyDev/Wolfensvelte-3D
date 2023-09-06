@@ -6,7 +6,9 @@ import type MapObject from "$lib/components/MapObject.svelte";
 import type Pushwall from "$lib/components/Pushwall.svelte";
 import type Wall from "$lib/components/Wall.svelte";
 import { writable } from "svelte/store";
-type Model = InstanceType<typeof Door | typeof Enemy | typeof MapObject | typeof Elevator>;
+import { asap } from "./levelManager";
+
+export type Model = InstanceType<typeof Door | typeof E | typeof MapObject | typeof Elevator>;
 
 interface GameObjectStore {
 	walls: Wall[];
@@ -55,17 +57,23 @@ class GameObjectStoreManager {
 	};
 	reset = () => {
 		for (const key in this.store) {
-			this.store[key as keyof typeof this.store] = this.store[
-				key as keyof typeof this.store
-			].filter((v) => v != null) as any;
-			this.store[key as keyof typeof this.store].length = 0;
-			this.subscribers.forEach((cb) => cb(this.store));
+			asap(() => {
+				this.store[key as keyof typeof this.store].length = 0;
+				this.subscribers.forEach((cb) =>
+					cb(Object.fromEntries(Object.keys(this.store).map((k) => [k, []])))
+				);
+				this.store[key as keyof typeof this.store] = this.store[
+					key as keyof typeof this.store
+				].filter((v) => v != null) as any;
+			});
 		}
-		this.subscribers.clear();
+		this.subscribers.forEach((cb) =>
+			cb(Object.fromEntries(Object.keys(this.store).map((k) => [k, []])))
+		);
 	};
 	*[Symbol.iterator]() {
 		for (const key of this.keys) {
-			yield * this.store[key];
+			yield* this.store[key];
 		}
 	}
 }

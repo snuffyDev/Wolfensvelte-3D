@@ -1,4 +1,4 @@
-export class AudioManager<T extends Record<string, string>> {
+export class AIAudioManager<T extends Record<string, string>> {
 	private declare ref: Map<keyof T, HTMLAudioElement>;
 
 	constructor(dict: Partial<T>) {

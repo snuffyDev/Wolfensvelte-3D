@@ -29,7 +29,7 @@ export function isVisibleToPlayer<
 
 	const angleBetween = getAngleBetweenPoints(playerState.position, position);
 
-	const playerViewAngle = normalizeAngle(-playerState.rotation.y - 90);
+	const playerViewAngle = normalizeAngle(-playerState.rotation.y + 90);
 	const left = normalizeAngle(playerViewAngle - fov / 2);
 	const right = normalizeAngle(playerViewAngle + fov / 2);
 

@@ -7,7 +7,7 @@
 	import { ctxKey, type WSContext } from "../../key";
 	import Cell from "./Cell.svelte";
 	import TexturePreview from "./Editor/TexturePreview.svelte";
-	import Level from "../../../lib/components/Level.svelte";
+	import Level, { type WorldState } from "../../../lib/components/Level.svelte";
 	import type { MapItem, Texture, WallFace, World } from "../../../lib/types/core";
 	import {
 		EnemySymbol,
@@ -26,8 +26,9 @@
 		active: boolean;
 		data: MapItem;
 	}[][] = [[]];
+	const SPAWN_ROTATION_MAP = { 0: 180, 1: 0, 2: 270, 3: 90 } as const;
 
-	let SPAWN_COORDS: { x: number; z: number } = { x: 0, z: 0 };
+	let SPAWN_COORDS: WorldState["spawn"] = { rotation: 0, x: 0, z: 0 };
 
 	TILE_MAP = [...Array(64).keys()].map(() =>
 		[...Array(64).keys()].map(() => ({
@@ -164,9 +165,6 @@
 							...TILE_MAP[x][y].data,
 							model: { component: enemyType }
 						};
-					} else if (tile === SpawnTile) {
-						SPAWN_COORDS = getRealPositionFromLocalPosition({ x: y, z: x });
-						console.log(SPAWN_COORDS, tile, getRealPositionFromLocalPosition({ x, z: y }));
 					} else if (specialObjects.includes(tile)) {
 						TILE_MAP[x][y].data = {
 							...TILE_MAP[x][y].data,
@@ -183,6 +181,51 @@
 					}
 				}
 			}
+
+			if (objectLayer) {
+				for (const object of objectLayer) {
+					const { x, z } = getLocalPositionFromRealPosition({
+						...object,
+						x: object.y,
+						z: object.x
+					});
+					const type = object.type.toLowerCase();
+					console.log(type);
+					if (type === "pushwall") {
+						TILE_MAP[x][z].data = {
+							surfaces: +object.gid,
+							secret: true,
+							pushwall: true,
+							rotation: undefined
+						};
+					} else if (type === "elevator") {
+						TILE_MAP[x][z].data = {
+							surfaces: +object.gid,
+							model: { component: "Elevator" },
+							rotation: undefined
+						};
+					} else if (type === "lockeddoor") {
+						TILE_MAP[x][z].data = {
+							surfaces: +object.gid,
+							model: {
+								component: "Door",
+								texture: +object.gid,
+								attributes: {
+									//@ts-expect-error it's fine it exists
+									needsKey: object.properties?.find((prop) => prop.name === "needs_key")?.value
+								}
+							},
+							rotation: undefined
+						};
+					} else if (type === "spawn") {
+						SPAWN_COORDS = {
+							...getRealPositionFromLocalPosition({ x: z, z: x }),
+							// @ts-expect-error it's fine it exists!
+							rotation: object.properties?.find((property) => property.name === "rotation")?.value
+						};
+					}
+				}
+			}
 			for (let x = 0; x < TILE_MAP.length; x++) {
 				for (let y = 0; y < TILE_MAP[x].length; y++) {
 					const topBottom = [
@@ -195,7 +238,13 @@
 					];
 
 					if (specialObjects.includes(+chunked[x][y])) continue;
-					if (+chunked[x][y] === 99 || +chunked[x][y] === 103 || +chunked[x][y] === 25) {
+					if (
+						+chunked[x][y] === 99 ||
+						+chunked[x][y] === 103 ||
+						+chunked[x][y] === 104 ||
+						+chunked[x][y] === 105 ||
+						+chunked[x][y] === 25
+					) {
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 0, z: 0 } };
 
 						if (topBottom.every((o) => typeof o === "number")) {
@@ -205,29 +254,6 @@
 							TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data, rotation: { x: 0, y: 90, z: 0 } };
 						}
 						TILE_MAP[x][y].data = { ...TILE_MAP[x][y].data };
-					}
-				}
-			}
-			if (objectLayer) {
-				for (const object of objectLayer) {
-					const { x, z } = getLocalPositionFromRealPosition({
-						...object,
-						x: object.y,
-						z: object.x
-					});
-					if (object.type === "Pushwall") {
-						TILE_MAP[x][z].data = {
-							surfaces: +object.gid,
-							secret: true,
-							pushwall: true,
-							rotation: undefined
-						};
-					} else if (object.type === "Elevator") {
-						TILE_MAP[x][z].data = {
-							surfaces: +object.gid,
-							model: { component: "Elevator" },
-							rotation: undefined
-						};
 					}
 				}
 			}
@@ -419,7 +445,7 @@
 		inset: 0;
 		background-color: #010102;
 		will-change: contents;
-		contain: strict;
+		// contain: strict;
 	}
 	.row {
 		contain: content;

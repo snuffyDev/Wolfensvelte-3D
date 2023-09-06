@@ -55,7 +55,7 @@ export function diffPositions(a: Position2D, b: Position2D) {
 }
 
 export function comparePositions(a: Position2D, b: Position2D): Position2D {
-	const tolerance = 0.001; // Adjust this value to change the acceptable tolerance
+	const tolerance = 0.001;
 
 	const xDiff = Math.abs(a.x - b.x);
 	const zDiff = Math.abs(a.z - b.z);

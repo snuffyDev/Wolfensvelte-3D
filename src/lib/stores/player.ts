@@ -2,10 +2,10 @@ import type { Position, Position2D } from "$lib/types/position";
 import { derived, writable } from "svelte/store";
 import { CurrentLevel } from "../components/Level.svelte";
 import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "../utils/position";
-import type Guard from "../components/Guard/Guard.svelte";
 import { rand } from "$lib/utils/engine";
 import { ArrayUtils } from "$lib/utils/validation";
 import type Enemy from "$lib/components/Enemy.svelte";
+import { AudioEngine } from "$lib/helpers/music";
 
 export const createPlayerState = (initialState: Partial<IPlayerState>) =>
 	_playerState(initialState);
@@ -30,18 +30,28 @@ const isValidWeaponKey = (input: unknown): input is Weapons => {
 export interface IPlayerState {
 	health: number;
 	score: number;
+	state: "hurt" | "attack" | "idle" | "pickup";
 	weapons: Partial<Record<Weapons, { acquired: boolean }>> & { ammo: number; active: Weapons };
 	rotation: Position;
 	position: Position;
+	keys?: {
+		blue: boolean;
+		yellow: boolean;
+	};
 	lives?: number;
 }
 
 const CONSTANTS = {
-	speed: 6.875
+	speed: 8.875
 } as const;
 
 const DEFAULT_STATE = (lives: number | undefined = 3, score = 0): IPlayerState => ({
 	health: 100,
+	state: "idle",
+	keys: {
+		blue: false,
+		yellow: false
+	},
 	weapons: {
 		ammo: 8,
 		active: "pistol",
@@ -64,9 +74,19 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 	};
 	const { subscribe, set, update } = writable<IPlayerState>(state);
 	let startScore = 0;
+	const setPickupState = () => {
+		state.state = "pickup";
+		update((u) => ({ ...u, state: state.state }));
+		setTimeout(() => {
+			state.state = "idle";
+			update((u) => ({ ...u, state: state.state }));
+		}, 100);
+	};
 	return {
 		subscribe,
 		set,
+		modify: update,
+		setPickupState,
 		init(newState: Partial<IPlayerState>, dead = false) {
 			if (!dead) {
 				startScore = state.score;
@@ -90,6 +110,13 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			if (state.health >= 100) state.health = 100;
 
 			update((u) => ({ ...u, health: state.health }));
+			setPickupState();
+		},
+		giveKey(key: "yellow" | "blue") {
+			state.keys[key] = true;
+
+			update((u) => ({ ...u, keys: state.keys }));
+			setPickupState();
 		},
 		giveWeapon(weapon: Weapons) {
 			if (state.weapons[weapon]?.acquired) state.weapons.ammo += 4;
@@ -103,6 +130,7 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			}
 
 			update((u) => ({ ...u, weapons: state["weapons"] }));
+			setPickupState();
 		},
 		changeWeapon(key: number) {
 			if (key > WEAPON_KEYS.length) return;
@@ -119,11 +147,15 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			if (typeof n !== "number") {
 				n = rand.nextInt(5, 13);
 			}
-
+			state.state = "hurt";
 			state.health -= n;
 			state.health = state.health < 0 ? 0 : state.health;
 
-			update((u) => ({ ...u, health: state.health }));
+			update((u) => ({ ...u, state: state.state, health: state.health }));
+			setTimeout(() => {
+				state.state = "idle";
+				update((u) => ({ ...u, state: state.state }));
+			}, 150);
 		},
 		givePoints(points: number) {
 			state.score += points;
@@ -143,6 +175,7 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			}
 
 			update((u) => ({ ...u, weapons: { ...state.weapons, [weapon]: weaponState } }));
+			setPickupState();
 		},
 		update: function (input: PlayerControls) {
 			const moves: Position2D[] = [];
@@ -172,6 +205,8 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			if (!CurrentLevel.checkCollisionWithWorld(localTarget, false)) {
 				state.position.x = +toMove.x;
 				state.position.z = +toMove.z;
+			} else {
+				AudioEngine.playEffect("blocked");
 			}
 
 			update((u) => {
@@ -230,19 +265,6 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 		async attack(e: Enemy) {
 			e.setState("hurt");
 			let damage: number | undefined = undefined;
-			switch (state.weapons.active) {
-				case "knife":
-					damage = rand.nextInt(0, 16);
-					break;
-				case "pistol":
-					damage = rand.nextInt(0, 18);
-					break;
-				case "smg":
-					damage = rand.nextInt(0, 21);
-					break;
-				default:
-					break;
-			}
 			const enemyPosition = e.getLocalPosition();
 			const ourPosition = getLocalPositionFromRealPosition(state.position);
 			const distance = getDistanceFromPoints(ourPosition, enemyPosition);
@@ -254,14 +276,19 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 				rand2,
 				distance
 			});
-			if (4 < distance && rand1 / 12 < distance) {
-				damage = 0;
-			} else if (distance < 2) {
-				damage = rand2 / 4;
-				console.log("DISTANCE < 2", damage);
-			} else if (distance >= 2) {
-				damage = rand2 / 6;
-				console.log("DISTANCE >= 2", damage);
+			if (state.weapons.active !== "knife") {
+				if (distance >= 4 && rand1 / 12 >= distance) {
+					return;
+				} else if (distance < 2) {
+					damage = rand2 / 4;
+					console.log("DISTANCE < 2", damage);
+				} else if (distance >= 2) {
+					damage = rand2 / 6;
+				} else {
+					return;
+				}
+			} else {
+				damage = 10;
 			}
 			if (e) await e?.takeDamage(damage);
 		}
@@ -274,6 +301,15 @@ const playerScore = derived(PlayerState, (state) => state.score);
 const playerPosition = derived(PlayerState, (state) => state.position);
 const playerAmmo = derived(PlayerState, (state) => state.weapons.ammo);
 const playerLives = derived(PlayerState, (state) => state.lives);
+const playerState = derived(PlayerState, (state) => state.state);
 
-export { playerRotation, playerHealth, playerScore, playerPosition, playerAmmo, playerLives };
+export {
+	playerRotation,
+	playerHealth,
+	playerScore,
+	playerPosition,
+	playerState,
+	playerAmmo,
+	playerLives
+};
 export { _playerState as AIBaseStore };

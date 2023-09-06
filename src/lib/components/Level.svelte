@@ -23,212 +23,368 @@
 		SS: Enemy
 	} as const;
 
+	export function getTileRegion(playerPosition: Position2D, regions: Region[]): number | undefined {
+		for (let i = 0; i < regions.length; i++) {
+			const region = regions[i];
+
+			for (const portal of region.portals) {
+				const { position } = portal;
+
+				// Check if the player's position matches the portal's position
+				if (position.x === playerPosition.x && position.z === playerPosition.z) {
+					return i; // Return the region index
+				}
+			}
+		}
+
+		return undefined; // Player is not in any region
+	}
+	export function getTileRegions(playerPosition: Position2D, regions: Region[]): number[] {
+		const { x, z } = playerPosition;
+		const tileRegions: number[] = [];
+
+		for (let i = 0; i < regions.length; i++) {
+			const region = regions[i];
+			const { portals, connectedRegions } = region;
+
+			for (let j = 0; j < portals.length; j++) {
+				const portal = portals[j];
+				const { position, connectedRegion } = portal;
+
+				if (position.x === x && position.z === z) {
+					tileRegions.push(i);
+					tileRegions.push(...connectedRegions);
+					break;
+				}
+			}
+		}
+
+		return Array.from(new Set(tileRegions));
+	}
+
+	export function renderVisibleTiles(
+		visibleTiles: Position2D[],
+		models: Model[],
+		callback: (position: Model, state: boolean, isLast: boolean) => void
+	): void {
+		const tilePositions = visibleTiles;
+		if (visibleTiles.length === 0) return;
+		const modelsLength = models.length - 1;
+		for (let index = 0; index < modelsLength; index++) {
+			const model = models[index];
+			if (!model) continue;
+			const position = model?.getLocalPosition?.();
+			if (!position) continue;
+
+			if (
+				tilePositions.some(
+					(tilePos) => tilePos && tilePos?.x === position?.x && tilePos?.z === position?.z
+				)
+			) {
+				callback(model, true, index === modelsLength - 1);
+			} else {
+				callback(model, false, index === modelsLength - 1);
+			}
+		}
+	}
 	export let CurrentLevel = _levelStore();
-	export function createExtendedWorld(world: World | ExtendedEntity[][]): ExtendedEntity[][] {
-		return world.map((row) => {
-			return row.map((entity) => {
-				if (entity.surfaces !== null) {
+	export function processWorld(world: EntityV2[][]): ExtendedEntityV2[][] {
+		return world.map((row, rowIndex) => {
+			return row.map((entity, colIndex) => {
+				if (entity.component === "Wall" && entity.texture) {
 					const surfaces: Record<WallFace, Surface> = {
-						front: entity.surfaces,
-						left: entity.surfaces,
-						back: entity.surfaces,
-						right: entity.surfaces
+						front: entity.texture as Texture,
+						left: entity.texture as Texture,
+						back: entity.texture as Texture,
+						right: entity.texture as Texture
 					};
 
-					return { ...entity, surfaces } as ExtendedEntity;
+					const extendedEntity = { ...entity, surfaces } as ExtendedEntityV2;
+
+					if (entity.pushwall) return extendedEntity;
+
+					// Check adjacent tiles
+					const adjacentPositions = [
+						{ row: rowIndex - 1, col: colIndex, face: "front" as WallFace },
+						{ row: rowIndex + 1, col: colIndex, face: "back" as WallFace },
+						{ row: rowIndex, col: colIndex - 1, face: "left" as WallFace },
+						{ row: rowIndex, col: colIndex + 1, face: "right" as WallFace }
+					];
+
+					for (const { row: adjRow, col: adjCol, face } of adjacentPositions) {
+						const target = world[adjRow]?.[adjCol] as ExtendedEntityV2;
+						if (
+							adjRow >= 0 &&
+							adjRow < world.length &&
+							adjCol >= 0 &&
+							adjCol < world[0].length &&
+							target.component === "Wall" &&
+							target.surfaces !== null &&
+							target.pushwall !== true
+						) {
+							if (extendedEntity.surfaces === null)
+								extendedEntity.surfaces = {} as Record<WallFace, Texture>;
+							// Set connected surfaces to null
+							((extendedEntity as ExtendedEntityV2).surfaces as Record<WallFace, Texture>)[face] =
+								null;
+						}
+					}
+
+					return extendedEntity;
 				}
 
-				return { ...entity, surfaces: null } as ExtendedEntity;
+				return { ...entity, surfaces: null } as ExtendedEntityV2;
 			});
 		});
 	}
 
-	export function removeConnectedSurfaces(world: ExtendedEntity[][]): void {
-		const numRows = world.length;
-		const numCols = world[0].length;
-		console.log("RCS: ", structuredClone(world));
-		for (let row = 0; row < numRows; row++) {
-			for (let col = 0; col < numCols; col++) {
-				const currentEntity = world[row][col];
-
-				if (
-					currentEntity.surfaces === null ||
-					currentEntity.model ||
-					currentEntity.pushwall ||
-					currentEntity.rotation
-				)
-					continue;
-
-				// Check adjacent tiles
-				const adjacentPositions = [
-					{ row: row - 1, col, face: "front" as WallFace },
-					{ row: row + 1, col, face: "back" as WallFace },
-					{ row, col: col - 1, face: "left" as WallFace },
-					{ row, col: col + 1, face: "right" as WallFace }
-				];
-
-				for (const { row: adjRow, col: adjCol, face } of adjacentPositions) {
-					if (
-						adjRow >= 0 &&
-						adjRow < numRows &&
-						adjCol >= 0 &&
-						adjCol < numCols &&
-						world[adjRow][adjCol].surfaces !== null &&
-						world[adjRow][adjCol].pushwall !== true
-					) {
-						// Set connected surfaces to null
-						currentEntity.surfaces[face] = null;
-					}
-				}
-			}
-		}
-	}
-
-	export type WorldState = { spawn: { x: number; z: number }; data: ExtendedEntity[][] };
+	export type WorldState = {
+		spawn: { x: number; z: number; rotation: 0 | 270 | 180 | 90 };
+		data: ExtendedEntityV2[][];
+	};
 
 	function _levelStore() {
 		let TILES: WorldState["data"] = [];
+		let PORTAL: Region[] = [];
 		const { subscribe, set, update } = writable<WorldState["data"]>([]);
 
 		const checkCollisionWithWorld = (
 			position: Position | Position2D,
-			isBot: boolean | null = false,
-			skipWalls = false
+			isBot: boolean | null = false
 		) => {
-			const {
-				pushwall = false,
-				secret = false,
-				model,
-				position: wallPosition,
-				surfaces,
-				rotation
-			} = TILES[position!.z][position!.x];
-
-			if (model?.texture && noClipObjectIds.includes(model?.texture)) {
-				if (isBot === null || isBot === true) return false;
-				handleNoClipObject(model, position);
+			const { component, surfaces, texture, attributes, blocking } =
+				TILES[position!.z][position!.x];
+			if (!component && (!texture || !surfaces)) return null;
+			if (attributes?.collectable) {
+				return handleNoClipObject(TILES[position.z][position.x], position, isBot);
 				return false;
-			} else if (model?.texture && model.component === "Object") return true;
+			}
 
-			const doorCheck = isDoor(
-				{ pushwall, secret, model, position: wallPosition, rotation, surfaces },
-				position
-			);
-			if (doorCheck) return doorCheck;
-			if (
-				!skipWalls &&
-				isWall(
-					{ position: wallPosition, secret, rotation, pushwall, model, surfaces },
-					wallPosition
-				)
-			)
-				return true;
+			if (attributes?.state === "open") return false;
 
-			if (isBot && isEnemy(model)) return true;
-			else if (isEnemy(model)) return false;
-
-			return (
-				surfaces &&
-				(pushwall
-					? secret && position.x === wallPosition?.x && position.z === wallPosition?.z
-					: surfaces && Object.values(surfaces).some(hasValidTexture))
-			);
-		};
-
-		const isDoor = (
-			entity: { [K in keyof ExtendedEntity]: ExtendedEntity[K] },
-			position: Position2D
-		) => {
-			return (
-				(entity.pushwall === true && entity.secret === true) ||
-				("model" in entity &&
-					typeof entity.model === "object" &&
-					"component" in entity.model &&
-					entity.model.component === "Door" &&
-					entity.position?.x === position.x &&
-					entity.position?.z === position.z)
-			);
+			return component === "Wall" || attributes?.state === "closed" || blocking === true;
 		};
 
 		const handleNoClipObject = (
-			model: NonNullable<ExtendedEntity["model"]>,
-			position: Position2D
+			model: NonNullable<ExtendedEntityV2>,
+			position: Position2D,
+			isBot: boolean | null = false
 		) => {
+			if (isBot || isBot === null) return false;
 			if (!ArrayUtils.includesUnknown(ItemPickupIds as never, model.texture)) return;
-
 			if (model.texture === ItemPickups.Smg) {
 				PlayerState.giveWeapon("smg");
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 			if (model.texture === ItemPickups.Ammo) {
 				PlayerState.giveAmmo("pistol", 4);
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 
 			if (model.texture! in TreasurePickupPointMap) {
 				PlayerState.givePoints(
 					TreasurePickupPointMap[model.texture! as keyof typeof TreasurePickupPointMap]
 				);
+				PlayerState.setPickupState();
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 			if (model.texture === ItemPickups.DogFood) {
 				PlayerState.giveHealth(4);
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 
 			if (model.texture === ItemPickups.Food) {
 				PlayerState.giveHealth(10);
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 			if (model.texture === ItemPickups.Medkit) {
 				PlayerState.giveHealth(25);
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
+			} else {
+				return true;
 			}
-
-			model.texture = undefined;
-			updateTileAt(position.z, position.x, { rotation: undefined, surfaces: null });
 		};
 
-		const isWall = (
-			{
-				secret,
-				position: wallPosition,
-				pushwall,
-				surfaces,
-				model
-			}: { [K in keyof ExtendedEntity]: ExtendedEntity[K] },
-			position: ExtendedEntity["position"]
-		) => {
-			return (
-				position &&
-				!model &&
-				wallPosition &&
-				wallPosition.x === position.x &&
-				wallPosition.z === position.z &&
-				surfaces &&
-				!secret
-			);
-		};
-
-		const isEnemy = (model: ExtendedEntity["model"]) => {
-			return model?.component === "Guard" || model?.component === "Dog";
-		};
-
-		const hasValidTexture = (surfaces: Surface) => {
-			return compare(surfaces, (t) => isValidTexture(t) !== false);
-		};
-
-		const updateTileAt = (row: number, column: number, data: ExtendedEntity) => {
+		const updateTileAt = (row: number, column: number, data: Partial<ExtendedEntityV2>) => {
 			update((u) => {
 				u = [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
+
 				return u;
 			});
 
 			TILES[row][column] = data;
+			// queueMicrotask(() => {
+			// tree = buildTree(TILES.flat())!;
+			// });
 		};
 		return {
 			subscribe,
 			get() {
 				return TILES;
 			},
-			set(level: typeof TILES) {
-				TILES = [...level];
+			set() {
+				const baseTile = (model: Partial<EntityV2>) =>
+					({
+						rotation: null,
+						texture: null,
+						pushwall: false,
+						blocking: false,
+						position: {},
+						secret: false,
+						attributes: null,
+						...model
+					} as EntityV2);
+
+				const BASE_TILE_MAP: EntityV2[][] = [...Array(64).keys()].map(() =>
+					[...Array(64).keys()].map(() => baseTile({}))
+				);
+				const BASE_PROP_MAP: EntityV2[][] = [...Array(64).keys()].map(() =>
+					[...Array(64).keys()].map(() => baseTile({}))
+				);
+				for (let z = 0; z < 64; z++) {
+					for (let x = 0; x < 64; x++) {
+						let m0 = gameData.getMap0(x, z)!;
+						if (m0 <= 63) {
+							// wall
+							BASE_TILE_MAP[z][x] = baseTile({
+								blocking: true,
+								position: { z, x },
+								texture: m0 * 2 - 1,
+								component: "Wall"
+							});
+							gameData.plane2[z][x] = true;
+						} else if (89 <= m0 && m0 <= 103) {
+							// door
+							BASE_TILE_MAP[z][x] = baseTile({
+								component: "Door",
+								position: { z, x },
+								texture: m0 + 9,
+								attributes: { state: "closed" },
+								blocking: true
+							});
+							gameData.plane2[z][x] = true;
+						}
+						let m1 = gameData.getMap1(x, z);
+						if (19 <= m1 && m1 <= 22) {
+							// player starting position
+							PlayerState.modify((player) => {
+								player.position.x = x - 0.5;
+
+								player.position.z = z - 0.5;
+								console.log(player.position);
+								player.position = { ...getRealPositionFromLocalPosition(player.position), y: 0 };
+								return player;
+							});
+							// TODO: Player spawn direction
+							PlayerState.modify((player) => {
+								if (m1 === 19) {
+									player.rotation.y = 180;
+								} else if (m1 === 20) {
+									player.rotation.y = 270;
+								} else if (m1 === 21) {
+									player.rotation.y = 0;
+								} else if (m1 === 22) {
+									player.rotation.y = 90;
+								}
+								return player;
+							});
+						} else if (23 <= m1 && m1 <= 70) {
+							// props
+							// TODO: Map these correctly to the correct plane
+							let collectible = false;
+							if ([29, 43, 44, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56].indexOf(m1) >= 0) {
+								// collectible
+								collectible = true;
+								if (52 <= m1 && m1 <= 56) {
+									LevelStatManager.addTotalKey("totalTreasure");
+								}
+							}
+							if (
+								[
+									24, 25, 26, 28, 30, 31, 33, 34, 35, 36, 39, 40, 41, 45, 58, 59, 60, 62, 63, 68, 69
+								].indexOf(m1!) >= 0
+							) {
+								// // TODO: blocking prop
+								BASE_TILE_MAP[z][x] = baseTile({
+									texture: 115 + m1! - 21,
+									position: { z, x },
+									component: "Object",
+									attributes: { collectable: !!collectible },
+									blocking: true
+								});
+								gameData.plane2[z][x] = true;
+							} else {
+								BASE_TILE_MAP[z][x] = baseTile({
+									texture: 115 + m1! - 21,
+									position: { z, x },
+									component: "Object",
+									attributes: { collectable: !!collectible },
+									blocking: false
+								});
+							}
+						} else if (m1 === 98) {
+							// pushwall
+							// score.totalSecrets += 1;
+							BASE_TILE_MAP[z][x] = {
+								...BASE_TILE_MAP[z][x],
+								position: { z, x },
+								blocking: true,
+								component: "Wall",
+								pushwall: true
+							};
+							console.log("PUSHWALL!!!!", BASE_TILE_MAP[z][x]);
+						} else if (m1 === 124) {
+							// dead guard
+							BASE_TILE_MAP[z][x] = {
+								...BASE_TILE_MAP[z][x],
+								blocking: false,
+								position: { z, x },
+								texture: 165
+							};
+						} else if (m1 >= 108) {
+							const guardEnemyRange = (108 <= m1 && m1 < 116) || (144 <= m1 && m1 < 152);
+							const ssEnemyRange = (126 <= m1 && m1 < 134) || (162 <= m1 && m1 < 170);
+							const dogEnemyRange = (134 <= m1 && m1 < 142) || (170 <= m1 && m1 < 178);
+							if (guardEnemyRange) {
+								const baseNumber = guardEnemyRange ? 108 : 144;
+								BASE_TILE_MAP[z][x] = {
+									...BASE_TILE_MAP[z][x],
+									blocking: false,
+									component: "Guard"
+								};
+								//  (m1 - baseNumber) % 4);
+							} else if (ssEnemyRange) {
+								const baseNumber = ssEnemyRange ? 126 : 162;
+								BASE_TILE_MAP[z][x] = { ...BASE_TILE_MAP[z][x], blocking: false, component: "SS" };
+								// things.push(new SSEnemy(x, y, (m1 - baseNumber) % 4));
+							} else if (dogEnemyRange) {
+								const baseNumber = dogEnemyRange ? 134 : 170;
+								BASE_TILE_MAP[z][x] = { ...BASE_TILE_MAP[z][x], blocking: false, component: "Dog" };
+								// things.push(new DogEnemy(x, y, (m1 - baseNumber) % 4));
+							}
+						}
+					}
+				}
+				const extendedMap = processWorld(BASE_TILE_MAP);
+
+				TILES = extendedMap;
+				PORTAL = Array.from(preprocessLevel(TILES));
+				console.log(PORTAL);
 				set(TILES);
 			},
+			getPortal: () => PORTAL,
 			updateTileAt,
 			update: (updateFn: Updater<typeof TILES>) => {
 				update((v) => {
@@ -244,47 +400,57 @@
 
 <script lang="ts">
 	import { frameLoop, type Task, type TaskCallback } from "$lib/utils/raf";
-	import { getDistanceFromPoints, getLocalPositionFromRealPosition } from "$lib/utils/position";
-	import { ArrayUtils, isValidTexture } from "../utils/validation";
+	import {
+		getDistanceFromPoints,
+		getLocalPositionFromRealPosition,
+		getRealPositionFromLocalPosition
+	} from "$lib/utils/position";
+	import { ArrayUtils } from "../utils/validation";
 	import { getContext, onMount } from "svelte";
-	import { playerPosition, PlayerState } from "$lib/stores/player";
+	import { PlayerState } from "$lib/stores/player";
 	import { writable, type Updater } from "svelte/store";
 
 	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
-	import Guard from "$lib/components/Guard/Guard.svelte";
 	import Enemy from "$lib/components/Enemy.svelte";
-	import Player, {
-		testLineOfSight,
-		testLineOfSight2,
-		testLineOfSightSkipWalls
-	} from "$lib/components/Player.svelte";
+	import { buildTree, castRays, type TreeNode } from "$lib/components/Player.svelte";
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { ExtendedEntity, Entity, Model, Surface, WallFace, World } from "../types/core";
-	import { compare } from "../utils/compare";
-	import { isVisibleToPlayer } from "../utils/angle";
-	import { GameObjects } from "$lib/utils/manager";
-	import {
-		ItemPickupIds,
-		ItemPickups,
-		TreasurePickupPointMap,
-		noClipObjectIds
-	} from "$lib/utils/engine/objects";
-	import Dog from "./Dog/Dog.svelte";
+	import type {
+		EntityV2,
+		ExtendedEntityV2,
+		Surface,
+		Texture,
+		WallFace,
+		World
+	} from "../types/core";
+	import { GameObjects, type Model } from "$lib/utils/manager";
+	import { ItemPickupIds, ItemPickups, TreasurePickupPointMap } from "$lib/utils/engine/objects";
 	import Pushwall from "./Pushwall.svelte";
 	import Elevator from "./Elevator.svelte";
 	import { ctxKey, type WSContext } from "../../routes/key";
+	import { asap } from "$lib/utils/levelManager";
+	import { gameData } from "$lib/helpers/maps";
+	import { LevelStatManager } from "$lib/stores/stats";
+	import { normalizeAngle } from "$lib/utils/angle";
+	import {
+		preprocessLevel,
+		getAdjacentRegions,
+		getCurrentRegion,
+		getVisiblePortals,
+		isPositionPortal,
+		type Region
+	} from "./portal";
 
 	export let mode: "editor" | "generating" | "play" = "play";
 
 	export let worldRef: HTMLElement;
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
-	let gameLoop: Task;
-	let start: number;
 
+	let start: number;
+	let gameLoop;
 	const INTERVAL = 1000 / 60;
 
 	const update: TaskCallback = (now: number, scheduler) => {
@@ -294,107 +460,124 @@
 		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
 
 		if ($isLoadingNextLevel) return true;
-		const hasWillChange = worldRef.style.willChange;
-		if (!hasWillChange) worldRef.style.willChange = "transform";
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
-		if (elapsed > 320) {
+		if (elapsed > 90) {
 			start = now % INTERVAL;
 			const playerLocal = getLocalPositionFromRealPosition({ x, y, z });
-			for (const obj of GameObjects) {
-				if (!obj) {
-					continue;
-				}
-				// console.log(obj);
-				const pos = obj.getPosition?.();
-				// console.log(pos);
-				if (!pos) continue;
-
-				const visible = testLineOfSightSkipWalls($CurrentLevel, playerLocal, obj);
-				const distance = getDistanceFromPoints(
-					{ x: pos.x - 50, z: pos.z },
-					{ x: x, y: y, z: z } /* playerPosition */
+			const { models, ...rest } = $GameObjects;
+			if (isPositionPortal(CurrentLevel.getPortal(), playerLocal)) {
+				const regions = getTileRegions(
+					getLocalPositionFromRealPosition({ x, z }),
+					CurrentLevel.getPortal()
 				);
+				const visibleTiles = regions.flatMap((regionIndex) => {
+					const region = CurrentLevel.getPortal()[regionIndex];
+					return [
+						region.tiles,
+						...region.connectedRegions.map((v) =>
+							CurrentLevel.getPortal()[v].portals.map((p) => p.position)
+						),
+						region.portals.map(({ position }) => position)
+					].flat();
+				});
+				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
+					const visibility = position.setVisibility(state);
+					scheduler(() => visibility());
+				});
 
-				const isVisibleAlready = obj.getVisibility();
-
-				if (
-					(isVisibleAlready !== true && visible === true) ||
-					((obj.type === "wall" || obj.type === "door") &&
-						visible === true &&
-						isVisibleAlready !== true &&
-						distance < 1568)
-				) {
-					const setVisibility = obj.setVisibility(true);
-					scheduler(() => setVisibility());
-					continue;
-				} else if (visible === false && isVisibleAlready !== false && distance > 2048) {
-					const setVisibility = obj.setVisibility(false);
-					scheduler(() => setVisibility());
-				}
+				// renderVisibleTiles(
+				// visibleTiles,
+				// [...Object.values($GameObjects).flat()],
+				// (position, state) => {
+				// 	const visibility = position.setVisibility(state);
+				// 	scheduler(() => visibility());
+				// }
+				// );
 			}
-			if (hasWillChange) worldRef.style.willChange = "";
+			// castRays(
+			// 	getLocalPositionFromRealPosition({ x, z }),
+			// 	normalizeAngle(y),
+			// 	GameObjects[Symbol.iterator](),
+			// 	360,
+			// 	(model, state) => {
+			// 		scheduler(model.setVisibility(state));
+			// 	}
+			// );
+			// // }
 		}
+		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
 		return true;
 	};
 	onMount(() => {
 		queueMicrotask(() => {
 			gameLoop = frameLoop(update);
 		});
+		setTimeout(() => {
+			const playerLocal = getLocalPositionFromRealPosition($PlayerState.position);
+			const regions = getTileRegions(playerLocal, CurrentLevel.getPortal());
+			const visibleTiles = regions.flatMap((regionIndex) => {
+				const region = CurrentLevel.getPortal()[regionIndex];
+				return [region.tiles, region.portals.map(({ position }) => position)].flat();
+			});
+			console.log(regions, visibleTiles, playerLocal, CurrentLevel.getPortal());
+			renderVisibleTiles(visibleTiles, [...GameObjects], (model, state) => {
+				if (model.type === "door") {
+					// model.toggleAction();
+					model.toggleAction();
+				}
+			});
+		}, 2000);
 		return () => {
 			GameObjects.reset();
 			gameLoop.abort();
 		};
 	});
-	$: console.log($CurrentLevel);
+	$: console.log($GameObjects, $CurrentLevel);
 </script>
-
-s
 
 {#if mode !== "generating"}
 	{#each $CurrentLevel as group, section}
 		{#each group as item, offset}
-			{#if item.model?.component}
-				{#if item.model.component === "Guard" || item.model.component === "Dog" || item.model.component === "SS"}
-					<svelte:component
-						this={MODEL_MAP[item.model.component]}
-						{offset}
-						{section}
-						bind:this={$GameObjects.enemies[$GameObjects.enemies.length]}
-						{item}
-					/>
-				{:else if item.model.component === "Door"}
-					<svelte:component
-						this={MODEL_MAP[item.model.component]}
-						{offset}
-						{section}
-						bind:this={$GameObjects.doors[$GameObjects.doors.length]}
-						{item}
-					/>
-				{:else if item.model.component === "Elevator"}
-					<svelte:component
-						this={MODEL_MAP[item.model.component]}
-						{offset}
-						{section}
-						bind:this={$GameObjects.elevators[$GameObjects.elevators.length]}
-						{item}
-					/>
-				{:else}
-					<svelte:component
-						this={MODEL_MAP[item.model.component]}
-						{offset}
-						{section}
-						bind:this={$GameObjects.models[$GameObjects.models.length]}
-						{item}
-					/>
-				{/if}
+			{#if item.component === "Guard" || item.component === "Dog" || item.component === "SS"}
+				<svelte:component
+					this={MODEL_MAP[item.component]}
+					{offset}
+					{section}
+					bind:this={$GameObjects.enemies[$GameObjects.enemies.length]}
+					{item}
+				/>
+			{:else if item.component === "Door"}
+				<svelte:component
+					this={MODEL_MAP[item.component]}
+					{offset}
+					{section}
+					bind:this={$GameObjects.doors[$GameObjects.doors.length]}
+					{item}
+				/>
+			{:else if item.component === "Elevator"}
+				<svelte:component
+					this={MODEL_MAP[item.component]}
+					{offset}
+					{section}
+					bind:this={$GameObjects.elevators[$GameObjects.elevators.length]}
+					{item}
+				/>
+			{:else if item.component === "Object"}
+				<svelte:component
+					this={MODEL_MAP[item.component]}
+					{offset}
+					{section}
+					bind:this={$GameObjects.models[$GameObjects.models.length]}
+					{item}
+				/>
 			{:else if item.pushwall}
 				<Pushwall
-					bind:this={$GameObjects.doors[$GameObjects.doors.length]}
+					bind:this={$GameObjects.pushwalls[$GameObjects.pushwalls.length]}
 					{item}
 					{section}
 					{offset}
 				/>
-			{:else if item.surfaces}
+			{:else if item.component === "Wall" && !!item.texture}
 				<Wall
 					bind:this={$GameObjects.walls[$GameObjects.walls.length]}
 					{item}
