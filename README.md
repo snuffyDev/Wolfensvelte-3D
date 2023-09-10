@@ -6,12 +6,6 @@ No, there's no WebGL, or canvas.
 
 Live Site: https://wolfensvelte-3d.vercel.app/
 
-### Remove at a later time
-
-> I added this to prove I spoke to Kev
-> ![image](https://github.com/snuffyDev/Wolfensvelte-3D/assets/72365477/bbe2b2b1-1fe2-488b-b5f3-b579780ddd8c)
-
-
 ## Screenshots
 
 <div align="center">
