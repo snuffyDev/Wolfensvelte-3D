@@ -1,11 +1,3 @@
-<script
-	context="module"
-	lang="ts"
->
-	import * as Maps from "$lib/utils/map";
-	const levelMusic = import.meta.glob("$lib/music/*", { as: "url" });
-</script>
-
 <script lang="ts">
 	import Ui from "$lib/components/UI.svelte";
 	import { getContext, onMount, tick } from "svelte";
@@ -32,34 +24,33 @@
 	import type { Position, Position2D } from "$lib/types/position";
 	import Joystick from "$lib/components/Controls/Joystick.svelte";
 	import Level, { CurrentLevel, type WorldState } from "$lib/components/Level.svelte";
-	import { asap } from "$lib/utils/levelManager";
+	import { asap } from "$lib/utils/asap";
 	import { gameData } from "$lib/helpers/maps";
+	import { Soundtrack } from "$lib/music";
 	export let data;
 
 	$: ({ page } = data);
 	const isPlaying = writable(false);
 
 	let menuMusicPlayer: HTMLAudioElement;
-	let get_psyched_promise: Promise<void>;
+	let get_psyched_promise: Promise<void> = Promise.resolve();
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
 	let spawn: Partial<WorldState["spawn"]> = {};
 
 	let initialized = false;
-	const showSplashscreen = async () => {
+	async function showSplashscreen() {
 		// $CurrentLevel = [];
 		// if (!initialized) initialized = true;
 		// if (initialized) return;
-		if (MapHandler.currentMapName !== page) {
-			const promise = await goto(MapHandler.currentMapName);
-		}
+
 		console.log($MapHandler);
 
 		return (get_psyched_promise = new Promise((r) => {
 			setTimeout(r, 2500);
 		}));
-	};
+	}
 
 	const handlePlayerDeath = async (death = true) => {
 		showSplashscreen();
@@ -97,28 +88,21 @@
 			rotation: { y: 0, x: 0, z: 0 },
 			position: { x: 0, z: 0, y: 0 }
 		});
-		gameData.loadLevel(+page.slice(-1) - 1);
 		CurrentLevel.set();
 		console.log(page);
-
-		// Asynchronously load here to ensure the map is ready to go
 
 		const { rotation, ...rest } = spawn;
 	};
 	$: {
 		if ($playerHealth === 0) {
-			clear_loops();
 			GameObjects.reset();
-			LevelHandler.reset(); // tick().then(() => {
+			LevelHandler.reset();
 			isLoadingNextLevel.set(true);
 			setTimeout(() => {
 				handlePlayerDeath();
 			}, 4500);
-			// onMounted();
-			// });
 		}
 		if ($LevelHandler.isComplete === true) {
-			// asap(() => {
 			GameObjects.reset();
 			isLoadingNextLevel.set(true);
 			MapHandler.nextMap();
@@ -128,24 +112,15 @@
 					showSplashscreen();
 				});
 			}, 4000);
-			// });
 		}
 	}
 	$: page, onMounted();
 	onMount(async () => {
-		const remapped = Object.fromEntries(
-			await Promise.all(
-				Object.entries(levelMusic).map(async ([k, v]) => [
-					k.slice(k.lastIndexOf("/") + 1, k.lastIndexOf(".")),
-					new URL(await v(), import.meta.url).toString()
-				])
-			)
-		);
-		console.log(remapped, page, remapped[page]);
-		AudioEngine.loadAudioFile(page, remapped[page], true, true);
+		console.log({ page });
+		AudioEngine.loadAudioFile(page, Soundtrack[page], true, true);
 		isLoadingNextLevel.set(false);
-		MapHandler.changeMap(page);
 		AudioEngine.play(page, true);
+		get_psyched_promise = showSplashscreen();
 	});
 </script>
 
@@ -260,6 +235,8 @@
 			inset: 0;
 			width: 100vw;
 			height: 100vh;
+			// display: contents;
+			pointer-events: none;
 			z-index: 5;
 			transition: background-color ease-out 100ms;
 		}

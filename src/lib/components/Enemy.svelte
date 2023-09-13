@@ -53,6 +53,7 @@
 	import { ctxKey, type WSContext } from "../../routes/key";
 	import { ENEMY_INIT } from "$lib/core/ai";
 	import { findPath } from "$lib/helpers/ai";
+	import { LevelStatManager } from "$lib/stores/stats";
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
@@ -78,6 +79,7 @@
 	let isVisible = false;
 	let hasTakenDamage = false;
 	let willChange: string | false = false;
+	let canPatrol = Math.random() > 0.3;
 	export const setState = state.setState;
 
 	export const getPosition = () => $tween;
@@ -99,7 +101,6 @@
 		busy = false;
 		setTimeout(() => {
 			hasTakenDamage = false;
-			// state.setState("idle");
 		}, 125);
 		if ($state.health <= 0) {
 			tween.cancel();
@@ -113,6 +114,7 @@
 			}
 
 			state.setState("dead");
+			LevelStatManager.add('kills');
 		}
 	};
 	let previousAnimationState: typeof $state.state;
@@ -220,24 +222,23 @@
 					state.setState("idle");
 				}
 			} else {
-				if (!busy && $state.state === "idle") {
+				if (canPatrol && !busy && $state.state === "idle") {
 					const timeSinceLastPatrol = now - startPatrolTime;
 					// previousAnimationState = "idle";
 
-					// console.log("BUSY!");
-
-					if (timeSinceLastPatrol > Math.max(16000, (rand.nextByte() * 512) / 4)) {
+					if (timeSinceLastPatrol > Math.min(3200, Math.max(100, (rand.nextByte() * 512) / 4))) {
 						startPatrolTime = now;
 						busy = true;
 						state.setState("walk");
 						previousAnimationState = "idle";
+						console.log("WALKING!");
 
-						const directions = [...Array(5).keys()].map(() => WALL_FACES[~~rand.nextInt(0, 3)]);
+						const directions = [...Array(4).keys()].map((i) => WALL_FACES[rand.nextInt(0, 8) % 4]);
 						const res = [[true, getLocalPosition()] as const];
 						for (let idx = 0; idx < directions.length; idx++) {
 							const dir = directions[idx];
 							if (item.component === "Guard") {
-								const [canMove, pos] = findEmptyTile(dir, ~~rand.nextInt(1, 7));
+								const [canMove, pos] = findEmptyTile(dir, ~~rand.nextInt(1, 8));
 								if (canMove) {
 									res.push([canMove, pos] as const);
 								}
@@ -255,7 +256,7 @@
 						});
 
 						await Promise.race([
-							new Promise((r) => setTimeout(r, 1000)),
+							new Promise((r) => setTimeout(r, 5000)),
 							state.moveTo(getRealPositionFromLocalPosition(goToPosition))
 						]);
 						busy = false;

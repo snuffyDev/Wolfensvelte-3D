@@ -1,8 +1,11 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { ExtendedEntity } from "../types/core";
+	import type { ExtendedEntityV2 } from "../types/core";
 	import {
 		getFacingDirection,
 		getLocalPositionFromRealPosition,
@@ -14,7 +17,7 @@
 	import { PlayerState } from "$lib/stores/player";
 	import { GameObjects } from "$lib/utils/manager";
 
-	export let item: ExtendedEntity;
+	export let item: ExtendedEntityV2;
 	export let offset: number;
 	export let section: number;
 
@@ -40,7 +43,24 @@
 		const oldPosition = $position;
 		const direction = getFacingDirection($PlayerState.rotation.y);
 		let toPosition: Position2D = getLocalPosition();
-
+		const regions = getTileRegions(
+			getLocalPositionFromRealPosition(oldPosition),
+			CurrentLevel.getPortal()
+		);
+		const visibleTiles = regions.flatMap((regionIndex) => {
+			const region = CurrentLevel.getPortal()[regionIndex];
+			return [
+				region.tiles,
+				...region.connectedRegions.map((v) =>
+					CurrentLevel.getPortal()[v].portals.map((p) => p.position)
+				),
+				region.portals.map(({ position }) => position)
+			].flat();
+		});
+		renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
+			const visibility = position.setVisibility(state);
+			queueMicrotask(() => visibility());
+		});
 		do {
 			let nextMove: Position2D = {} as Position2D;
 
@@ -77,6 +97,7 @@
 			position: currentState.position,
 			surfaces: currentState.surfaces,
 			rotation: undefined,
+			blocking: true,
 			secret: false,
 			pushwall: true
 		});
@@ -85,29 +106,11 @@
 			surfaces: null,
 			rotation: undefined,
 			secret: false,
-			pushwall: true
+			pushwall: false
 		});
 
 		queueMicrotask(() => {
 			state = "open";
-			const regions = getTileRegions(
-				getLocalPositionFromRealPosition(oldPosition),
-				CurrentLevel.getPortal()
-			);
-			const visibleTiles = regions.flatMap((regionIndex) => {
-				const region = CurrentLevel.getPortal()[regionIndex];
-				return [
-					region.tiles,
-					...region.connectedRegions.map((v) =>
-						CurrentLevel.getPortal()[v].portals.map((p) => p.position)
-					),
-					region.portals.map(({ position }) => position)
-				].flat();
-			});
-			renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
-				const visibility = position.setVisibility(state);
-				queueMicrotask(() => visibility());
-			});
 		});
 	};
 	export const type = "pushwall";
@@ -141,5 +144,6 @@
 		will-change: top;
 		backface-visibility: hidden;
 		transform-style: preserve-3d;
+		backface-visibility: visible !important;
 	}
 </style>

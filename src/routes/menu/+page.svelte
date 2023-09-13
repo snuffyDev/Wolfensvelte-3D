@@ -68,7 +68,7 @@
 				<!-- -->
 				<button
 					on:click|once={() => {
-						goto("/E1M1");
+						// goto("/E1M1");
 					}}
 					><span>g</span>
 					<span>New Game</span></button

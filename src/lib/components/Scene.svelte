@@ -28,7 +28,9 @@
 					if (entry.oldValue === firstValue) {
 						worldRef = document.querySelector("#world");
 						const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
-						if (worldRef) worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+						if (worldRef) {
+							worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+						}
 					}
 				}
 			}

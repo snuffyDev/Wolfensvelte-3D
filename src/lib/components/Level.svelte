@@ -53,7 +53,8 @@
 
 				if (position.x === x && position.z === z) {
 					tileRegions.push(i);
-					tileRegions.push(...connectedRegions);
+					tileRegions.push(...connectedRegions, connectedRegion);
+
 					break;
 				}
 			}
@@ -99,9 +100,9 @@
 						right: entity.texture as Texture
 					};
 
-					const extendedEntity = { ...entity, surfaces } as ExtendedEntityV2;
+					const currentEntity = { ...entity, surfaces } as ExtendedEntityV2;
 
-					if (entity.pushwall) return extendedEntity;
+					if (entity.pushwall) return currentEntity;
 
 					// Check adjacent tiles
 					const adjacentPositions = [
@@ -112,25 +113,22 @@
 					];
 
 					for (const { row: adjRow, col: adjCol, face } of adjacentPositions) {
-						const target = world[adjRow]?.[adjCol] as ExtendedEntityV2;
+						const targetEntity = world[adjRow]?.[adjCol] as ExtendedEntityV2;
+						if (!(adjRow >= 0 && adjRow < world.length && adjCol >= 0 && adjCol < world[0].length))
+							continue;
 						if (
-							adjRow >= 0 &&
-							adjRow < world.length &&
-							adjCol >= 0 &&
-							adjCol < world[0].length &&
-							target.component === "Wall" &&
-							target.surfaces !== null &&
-							target.pushwall !== true
+							targetEntity.component === "Wall" &&
+							!targetEntity.pushwall &&
+							!currentEntity.pushwall
 						) {
-							if (extendedEntity.surfaces === null)
-								extendedEntity.surfaces = {} as Record<WallFace, Texture>;
+							if (currentEntity.surfaces === null)
+								currentEntity.surfaces = {} as Record<WallFace, Texture>;
 							// Set connected surfaces to null
-							((extendedEntity as ExtendedEntityV2).surfaces as Record<WallFace, Texture>)[face] =
+							((currentEntity as ExtendedEntityV2).surfaces as Record<WallFace, Texture>)[face] =
 								null;
 						}
 					}
-
-					return extendedEntity;
+					return currentEntity;
 				}
 
 				return { ...entity, surfaces: null } as ExtendedEntityV2;
@@ -218,16 +216,13 @@
 		};
 
 		const updateTileAt = (row: number, column: number, data: Partial<ExtendedEntityV2>) => {
-			update((u) => {
-				u = [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
+			queueMicrotask(() => {
+				update((u) => {
+					return [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
+				});
 
-				return u;
+				TILES[row][column] = data as ExtendedEntityV2;
 			});
-
-			TILES[row][column] = data;
-			// queueMicrotask(() => {
-			// tree = buildTree(TILES.flat())!;
-			// });
 		};
 		return {
 			subscribe,
@@ -276,7 +271,15 @@
 							});
 							gameData.plane2[z][x] = true;
 						}
-						let m1 = gameData.getMap1(x, z);
+						let m1 = gameData.getMap1(x, z) as number;
+						if (m0 === 21) {
+							console.warn({ m1 });
+							BASE_TILE_MAP[z][x] = baseTile({
+								component: "Elevator",
+								texture: 108,
+								blocking: true
+							});
+						}
 						if (19 <= m1 && m1 <= 22) {
 							// player starting position
 							PlayerState.modify((player) => {
@@ -316,7 +319,6 @@
 									24, 25, 26, 28, 30, 31, 33, 34, 35, 36, 39, 40, 41, 45, 58, 59, 60, 62, 63, 68, 69
 								].indexOf(m1!) >= 0
 							) {
-								// // TODO: blocking prop
 								BASE_TILE_MAP[z][x] = baseTile({
 									texture: 115 + m1! - 21,
 									position: { z, x },
@@ -336,15 +338,14 @@
 							}
 						} else if (m1 === 98) {
 							// pushwall
-							// score.totalSecrets += 1;
+							LevelStatManager.addTotalKey("totalSecrets");
 							BASE_TILE_MAP[z][x] = {
 								...BASE_TILE_MAP[z][x],
 								position: { z, x },
-								blocking: true,
 								component: "Wall",
+								blocking: true,
 								pushwall: true
 							};
-							console.log("PUSHWALL!!!!", BASE_TILE_MAP[z][x]);
 						} else if (m1 === 124) {
 							// dead guard
 							BASE_TILE_MAP[z][x] = {
@@ -364,19 +365,21 @@
 									blocking: false,
 									component: "Guard"
 								};
-								//  (m1 - baseNumber) % 4);
+								LevelStatManager.addTotalKey("totalKills");
 							} else if (ssEnemyRange) {
 								const baseNumber = ssEnemyRange ? 126 : 162;
 								BASE_TILE_MAP[z][x] = { ...BASE_TILE_MAP[z][x], blocking: false, component: "SS" };
-								// things.push(new SSEnemy(x, y, (m1 - baseNumber) % 4));
+								LevelStatManager.addTotalKey("totalKills");
 							} else if (dogEnemyRange) {
 								const baseNumber = dogEnemyRange ? 134 : 170;
 								BASE_TILE_MAP[z][x] = { ...BASE_TILE_MAP[z][x], blocking: false, component: "Dog" };
-								// things.push(new DogEnemy(x, y, (m1 - baseNumber) % 4));
+								LevelStatManager.addTotalKey("totalKills");
 							}
 						}
 					}
 				}
+
+				console.log({ BASE_TILE_MAP });
 				const extendedMap = processWorld(BASE_TILE_MAP);
 
 				TILES = extendedMap;
@@ -399,9 +402,8 @@
 </script>
 
 <script lang="ts">
-	import { frameLoop, type Task, type TaskCallback } from "$lib/utils/raf";
+	import { frameLoop, type TaskCallback } from "$lib/utils/raf";
 	import {
-		getDistanceFromPoints,
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
@@ -413,40 +415,19 @@
 	import MapObject from "$lib/components/MapObject.svelte";
 	import Door from "$lib/components/Door.svelte";
 	import Enemy from "$lib/components/Enemy.svelte";
-	import {
-		buildTree,
-		castRays,
-		testLineOfSightSkipWalls,
-		type TreeNode
-	} from "$lib/components/Player.svelte";
 	import Wall from "$lib/components/Wall.svelte";
 
 	import type { Position, Position2D } from "$lib/types/position";
-	import type {
-		EntityV2,
-		ExtendedEntityV2,
-		Surface,
-		Texture,
-		WallFace,
-		World
-	} from "../types/core";
+	import type { EntityV2, ExtendedEntityV2, Surface, Texture, WallFace } from "../types/core";
 	import { GameObjects, type Model } from "$lib/utils/manager";
 	import { ItemPickupIds, ItemPickups, TreasurePickupPointMap } from "$lib/utils/engine/objects";
 	import Pushwall from "./Pushwall.svelte";
 	import Elevator from "./Elevator.svelte";
 	import { ctxKey, type WSContext } from "../../routes/key";
-	import { asap } from "$lib/utils/levelManager";
 	import { gameData } from "$lib/helpers/maps";
 	import { LevelStatManager } from "$lib/stores/stats";
-	import { normalizeAngle } from "$lib/utils/angle";
-	import {
-		preprocessLevel,
-		getAdjacentRegions,
-		getCurrentRegion,
-		getVisiblePortals,
-		isPositionPortal,
-		type Region
-	} from "./portal";
+	import { preprocessLevel, isPositionPortal, type Region, getCurrentRegion } from "./portal";
+	import { asap } from "$lib/utils/asap";
 
 	export let mode: "editor" | "generating" | "play" = "play";
 
@@ -455,10 +436,12 @@
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
 	let start: number;
-	let gameLoop;
+	let gameLoop: ReturnType<typeof frameLoop>;
 	const INTERVAL = 1000 / 60;
+	let schedule: (fn: () => void) => void;
 
 	const update: TaskCallback = (now: number, scheduler) => {
+		if (!schedule) schedule = scheduler;
 		if (!start) start = now;
 		const elapsed = now - start;
 
@@ -466,10 +449,11 @@
 
 		if ($isLoadingNextLevel) return true;
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
-		if (elapsed > 32) {
+		if (elapsed > 250) {
 			start = now % INTERVAL;
 			const playerLocal = getLocalPositionFromRealPosition({ x, y, z });
-			const { models, ...rest } = $GameObjects;
+			const { models } = $GameObjects;
+
 			if (isPositionPortal(CurrentLevel.getPortal(), playerLocal)) {
 				const regions = getTileRegions(
 					getLocalPositionFromRealPosition({ x, z }),
@@ -490,69 +474,40 @@
 					scheduler(() => visibility());
 				});
 			} else {
-				// renderVisibleTiles(
-				// visibleTiles,
-				// [...Object.values($GameObjects).flat()],
-				// (position, state) => {
-				// 	const visibility = position.setVisibility(state);
-				// 	scheduler(() => visibility());
-				// }
-				// );
-				const regions = getTileRegions(
-					getLocalPositionFromRealPosition({ x, z }),
-					CurrentLevel.getPortal()
-				);
-				const visibleTiles = regions.flatMap((regionIndex) => {
-					const region = CurrentLevel.getPortal()[regionIndex];
-					return [
-						region.tiles,
-						...region.connectedRegions.map((v) =>
-							CurrentLevel.getPortal()[v].portals.map((p) => p.position)
-						),
-						region.portals.map(({ position }) => position)
-					].flat();
-				});
-				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state) => {
-					const visibility = position.setVisibility(state);
-					scheduler(() => visibility());
-				});
 			}
-			// castRays(
-			// 	getLocalPositionFromRealPosition({ x, z }),
-			// 	normalizeAngle(y),
-			// 	GameObjects[Symbol.iterator](),
-			// 	360,
-			// 	(model, state) => {
-			// 		scheduler(model.setVisibility(state));
-			// 	}
-			// );
-			// // }
 		}
 		worldRef.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
 		return true;
 	};
+
 	onMount(() => {
 		queueMicrotask(() => {
 			gameLoop = frameLoop(update);
-		});
-		setTimeout(() => {
-			const playerLocal = getLocalPositionFromRealPosition($PlayerState.position);
-			const regions = getTileRegions(playerLocal, CurrentLevel.getPortal());
-			const visibleTiles = regions.flatMap((regionIndex) => {
-				const region = CurrentLevel.getPortal()[regionIndex];
-				return [region.tiles, region.portals.map(({ position }) => position)].flat();
-			});
-			console.log(regions, visibleTiles, playerLocal, CurrentLevel.getPortal());
-			renderVisibleTiles(visibleTiles, [...GameObjects], (model, state) => {
-				if (model.type === "door") {
-					// model.toggleAction();
-					model.toggleAction();
+			const currentRegion = getCurrentRegion(
+				CurrentLevel.getPortal(),
+				getLocalPositionFromRealPosition($PlayerState.position)
+			)!;
+			renderVisibleTiles(
+				[
+					...currentRegion.tiles,
+					...currentRegion.portals.map(({ position }) => {
+						return position;
+					})
+				],
+				[...GameObjects],
+				(model, state) => {
+					const visibility = model.setVisibility(state);
+					if (schedule) schedule(visibility);
+					else asap(visibility);
 				}
-			});
-		}, 2000);
+			);
+		});
 		return () => {
-			GameObjects.reset();
-			gameLoop.abort();
+			asap(() => {
+				gameLoop.abort();
+				GameObjects.reset();
+				gameLoop = null as never;
+			});
 		};
 	});
 	$: console.log($GameObjects, $CurrentLevel);
@@ -600,7 +555,7 @@
 					{section}
 					{offset}
 				/>
-			{:else if item.component === "Wall" && !!item.texture}
+			{:else if item.component === "Wall" && !!item.texture && !item.pushwall}
 				<Wall
 					bind:this={$GameObjects.walls[$GameObjects.walls.length]}
 					{item}

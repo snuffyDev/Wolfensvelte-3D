@@ -9,15 +9,12 @@
 	import { onMount, setContext } from "svelte";
 	import { writable } from "svelte/store";
 	import { textureData } from "../lib/utils/engine/textures";
-	import MenuMusic from "../lib/music/menu.mp3?url";
-	import E1M1Music from "../lib/music/E1M1.mp3?url";
-	import Wondering from "../lib/music/Wondering_About_My_Loved_Ones.ogg?url";
-	import E1M2Music from "../lib/music/E1M2.ogg?url";
 	import { ctxKey, type WSContext } from "./key";
 	import "./../app.scss";
 	import { AudioEngine } from "$lib/helpers/music";
 	import { page } from "$app/stores";
 	import { gameData } from "$lib/helpers/maps";
+	import { Soundtrack } from "$lib/music";
 	const textureStore = writable<Awaited<ReturnType<typeof textureData>>>({});
 	const isLoadingNextMap = writable<boolean>(false);
 
@@ -27,11 +24,17 @@
 		let textures: Awaited<ReturnType<typeof textureData>> = await textureData();
 		textureStore.set(await textures);
 
-		AudioEngine.loadAudioFile("wondering", Wondering, false, true);
-		AudioEngine.loadAudioFile("menu", MenuMusic, true, true);
+		AudioEngine.loadAudioFile(
+			"wondering",
+			Soundtrack["Wondering About My Loved Ones"],
+			false,
+			true
+		);
+		AudioEngine.loadAudioFile("menu", Soundtrack.menu, true, true);
 		console.time("start - og");
 		await gameData.loadResources();
-		gameData.loadLevel(1);
+		console.warn(new Error($page.url.toString()).stack);
+		gameData.loadLevel(parseInt($page.url.pathname.slice(-1).toString()) - 1 ?? 0);
 		console.log(gameData.get());
 		console.timeEnd("start - og");
 		loaded = true;

@@ -1,3 +1,5 @@
+<svelte:options accessors={true} />
+
 <script lang="ts">
 	import { LevelHandler } from "$lib/stores/stats";
 	import type { ExtendedEntity, Texture, WallFace } from "$lib/types/core";

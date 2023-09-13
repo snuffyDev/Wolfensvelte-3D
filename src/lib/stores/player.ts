@@ -42,7 +42,7 @@ export interface IPlayerState {
 }
 
 const CONSTANTS = {
-	speed: 8.875
+	speed: 9
 } as const;
 
 const DEFAULT_STATE = (lives: number | undefined = 3, score = 0): IPlayerState => ({
@@ -271,17 +271,12 @@ function _playerState(initialState: Partial<IPlayerState> = {}) {
 			const rand1 = rand.nextInt(0, 255);
 			const rand2 = rand.nextInt(0, 255);
 			const hitChance = 160 - distance * 16;
-			console.log({
-				rand1,
-				rand2,
-				distance
-			});
+
 			if (state.weapons.active !== "knife") {
 				if (distance >= 4 && rand1 / 12 >= distance) {
 					return;
 				} else if (distance < 2) {
 					damage = rand2 / 4;
-					console.log("DISTANCE < 2", damage);
 				} else if (distance >= 2) {
 					damage = rand2 / 6;
 				} else {

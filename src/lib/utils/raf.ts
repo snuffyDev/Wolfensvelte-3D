@@ -1,13 +1,7 @@
-// Set of callback fns that will run on each animation frame
+// Based on https://github.com/sveltejs/svelte/blob/master/packages/svelte/src/runtime/internal/loop.js
 
 import { browser } from "$app/environment";
-import { asap } from "./levelManager";
-
-const yieldMicrotask = () => new Promise<void>(queueMicrotask);
-/**
- * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
- * Why a single frameloop? Imagine the map, each enemy, the player, etc. all calling RAF individually... Yeah, no bueno.
- */
+import { asap } from "./asap";
 
 export interface Task {
 	abort(): void;
@@ -26,55 +20,72 @@ const prerender_queue = new Array<() => void>();
 const add_to_queue = (cb: () => void) => {
 	prerender_queue.push(cb);
 };
-let then: number;
+
 const TARGET_FPS = 1000 / 24;
 async function run_async(now: number) {
 	const _tasks: TaskEntry[] = [];
 	for (const task of tasks) {
 		_tasks.push(task);
 	}
-	await Promise.allSettled(
+
+	await Promise.all(
 		_tasks.map(async (v) => {
-			if (!(await v.c(now, add_to_queue))) {
-				tasks.delete(v);
-				v.f();
+			try {
+				if (!(await v.c(now, add_to_queue))) {
+					tasks.delete(v);
+					v.f();
+				}
+			} catch (e) {
+				console.error(e);
 			}
 		})
 	);
 }
-function run_tasks(now: number) {
-	if (!then) then = now;
-	const elapsed = now - then;
-	if (elapsed > TARGET_FPS) {
-		then = now - (elapsed % TARGET_FPS);
 
-		run_async(now);
-		while (prerender_queue.length) {
-			const cb = prerender_queue.shift()!;
-			cb();
+let running = false;
+
+async function run_tasks() {
+	let then: number | undefined = undefined;
+	while (running) {
+		if (tasks.size === 0) {
+			running = false;
+			break;
 		}
-	}
+		const now = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+		if (!then) then = now;
+		const elapsed = (now - then) as number;
+		if (elapsed > TARGET_FPS) {
+			then = now - (elapsed % TARGET_FPS);
 
-	if (tasks.size !== 0) {
-		requestAnimationFrame(run_tasks);
+			queueMicrotask(() => {
+				run_async(now);
+			});
+			while (prerender_queue.length) {
+				try {
+					prerender_queue.shift()?.();
+				} catch (e) {
+					console.error(e);
+				}
+			}
+		}
 	}
 }
 
-/**
- * For testing purposes only!
- */
 export function clear_loops() {
 	tasks.clear();
 }
 
 /**
- * Creates a new task that runs on each raf frame
- * until it returns a falsy value or is aborted
+ * frameLoop is a global animation frame loop, that allows for adding and removing tasks whenever desired.
+ * Why a single frameloop? Imagine the map, each enemy, the player, etc. all calling RAF individually... Yeah, no bueno.
  */
 export function frameLoop(callback: TaskCallback): Task {
 	let task: TaskEntry;
 
-	if (tasks.size === 0) requestAnimationFrame(run_tasks);
+	if (tasks.size === 0) {
+		requestAnimationFrame(run_tasks);
+		running = true;
+	}
 
 	return {
 		promise: new Promise((fulfill) => {

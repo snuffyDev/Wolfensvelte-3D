@@ -1,4 +1,4 @@
-import { PlayerState, type IPlayerState } from "$lib/stores/player";
+import type { IPlayerState } from "$lib/stores/player";
 import type { Position, Position2D } from "../types/position";
 
 export function normalizeAngle(angle: number): number {

@@ -1,5 +1,3 @@
-import type { WorldState } from "$lib/components/Level.svelte";
-
 const taskQueue: (() => void)[] = [];
 let flushing = false;
 let index = 0;
@@ -44,15 +42,4 @@ function makeRequestCallFromMutationObserver(callback: MutationCallback) {
 }
 if (typeof MutationObserver !== "undefined") {
 	requestFlush = makeRequestCallFromMutationObserver(flush);
-}
-class LevelManager {
-	private currentLevel: WorldState;
-	private currentMap: WorldState["data"];
-	private spawn: WorldState["spawn"];
-
-	constructor(defaultLevel: WorldState) {
-		this.currentLevel = defaultLevel;
-		this.currentMap = this.currentLevel["data"];
-		this.spawn = this.currentLevel["spawn"];
-	}
 }

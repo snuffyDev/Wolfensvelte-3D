@@ -11,19 +11,13 @@ type Region = {
 	connectedRegions: number[];
 	tiles: Position2D[];
 };
-function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region[], void, void> {
+function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region, void, undefined> {
 	const regions: Region[] = [];
 	const visitedTiles: Set<string> = new Set();
 
 	function findConnectedRegion(position: Position2D, regionIndex: number): void {
 		const { x, z } = position;
 		const key = `${x},${z}`;
-
-		if (visitedTiles.has(key)) {
-			return;
-		}
-
-		visitedTiles.add(key);
 
 		const region: Region = {
 			portals: [],
@@ -53,9 +47,10 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region[], void
 
 				if (adjX >= 0 && adjX < level.length && adjZ >= 0 && adjZ < level[adjX].length) {
 					const adjacentTileData = level[adjZ][adjX];
-					// if (visitedTiles.has(`${adjX},${adjZ}`)) {
-					// 	continue;
-					// }
+
+					if (visitedTiles.has(`${adjX},${adjZ}`)) {
+						continue;
+					}
 					if (
 						adjacentTileData.pushwall ||
 						(adjacentTileData.component === "Door" &&
@@ -66,12 +61,9 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region[], void
 							position: adjacentTile,
 							connectedRegion
 						});
+
 						region.connectedRegions.push(connectedRegion);
-					} else if (
-						!level[tile.z][tile.x].blocking &&
-						adjacentTileData.blocking &&
-						adjacentTileData.component === "Object"
-					) {
+					} else if (adjacentTileData.blocking && adjacentTileData.component === "Object") {
 						stack.push(adjacentTile);
 
 						visitedTiles.add(`${adjX},${adjZ}`);
@@ -82,10 +74,11 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region[], void
 						region.tiles.push(adjacentTile);
 					} else if (
 						adjacentTileData &&
-						adjacentTileData.pushwall !== true &&
-						adjacentTileData.component !== "Door"
+						adjacentTileData.component !== "Door" &&
+						!adjacentTileData.pushwall
 					) {
 						if (!visitedTiles.has(`${adjX},${adjZ}`) && !adjacentTileData.blocking) {
+							visitedTiles.add(`${adjX},${adjZ}`);
 							stack.push(adjacentTile);
 							region.tiles.push(adjacentTile);
 							continue;
@@ -104,7 +97,7 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region[], void
 		for (let z = 0; z < level[x].length; z++) {
 			const tile = level[z][x];
 
-			if (!visitedTiles.has(`${x},${z}`) && !tile.blocking) {
+			if ((!visitedTiles.has(`${x},${z}`) && !tile.blocking) || tile.pushwall) {
 				const regionIndex = regions.length;
 				findConnectedRegion({ x, z }, regionIndex);
 			}

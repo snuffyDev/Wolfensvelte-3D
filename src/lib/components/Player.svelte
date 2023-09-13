@@ -104,227 +104,120 @@
 		distance: number;
 		normal: number;
 	};
-	function bresenhamLine(x0: number, y0: number, x1: number, y1: number): Position2D[] {
-		const points: Position2D[] = [];
-		const dx = Math.abs(x1 - x0);
-		const dy = Math.abs(y1 - y0);
-		const sx = x0 < x1 ? 1 : -1;
-		const sy = y0 < y1 ? 1 : -1;
+
+	export function bresenhamLineWithFilter(
+		start: Position2D,
+		end: Position2D,
+		world: ExtendedEntityV2[][],
+		include: ExtendedEntityV2["component"][] = ["Wall", "Door", "Elevator"]
+	): boolean {
+		const dx = Math.abs(end.z - start.z);
+		const dy = Math.abs(end.x - start.x);
+
+		const sx = start.z < end.z ? 1 : -1;
+		const sy = start.x < end.x ? 1 : -1;
 		let err = dx - dy;
 
 		while (true) {
-			points.push({ x: x0, z: y0 });
-
-			if (x0 === x1 && y0 === y1) break;
-
-			let e2 = 2 * err;
-			if (e2 > -dy) {
-				err -= dy;
-				x0 += sx;
-			}
-			if (e2 < dx) {
-				err += dx;
-				y0 += sy;
-			}
-		}
-
-		return points;
-	}
-	export interface TreeNode {
-		partition: ExtendedEntityV2 | null;
-		left: TreeNode | null;
-		right: TreeNode | null;
-	}
-
-	function createNode(partition: ExtendedEntityV2 | null): TreeNode {
-		return {
-			partition: partition,
-			left: null,
-			right: null
-		};
-	}
-
-	export function buildTree(partitions: ExtendedEntityV2[]): TreeNode | null {
-		if (partitions.length === 0) {
-			return null;
-		}
-
-		// split partitions into two halves
-		const midIndex = Math.floor(partitions.length / 2);
-		const node = createNode(partitions[midIndex]);
-
-		// recursively build left and right subtrees
-		node.left = buildTree(partitions.slice(0, midIndex));
-		node.right = buildTree(partitions.slice(midIndex + 1));
-
-		return node;
-	}
-
-	function traverseTree(node: TreeNode | null, callback: (partition: ExtendedEntityV2) => void) {
-		if (node === null) {
-			return;
-		}
-
-		traverseTree(node.left, callback);
-
-		if (node.partition) {
-			callback(node.partition);
-		}
-
-		traverseTree(node.right, callback);
-	}
-
-	function getVisibleEntities(root: TreeNode | null, position: Position2D): ExtendedEntityV2[] {
-		const visibleEntities: ExtendedEntityV2[] = [];
-
-		traverseTree(root, (partition) => {
-			// check if the partition is visible from the given position
-			// visibility check can be based on your specific game logic
-			if (partition.position?.x === position.x && partition.position?.z === position.z) {
-				visibleEntities.push(partition);
-			}
-		});
-
-		return visibleEntities;
-	}
-	export function raycast(origin: Position2D, rotation: number): string[] {
-		const visiblePositions: string[] = [];
-
-		let stepSize = 0.1; // This determines the resolution of the raycast
-		let maxSteps = 220; // This is a safeguard to prevent infinite loops in case of errors
-
-		forLoop: for (let step = 0; step < maxSteps; step++) {
-			let index = 0;
-			let x = origin.x + step * stepSize * Math.cos(rotation);
-			let z = origin.z + step * stepSize * Math.sin(rotation);
-
-			let tilePos: Position2D = { x: Math.floor(x + 0.5), z: Math.floor(z + 0.5) };
-
-			const entity = CurrentLevel.checkCollisionWithWorld(tilePos, true);
-			if (entity !== null) {
-				visiblePositions.push(`${tilePos.x}${tilePos.z}`);
-				if (entity) {
-					break;
-				}
-				continue;
-			}
-		}
-
-		return visiblePositions;
-	}
-	export function castRays(
-		viewer: Position2D,
-		viewerRotation: number,
-		models: IterableIterator<Model>,
-		fov: number,
-		callback: (model: Model, state: boolean) => void
-	): void {
-		// Calculate the rotation angles for the leftmost and rightmost rays
-		// Calculate the rotation angles for the leftmost and rightmost rays
-		const leftRotation = viewerRotation - fov / 2;
-		const rightRotation = viewerRotation + fov / 2;
-
-		// Calculate the number of rays to cast within the field of view
-		const numRays = window.innerWidth;
-
-		const rayVisibleEntities: string[] = [];
-
-		// Cast the rays
-		for (let i = 0; i < numRays; i++) {
-			// Interpolate the rotation angle for this ray
-			const rotation = leftRotation + ((rightRotation - leftRotation) * i) / (numRays - 1);
-
-			// add the visible entities to the list
-			rayVisibleEntities.push(...raycast(viewer, rotation));
-		}
-
-		// Check each model's visibility
-		for (const entity of models) {
-			const position = entity.getLocalPosition();
-			const isVisible = rayVisibleEntities.includes(`${position.x}${position.z}`);
-			callback(entity, isVisible);
-		}
-	}
-
-	export function testLineOfSightSkipWalls(
-		world: ExtendedEntityV2[][],
-		viewer: Position2D,
-		rotation: Position2D,
-		target: Model
-	): boolean {
-		const targetPos = target.getLocalPosition();
-		const viewerPos = { ...viewer };
-		let dx = Math.abs(targetPos.x - viewerPos.x);
-		let dz = Math.abs(targetPos.z - viewerPos.z);
-
-		let sx = targetPos.x < viewerPos.x ? 1 : -1;
-		let sz = targetPos.z < viewerPos.z ? 1 : -1;
-
-		let err = dx - dz;
-
-		let x = Math.floor(viewerPos.x + 0.5);
-		let z = Math.floor(viewerPos.z + 0.5);
-		let steps = 0;
-
-		while (true) {
-			x = Math.floor(targetPos.x + 0.5);
-			z = Math.floor(targetPos.z + +0.5);
-			const entity = world[z]?.[x];
-			// Give a little lee-way when checking if a wall is blocked or not by another wall
-			// if (
-			// 	target.type === "wall" &&
-			// 	x !== viewerPos.x &&
-			// 	z !== viewerPos.z &&
-			// 	entity.surfaces &&
-			// 	entity.blocking &&
-			// 	Object.values(entity.surfaces).filter(Boolean).length &&
-			// 	++steps >= 8
-			// ) {
-			// 	return false;
-			// }
-
-			// Disable rendering anything besides walls at any position if we're blocked
 			if (
-				target.type !== "wall" &&
-				target.type !== "pushwall" &&
-				target.type !== "door" &&
-				(x !== viewerPos.x || z !== viewerPos.z) &&
-				isBlocking(entity)
+				world[start.z][start.x].blocking &&
+				!include.includes(world[start.z][start.x].component)
 			) {
-				return false;
+				return false; // Hit an obstacle, no line of sight
 			}
 
-			// Disable rendering if the current target is a door and is blocked by another entity
-			if (
-				target.type !== "door" &&
-				target.type !== "object" &&
-				(x !== targetPos.x || z !== targetPos.z) &&
-				isBlocking(entity)
-			) {
-				return false;
+			if (start.z === end.z && start.x === end.x) {
+				return true; // Reached the target without hitting obstacles
 			}
-
-			// We gucci
-
-			if (viewerPos.x === x && z === viewerPos.z) {
-				break;
-			} // x = Math.floor(targetPos.x + 0.5);
-			// z = Math.floor(targetPos.z + 0.5);
 
 			const e2 = 2 * err;
-
-			if (e2 > -dz) {
-				err -= dz;
-				targetPos.x += sx;
+			if (e2 > -dy) {
+				err -= dy;
+				start.z += sx;
 			}
-
 			if (e2 < dx) {
 				err += dx;
-				targetPos.z += sz;
+				start.x += sy;
 			}
 		}
+	}
 
-		return true;
+	export function bresenhamLineSimple(
+		start: Position2D,
+		end: Position2D,
+		world: ExtendedEntityV2[][]
+	): boolean {
+		const dx = Math.abs(end.z - start.z);
+		const dy = Math.abs(end.x - start.x);
+		const sx = start.z < end.z ? 1 : -1;
+		const sy = start.x < end.x ? 1 : -1;
+		let err = dx - dy;
+
+		while (true) {
+			if (world[start.z][start.x].blocking) {
+				return false; // Hit an obstacle, no line of sight
+			}
+
+			if (start.z === end.z && start.x === end.x) {
+				return true; // Reached the target without hitting obstacles
+			}
+
+			const e2 = 2 * err;
+			if (e2 > -dy) {
+				err -= dy;
+				start.z += sx;
+			}
+			if (e2 < dx) {
+				err += dx;
+				start.x += sy;
+			}
+		}
+	}
+
+	export function bresenhamLine(
+		viewerPosition: Position2D,
+		viewerDirectionDegrees: number,
+		endPoint: Position2D,
+		grid: ExtendedEntityV2[][]
+	): boolean {
+		// Convert degrees to radians for trigonometric calculations
+		const viewerDirectionRadians = (viewerDirectionDegrees * Math.PI) / 180;
+
+		// Calculate the direction vector based on the angle
+		const dx = Math.cos(viewerDirectionRadians);
+		const dz = Math.sin(viewerDirectionRadians);
+
+		const sx = viewerPosition.x < endPoint.x ? 1 : -1;
+		const sz = viewerPosition.z < endPoint.z ? 1 : -1;
+		let err = dx - dz;
+		let x = viewerPosition.x;
+		let z = viewerPosition.z;
+
+		while (true) {
+			if (
+				x < 0 ||
+				x >= grid.length ||
+				z < 0 ||
+				z >= grid[0].length ||
+				grid[Math.floor(z)][Math.floor(x)].blocking
+			) {
+				return false; // Hit an obstacle, no line of sight
+			}
+
+			if (Math.floor(z) === Math.floor(endPoint.z) && Math.floor(x) === Math.floor(endPoint.x)) {
+				return true; // Reached the target without hitting obstacles
+			}
+
+			const e2 = 2 * err;
+			if (e2 > -dz) {
+				err -= dz;
+				z += sx;
+			}
+			if (e2 < dx) {
+				err += dx;
+				x += sz;
+			}
+		}
 	}
 	export class Cache<T> {
 		private declare current: T;
@@ -363,7 +256,7 @@
 <script lang="ts">
 	import { PlayerState, type PlayerControls, playerHealth, playerState } from "$lib/stores/player";
 	import { isVisibleToPlayer, normalizeAngle } from "$lib/utils/angle";
-	import { GameObjects } from "$lib/utils/manager";
+	import { GameObjects, type GameObjectType } from "$lib/utils/manager";
 	import {
 		comparePositions,
 		getDistanceFromPoints,
@@ -507,15 +400,16 @@
 				x: -position.x,
 				z: -position.z
 			});
+
 			if (
-				isVisibleToPlayer($PlayerState, e?.getPosition(), 35) &&
-				testLineOfSight2(
-					$CurrentLevel,
+				isVisibleToPlayer($PlayerState, e?.getPosition(), 20) &&
+				bresenhamLineSimple(
 					getLocalPositionFromRealPosition({
 						x: position.x,
 						z: position.z
 					}),
-					e.getLocalPosition()
+					e.getLocalPosition(),
+					$CurrentLevel
 				) &&
 				distance < 750 &&
 				e?.getState() !== "dead"
@@ -531,13 +425,12 @@
 				timeout = 125;
 				break;
 			case "pistol":
-				timeout = 625;
+				timeout = 350;
 				break;
 			case "knife":
 				timeout = 125;
 				break;
-			default:
-				break;
+				defaulgetLocalPositionFromRealPositiont: break;
 		}
 
 		const closest = enemiesInRange.sort(
@@ -561,23 +454,12 @@
 		setTimeout(() => {
 			$PlayerState.state = "idle";
 		}, timeout);
-		console.log({ distance });
-		if (!target) return console.log("NO TARGET");
+
+		if (!target) return;
 		if ($PlayerState.weapons.active === "knife" && distance > 1) return;
 
 		const enemyPosition = getLocalPositionFromRealPosition(target.getPosition());
-		const canShoot = testLineOfSight2($CurrentLevel, playerPos, enemyPosition)!;
-		console.log({
-			canShoot,
-			canShoot2: testLineOfSight2(
-				$CurrentLevel,
-				getLocalPositionFromRealPosition({
-					x: position.x,
-					z: position.z
-				}),
-				enemyPosition
-			)
-		});
+		const canShoot = bresenhamLineSimple(playerPos, enemyPosition, $CurrentLevel)!;
 
 		if (canShoot) {
 			await PlayerState.attack(target);

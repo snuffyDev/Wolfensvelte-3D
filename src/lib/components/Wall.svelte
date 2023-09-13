@@ -120,10 +120,10 @@
 		image-rendering: pixelated;
 		background-size: 64px;
 		background-repeat: no-repeat;
-		/* backface-visibility: hidden !important; */
 		font-size: 1rem;
 		color: white;
 		backface-visibility: hidden !important;
+		backface-visibility: visible !important;
 		z-index: -1;
 		opacity: 1;
 		/* image-rendering: ; */

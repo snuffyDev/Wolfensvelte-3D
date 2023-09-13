@@ -1,14 +1,12 @@
 import type Door from "$lib/components/Door.svelte";
 import type Elevator from "$lib/components/Elevator.svelte";
 import type Enemy from "$lib/components/Enemy.svelte";
-import type Guard from "$lib/components/Guard/Guard.svelte";
 import type MapObject from "$lib/components/MapObject.svelte";
 import type Pushwall from "$lib/components/Pushwall.svelte";
 import type Wall from "$lib/components/Wall.svelte";
-import { writable } from "svelte/store";
-import { asap } from "./levelManager";
+import { asap } from "./asap";
 
-export type Model = InstanceType<typeof Door | typeof E | typeof MapObject | typeof Elevator>;
+export type Model = Wall | Door | Enemy | MapObject | Elevator;
 
 interface GameObjectStore {
 	walls: Wall[];
@@ -18,6 +16,10 @@ interface GameObjectStore {
 	doors: Door[];
 	elevators: Elevator[];
 }
+
+export const GameObjectTypes = ["wall", "pushwall", "enemy", "model", "door", "elevator"] as const;
+
+export type GameObjectType = (typeof GameObjectTypes)[number];
 
 class GameObjectStoreManager {
 	private store: GameObjectStore = {
@@ -33,7 +35,8 @@ class GameObjectStoreManager {
 	private keys: (keyof GameObjectStore)[] = [];
 	constructor() {
 		this.keys = Object.keys(this.store) as (keyof GameObjectStore)[];
-		//
+
+		this.subscribe;
 	}
 
 	public subscribe = (callback: (store: GameObjectStore) => void): (() => void) => {
@@ -45,6 +48,21 @@ class GameObjectStoreManager {
 		};
 	};
 
+	public find = (
+		key: keyof GameObjectStore,
+		predicate: (value: Model) => boolean
+	): Model | undefined => {
+		return this.store[key].find(predicate);
+	};
+
+	public delete = (key: keyof GameObjectStore, predicate: (value: Model) => boolean): void => {
+		const index = this.store[key].findIndex(predicate);
+		if (index !== -1) {
+			this.store[key].splice(index, 1);
+			this.subscribers.forEach((callback) => callback(this.store));
+		}
+	};
+
 	public update = (key: keyof GameObjectStore, value: Model[]): void => {
 		//@ts-expect-error it's fine
 		this.store[key] = value;
@@ -52,6 +70,10 @@ class GameObjectStoreManager {
 	};
 
 	set = (value: GameObjectStore) => {
+		for (const v in value) {
+			const items = value[v as keyof GameObjectStore];
+			value[v as keyof GameObjectStore] = items.filter((v) => !!v && !!v.item);
+		}
 		this.store = value;
 		this.subscribers.forEach((cb) => cb(this.store));
 	};
@@ -60,7 +82,11 @@ class GameObjectStoreManager {
 			asap(() => {
 				this.store[key as keyof typeof this.store].length = 0;
 				this.subscribers.forEach((cb) =>
-					cb(Object.fromEntries(Object.keys(this.store).map((k) => [k, []])))
+					cb(
+						Object.fromEntries(
+							Object.keys(this.store).map((k) => [k, []])
+						) as unknown as GameObjectStore
+					)
 				);
 				this.store[key as keyof typeof this.store] = this.store[
 					key as keyof typeof this.store
@@ -68,7 +94,11 @@ class GameObjectStoreManager {
 			});
 		}
 		this.subscribers.forEach((cb) =>
-			cb(Object.fromEntries(Object.keys(this.store).map((k) => [k, []])))
+			cb(
+				Object.fromEntries(
+					Object.keys(this.store).map((k) => [k, []])
+				) as unknown as GameObjectStore
+			)
 		);
 	};
 	*[Symbol.iterator]() {

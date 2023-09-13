@@ -1,7 +1,4 @@
-<svelte:options
-	accessors={true}
-	immutable={true}
-/>
+<svelte:options accessors={true} />
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
@@ -18,8 +15,6 @@
 	import { AIAudioManager } from "$lib/helpers/audio";
 	import { PlayerState } from "$lib/stores/player";
 	import { GameObjects } from "$lib/utils/manager";
-	import { getAdjacentRegions, getCurrentRegion } from "./portal";
-	import { asap } from "$lib/utils/levelManager";
 
 	export let item: ExtendedEntityV2;
 	export let offset: number;
@@ -30,6 +25,7 @@
 	let shouldMute = true;
 	let count = 0;
 	let willChange: string | false = false;
+
 	const { textures }: WSContext = getContext(ctxKey);
 
 	const _position = getRealPositionFromLocalPosition({ x: offset, z: section });
@@ -98,28 +94,25 @@
 		if (!currentState.position) currentState.position = {} as Position2D;
 		if (count >= 0) {
 			console.log("COUNT>=0");
-			await new Promise((resolve) => {
-				const regions = getTileRegions(
-					getLocalPositionFromRealPosition(state === "open" ? $position : $PlayerState.position),
-					CurrentLevel.getPortal()
-				);
-				const visibleTiles = regions.flatMap((regionIndex) => {
-					const region = CurrentLevel.getPortal()[regionIndex];
-					return [
-						region.tiles,
-						...region.connectedRegions.map((v) => {
-							const connectedRegion = CurrentLevel.getPortal()[v];
+			const regions = getTileRegions(
+				getLocalPositionFromRealPosition(state === "open" ? $position : $PlayerState.position),
+				CurrentLevel.getPortal()
+			);
+			const visibleTiles = regions.flatMap((regionIndex) => {
+				const region = CurrentLevel.getPortal()[regionIndex];
+				return [
+					region.tiles,
+					...region.connectedRegions.map((v) => {
+						const connectedRegion = CurrentLevel.getPortal()[v];
 
-							return [...connectedRegion.tiles, ...connectedRegion.portals.map((p) => p.position)];
-						})
-					].flat();
-				});
-				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state, isLast) => {
-					const visibility = position.setVisibility(state);
-					queueMicrotask(() => visibility());
-					if (isLast) resolve(undefined);
-				});
-			}).then(() => console.log("RESOLVED"));
+						return [...connectedRegion.tiles, ...connectedRegion.portals.map((p) => p.position)];
+					})
+				].flat();
+			});
+			renderVisibleTiles(visibleTiles, [...GameObjects], (position, state, isLast) => {
+				const visibility = position.setVisibility(state);
+				queueMicrotask(() => visibility());
+			});
 		}
 
 		if (state === "open") {
@@ -178,7 +171,6 @@
 			else if (isTopBottom) rotation = 90;
 		} catch {}
 	});
-	$: console.log($textures[item.texture].original);
 </script>
 
 <!-- {#if visibility} -->
