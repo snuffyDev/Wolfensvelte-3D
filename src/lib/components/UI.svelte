@@ -8,9 +8,8 @@
 		playerLives,
 		playerScore
 	} from "$lib/stores/player";
-	import { MapHandler } from "$lib/stores/stats";
 	import { frameLoop } from "$lib/utils/raf";
-	import { getContext, onDestroy, onMount } from "svelte";
+	import { onMount } from "svelte";
 
 	const FACE_MAP = $page.data.FACES;
 	let PORTRAIT_STATE: keyof typeof FACE_MAP = "full";
@@ -22,7 +21,7 @@
 	let start: number | null = null;
 
 	$: HUD_SECTIONS = [
-		["level", $MapHandler],
+		["level", parseInt($page.url.pathname.slice($page.url.pathname.indexOf("M") + 1))],
 		["score", $playerScore],
 		["lives", $playerLives],
 		["portrait", null],
@@ -85,7 +84,7 @@
 					{/each}
 				{:else if value !== null}
 					<b />
-					{#if name.match(/lives|score|ammo|health/g)}
+					{#if name.match(/level|lives|score|ammo|health/g)}
 						<div class="numbers {name === 'health' ? 'pad' : ''}">
 							{#each value.toString() as num}
 								<span class="font-{num}" />
@@ -161,7 +160,7 @@
 			display: block;
 
 			max-height: calc(10vh - 3.25rem);
-			height: 5.25vw;
+			height: calc(0.5vh - 0.1px + calc(3vw / 1.5));
 		}
 	}
 
@@ -186,24 +185,26 @@
 			inset: 0;
 			content: "";
 		}
-		background-size: 100px 128px;
+		background-size: 85px 120px;
 		background-repeat: no-repeat;
 		background-image: var(--img);
-		background-position: center;
+		background-position: bottom;
 
-		justify-self: center;
-		place-self: center;
 		height: 100%;
 		left: 0;
 		right: 0;
 		width: 100%;
-		bottom: 0;
 		top: 0;
+		bottom: 0;
 		opacity: 0;
 		image-rendering: pixelated;
+		height: calc(100% - calc(1vw / 1.5));
 
 		&.show {
 			opacity: 1;
+		}
+		> img {
+			object-fit: contain;
 		}
 	}
 	.stats {
@@ -211,7 +212,7 @@
 
 		display: grid;
 		display: grid;
-		grid-template-columns: 0.9fr 1.5fr 0.9fr 0.9fr 1fr 0.9fr 0.2fr 1.7fr;
+		grid-template-columns: 1.3fr 1.5fr 0.5fr 1.2fr 1fr 0.7fr 0.5fr 1.7fr;
 		grid-template-rows: 1fr;
 		gap: 0px 0em;
 		grid-template-areas: "level score lives player health ammo gap weapon";
@@ -225,7 +226,7 @@
 		background-repeat: no-repeat;
 		background-size: cover;
 		background-position: center;
-		font-size: 3vh;
+		font-size: 2.667vh;
 		> :nth-last-child(2) {
 			margin: 0em;
 		}
@@ -239,7 +240,7 @@
 		justify-content: center;
 		display: grid;
 		grid-template-rows: 0.25fr 1fr;
-		justify-items: center;
+		justify-items: flex-end;
 
 		line-height: 1;
 		font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
@@ -247,12 +248,13 @@
 
 		font-size: 100%;
 
-		align-content: center;
+		align-content: flex-end;
 		place-items: flex-end;
 
 		place-items: flex-end;
 		justify-items: center;
 		align-items: center;
+		padding-bottom: 0.25rem;
 	}
 	.hud {
 		position: absolute;
@@ -273,8 +275,6 @@
 		margin: 0 auto;
 		font-size: 75%;
 		font-weight: 500;
-
-		// height: 100%;
 	}
 
 	.debug {

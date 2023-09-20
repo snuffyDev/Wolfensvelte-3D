@@ -5,7 +5,7 @@
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { ExtendedEntityV2 } from "../types/core";
+	import type { ExtendedEntityV2, Texture, WallFace } from "../types/core";
 	import {
 		getFacingDirection,
 		getLocalPositionFromRealPosition,
@@ -16,6 +16,7 @@
 	import Wall from "./Wall.svelte";
 	import { PlayerState } from "$lib/stores/player";
 	import { GameObjects } from "$lib/utils/manager";
+	import { WALL_FACES } from "$lib/utils/validation";
 
 	export let item: ExtendedEntityV2;
 	export let offset: number;
@@ -95,22 +96,27 @@
 
 		CurrentLevel.updateTileAt(toPosition.z, toPosition.x, {
 			position: currentState.position,
-			surfaces: currentState.surfaces,
+			surfaces: Object.fromEntries(WALL_FACES.map((f) => [f, item.texture])) as Record<
+				WallFace,
+				Texture
+			>,
 			rotation: undefined,
 			blocking: true,
+			component: "Wall",
 			secret: false,
 			pushwall: true
 		});
 
-		CurrentLevel.updateTileAt(section, offset, {
-			surfaces: null,
-			rotation: undefined,
-			secret: false,
-			pushwall: false
-		});
-
 		queueMicrotask(() => {
 			state = "open";
+			hasOpenedOnce = true;
+
+			CurrentLevel.updateTileAt(section, offset, {
+				surfaces: null,
+				rotation: undefined,
+				secret: false,
+				pushwall: false
+			});
 		});
 	};
 	export const type = "pushwall";

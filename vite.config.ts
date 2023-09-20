@@ -7,6 +7,6 @@ export default defineConfig({
 	build: { minify: true },
 	experimental: {},
 	css: { postcss: { plugins: [autoprefixer()] } },
-	esbuild: { drop: ["debugger", "console"] },
+	// esbuild: { drop: ["debugger", "console"] },	
 	plugins: [sveltekit()]
 });

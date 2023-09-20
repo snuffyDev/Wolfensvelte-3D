@@ -1,6 +1,6 @@
 import { browser } from "$app/environment";
 
-class SoundEffectNode {
+export class SoundEffectNode {
 	private node: OscillatorNode | null = null;
 	private filter: BiquadFilterNode | null = null;
 	private constructor(private context: AudioContext, options: OscillatorOptions) {
@@ -54,7 +54,7 @@ class SoundEffectNode {
 	}
 }
 
-class WebAudioCore {
+export class WebAudioCore {
 	private declare context: AudioContext;
 	private declare gainNode: GainNode;
 	private declare squareOsc: OscillatorNode;
@@ -87,23 +87,22 @@ class WebAudioCore {
 	) {
 		if (!this.context) {
 			this.preloadQueue.push([name, buffer, autoPlay, loop]);
-			console.log("preload");
 			return;
 		}
 
 		if (typeof buffer === "string") {
 			buffer = await fetch(buffer as string).then((res) => res.arrayBuffer());
 		}
+
 		const audioBuffer = await this.context.decodeAudioData(buffer as ArrayBuffer);
-		console.log("buffer", audioBuffer);
 		this.buffers[name] = audioBuffer;
+
 		if (autoPlay) {
-			console.log(this);
 			this.play(name, loop);
 		}
 	}
-	public play(name: string, loop = false) {
-		if (this.activeSourceNode) {
+	public play(name: string, loop = false, cancel = true) {
+		if (this.activeSourceNode && cancel) {
 			this.activeSourceNode.stop(this.context.currentTime);
 			this.activeSourceNode.disconnect();
 			try {
@@ -113,10 +112,13 @@ class WebAudioCore {
 			}
 		}
 		if (!name) return;
-		if (!this.buffers[name]) return console.log(this.buffers.n);
+		if (!this.buffers[name]) return;
+
 		this.activeSourceNode = this.context.createBufferSource();
 		this.activeSourceNode.buffer = this.buffers[name];
+
 		if (loop) this.activeSourceNode.loop = loop;
+
 		this.activeSourceNode.connect(this.gainNode);
 		this.activeSourceNode.start(this.context.currentTime);
 	}

@@ -4,107 +4,6 @@
 	context="module"
 	lang="ts"
 >
-	export function testLineOfSight(world: WorldState, start: Position2D, end: Position2D): boolean {
-		const dx = end.x - start.x;
-		const dz = end.z - start.z;
-		const distance = getDistanceFromPoints(start, end);
-		const stepX = dx / distance;
-		const stepZ = dz / distance;
-
-		let x = start.x;
-		let z = start.z;
-		for (let i = 0; i < distance; i++) {
-			// Round x and z to the nearest integer to get the coordinates of the tile
-			const tileX = Math.ceil(x - 0.5);
-			const tileZ = Math.floor(z + 0.5);
-
-			// Check if the tile at (tileX, tileZ) contains a MapItem
-			if (CurrentLevel.checkCollisionWithWorld({ x: tileX, z: tileZ }, null)) {
-				return false;
-			}
-
-			x += stepX;
-			z += stepZ;
-		}
-
-		return true;
-	}
-
-	export function testLineOfSight2(
-		world: ExtendedEntityV2[][],
-		start: Position2D,
-		end: Position2D
-	): boolean {
-		let dx = Math.abs(end.x - start.x);
-		let dy = Math.abs(end.z - start.z);
-		let x = start.x;
-		let z = start.z;
-		let n = 1 + dx + dy;
-		let x_inc = end.x > start.x ? 1 : -1;
-		let y_inc = end.z > start.z ? 1 : -1;
-		let error = dx - dy;
-		dx *= 2;
-		dy *= 2;
-
-		for (; n > 0; --n) {
-			// check if current tile is valid and doesn't have a model
-			if (
-				x < 0 ||
-				x >= world.length ||
-				z < 0 ||
-				z >= world[0].length ||
-				CurrentLevel.checkCollisionWithWorld({ x, z }, null)
-			) {
-				return false;
-			}
-
-			if (error > 0) {
-				x += x_inc;
-				error -= dy;
-			} else {
-				z += y_inc;
-				error += dx;
-			}
-		}
-
-		return true;
-	}
-
-	function isBlocking(entity: ExtendedEntity | undefined): boolean {
-		if (!entity) {
-			return false;
-		}
-
-		// Doors are blocking if they exist and are closed
-		if (
-			entity.model &&
-			entity.model?.component !== "Door" &&
-			["SS", "Guard", "Dog"].includes(entity.model.component) !== true
-		) {
-			return false; // adjust this to check if the door is actually closed
-		}
-		if (
-			entity.model &&
-			entity.model.component === "Door" &&
-			entity.model.attributes?.state &&
-			entity.model.attributes?.state === "closed"
-		) {
-			return true;
-		}
-		// Walls are blocking if they have any surfaces
-		if (entity.surfaces && Object.values(entity.surfaces).length) {
-			return true;
-		}
-
-		return false;
-	}
-	type Model = InstanceType<typeof Door | typeof MapObject | typeof Elevator | typeof Enemy>;
-	export type TracePoint = {
-		position: Position2D;
-		distance: number;
-		normal: number;
-	};
-
 	export function bresenhamLineWithFilter(
 		start: Position2D,
 		end: Position2D,
@@ -147,136 +46,116 @@
 		end: Position2D,
 		world: ExtendedEntityV2[][]
 	): boolean {
-		const dx = Math.abs(end.z - start.z);
-		const dy = Math.abs(end.x - start.x);
-		const sx = start.z < end.z ? 1 : -1;
-		const sy = start.x < end.x ? 1 : -1;
-		let err = dx - dy;
+		let dx = Math.abs(end.x - start.x);
+		let dy = Math.abs(end.z - start.z);
+		let x = start.x;
+		let z = start.z;
+		let n = 1 + dx + dy;
+		let x_inc = end.x > start.x ? 1 : -1;
+		let y_inc = end.z > start.z ? 1 : -1;
+		let error = dx - dy;
+		dx *= 2;
+		dy *= 2;
 
-		while (true) {
-			if (world[start.z][start.x].blocking) {
+		for (; n > 0; --n) {
+			// check if current tile is valid and doesn't have a model
+
+			if (
+				x < 0 ||
+				x >= world.length ||
+				z < 0 ||
+				z >= world[0].length ||
+				(world[Math.floor(z)][Math.floor(x)].blocking &&
+					world[Math.floor(z)][Math.floor(x)].component === "Door" &&
+					world[Math.floor(z)][Math.floor(x)].attributes?.state !== "open") ||
+				world[Math.floor(z)][Math.floor(x)].blocking
+			) {
+				// console.warn("No Line Of Sight", world[Math.floor(start.z)][Math.floor(start.x)]);
 				return false; // Hit an obstacle, no line of sight
 			}
-
-			if (start.z === end.z && start.x === end.x) {
-				return true; // Reached the target without hitting obstacles
-			}
-
-			const e2 = 2 * err;
-			if (e2 > -dy) {
-				err -= dy;
-				start.z += sx;
-			}
-			if (e2 < dx) {
-				err += dx;
-				start.x += sy;
+			if (error > 0) {
+				x += x_inc;
+				error -= dy;
+			} else {
+				z += y_inc;
+				error += dx;
 			}
 		}
+
+		return true;
 	}
 
 	export function bresenhamLine(
-		viewerPosition: Position2D,
-		viewerDirectionDegrees: number,
-		endPoint: Position2D,
-		grid: ExtendedEntityV2[][]
+		start: Position2D,
+		end: Position2D,
+		world: ExtendedEntityV2[][]
 	): boolean {
-		// Convert degrees to radians for trigonometric calculations
-		const viewerDirectionRadians = (viewerDirectionDegrees * Math.PI) / 180;
+		const startX = Math.floor(start.z); // Swap x and z here
+		const startZ = Math.floor(start.x); // Swap x and z here
+		const endX = Math.floor(end.z); // Swap x and z here
+		const endZ = Math.floor(end.x); // Swap x and z here
 
-		// Calculate the direction vector based on the angle
-		const dx = Math.cos(viewerDirectionRadians);
-		const dz = Math.sin(viewerDirectionRadians);
+		const dx = Math.abs(endX - startX);
+		const dz = Math.abs(endZ - startZ);
 
-		const sx = viewerPosition.x < endPoint.x ? 1 : -1;
-		const sz = viewerPosition.z < endPoint.z ? 1 : -1;
+		const sx = startX < endX ? 1 : -1;
+		const sz = startZ < endZ ? 1 : -1;
+
 		let err = dx - dz;
-		let x = viewerPosition.x;
-		let z = viewerPosition.z;
+		let x = startX;
+		let z = startZ;
 
 		while (true) {
+			if (x === endX && z === endZ) {
+				return true; // Reached the target without hitting obstacles
+			}
+
 			if (
 				x < 0 ||
-				x >= grid.length ||
+				x >= world.length ||
 				z < 0 ||
-				z >= grid[0].length ||
-				grid[Math.floor(z)][Math.floor(x)].blocking
+				z >= world[0].length ||
+				(world[Math.floor(start.z)][Math.floor(start.x)].blocking &&
+					world[Math.floor(start.z)][Math.floor(start.x)].component === "Door" &&
+					world[Math.floor(start.z)][Math.floor(start.x)].attributes?.state !== "open") ||
+				world[Math.floor(start.z)][Math.floor(start.x)].blocking
 			) {
 				return false; // Hit an obstacle, no line of sight
 			}
 
-			if (Math.floor(z) === Math.floor(endPoint.z) && Math.floor(x) === Math.floor(endPoint.x)) {
-				return true; // Reached the target without hitting obstacles
-			}
-
 			const e2 = 2 * err;
+
 			if (e2 > -dz) {
 				err -= dz;
-				z += sx;
+				x += sx;
 			}
+
 			if (e2 < dx) {
 				err += dx;
-				x += sz;
+				z += sz;
 			}
-		}
-	}
-	export class Cache<T> {
-		private declare current: T;
-		private declare previous: T;
-		private declare self: Map<T, T>;
-		constructor() {
-			this.self = new Map();
-		}
-
-		has(value: T) {
-			return this.self.has(value);
-		}
-
-		get(value: T) {
-			const r = this.self.get(value);
-			if (r && r !== this.current) this.current = r;
-			return r;
-		}
-
-		set(value: T) {
-			if (this.self.size >= 5 && this.previous !== value) {
-				this.self.delete(this.previous);
-				this.previous = this.current;
-			}
-			this.current = value;
-			return this.self.set(value, value);
-		}
-
-		setIfNotFound(value: T) {
-			if (this.has(value)) return;
-			this.set(value);
 		}
 	}
 </script>
 
 <script lang="ts">
 	import { PlayerState, type PlayerControls, playerHealth, playerState } from "$lib/stores/player";
-	import { isVisibleToPlayer, normalizeAngle } from "$lib/utils/angle";
-	import { GameObjects, type GameObjectType } from "$lib/utils/manager";
+	import { isVisibleToPlayer } from "$lib/utils/angle";
+	import { GameObjects } from "$lib/utils/manager";
 	import {
-		comparePositions,
 		getDistanceFromPoints,
 		getFacingDirection,
-		getLocalPositionFromRealPosition,
-		getRealPositionFromLocalPosition
+		getLocalPositionFromRealPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
 	import { onDestroy, onMount, tick } from "svelte";
-	import type Guard from "./Guard/Guard.svelte";
 	import { AIAudioManager } from "$lib/helpers/audio";
 	import PistolURL from "$lib/sounds/pistol.WAV?url";
-	import type { ExtendedEntity, ExtendedEntityV2, World } from "$lib/types/core";
-	import type { Position, Position2D } from "$lib/types/position";
-	import { CurrentLevel, type WorldState } from "./Level.svelte";
+	import type { ExtendedEntityV2 } from "$lib/types/core";
+	import type { Position2D } from "$lib/types/position";
+	import { CurrentLevel } from "./Level.svelte";
 	import type Enemy from "./Enemy.svelte";
-	import type Door from "./Door.svelte";
-	import type MapObject from "./MapObject.svelte";
-	import type Elevator from "./Elevator.svelte";
-	import { gameData } from "$lib/helpers/maps";
+	import { AudioEngine } from "$lib/helpers/music";
 
 	$: state = $playerState;
 
@@ -294,21 +173,15 @@
 
 	let x: number = 0;
 
-	const audioManager = new AIAudioManager({
-		pistol: new URL(PistolURL, import.meta.url).toString(),
-		knife: "",
-		smg: new URL("../sounds/smg.WAV", import.meta.url).toString()
-	});
+	const audioManager = AudioEngine;
 
 	let cssText = ``;
 	let start: number;
-	const cache = new Cache<string>();
 
 	const f = frameLoop(async (now) => {
 		if (!start) start = now;
 		const elapsed = now - start;
 		const { x: a, y: b, z: c } = $PlayerState.rotation;
-		const { x, y, z } = $PlayerState.position ?? { x: 0, y: 0, z: 0 };
 
 		if (elapsed > 8 && $playerHealth > 0) {
 			start = now;
@@ -320,14 +193,29 @@
 		return true;
 	});
 
+	onMount(async () => {
+		await Promise.all(
+			Object.entries({
+				"player:pistol": new URL(PistolURL, import.meta.url).toString(),
+				"player:smg": new URL("../sounds/smg.WAV", import.meta.url).toString(),
+				"player:chaingun": new URL("../sounds/chaingun.WAV", import.meta.url).toString()
+			}).map(async ([key, value]) => {
+				await AudioEngine.loadAudioFile(key, value);
+			})
+		);
+	});
 	onDestroy(() => {
 		f.abort();
 	});
 
-	async function primaryAction() {
+	async function primaryAction(event: KeyboardEvent) {
 		const { position } = $PlayerState;
 		const shouldAttackEnemy = await interactWithDoor(position);
 		if (shouldAttackEnemy) {
+			if ($PlayerState.weapons.active !== "knife" && $PlayerState.weapons.ammo > 0) {
+				if ($PlayerState.weapons.active !== "pistol" && event.repeat)
+					AudioEngine.play(`player:${$PlayerState.weapons.active}`, false, false);
+			}
 			await attackClosestEnemy(position);
 		}
 	}
@@ -372,7 +260,12 @@
 				(localPosition.x === toPosition.x && localPosition.z === toPosition.z) ||
 				(localPosition.x - 1 === toPosition.x && localPosition.z === toPosition.z)
 			) {
+				if (door.component === "Elevator" && door.secret === true) {
+					await door.toggleAction(true);
+					return false;
+				}
 				door.toggleAction();
+
 				return false;
 			}
 		}
@@ -380,15 +273,16 @@
 	}
 
 	async function attackClosestEnemy(position: Position2D) {
-		if (state === "attack" && $PlayerState.weapons.active !== "smg") return;
+		if (
+			state === "attack" &&
+			$PlayerState.weapons.active !== "smg" &&
+			$PlayerState.weapons.active !== "chaingun"
+		)
+			return;
 		if ($PlayerState.weapons.ammo <= 0 && $PlayerState.weapons.active !== "knife") {
 			return;
 		}
 
-		if ($PlayerState.weapons.active !== "knife") {
-			$PlayerState.weapons.ammo -= 1;
-			if ($PlayerState.weapons.active) audioManager.play($PlayerState.weapons.active);
-		}
 		$PlayerState.state = "attack";
 
 		await tick();
@@ -404,11 +298,11 @@
 			if (
 				isVisibleToPlayer($PlayerState, e?.getPosition(), 20) &&
 				bresenhamLineSimple(
+					e.getLocalPosition(),
 					getLocalPositionFromRealPosition({
 						x: position.x,
 						z: position.z
 					}),
-					e.getLocalPosition(),
 					$CurrentLevel
 				) &&
 				distance < 750 &&
@@ -417,21 +311,27 @@
 				enemiesInRange.push(e);
 			}
 		}
-
-		if (!enemiesInRange.length) return;
 		let timeout = 0;
+
 		switch ($PlayerState.weapons.active) {
 			case "smg":
-				timeout = 125;
+				timeout = 325;
 				break;
 			case "pistol":
-				timeout = 350;
+				timeout = 500;
 				break;
 			case "knife":
 				timeout = 125;
 				break;
-				defaulgetLocalPositionFromRealPositiont: break;
 		}
+
+		AudioEngine.play(`player:${$PlayerState.weapons.active}`, false, false);
+
+		setTimeout(() => {
+			$PlayerState.state = "idle";
+		}, timeout);
+
+		if (!enemiesInRange.length) return PlayerState.attack(undefined);
 
 		const closest = enemiesInRange.sort(
 			(a, b) =>
@@ -451,19 +351,10 @@
 			z: position.z
 		});
 		const distance = getDistanceFromPoints(playerPos, target.getLocalPosition());
-		setTimeout(() => {
-			$PlayerState.state = "idle";
-		}, timeout);
 
-		if (!target) return;
 		if ($PlayerState.weapons.active === "knife" && distance > 1) return;
 
-		const enemyPosition = getLocalPositionFromRealPosition(target.getPosition());
-		const canShoot = bresenhamLineSimple(playerPos, enemyPosition, $CurrentLevel)!;
-
-		if (canShoot) {
-			await PlayerState.attack(target);
-		}
+		PlayerState.attack(target);
 	}
 
 	const handleTouchStart = (e: TouchEvent) => {
@@ -473,8 +364,7 @@
 			(e.target as HTMLDivElement).contains(camera) ||
 			camera.isSameNode(e.target as HTMLElement)
 		) {
-			console.log(e.target);
-			primaryAction();
+			primaryAction(e as never);
 		}
 	};
 </script>
@@ -486,6 +376,7 @@
 			case "1":
 			case "2":
 			case "3":
+			case "4":
 				const key = +e.key;
 				PlayerState.changeWeapon(key);
 				break;
@@ -502,8 +393,7 @@
 				break;
 			case " ":
 			case "space":
-				primaryAction();
-
+				primaryAction(e);
 				break;
 			case "d":
 				b.d = true;
@@ -569,7 +459,6 @@
 		z-index: 1000;
 		left: 0;
 		max-width: 24.125rem;
-		// contain: strict;
 		right: 0;
 		inset: 0;
 
@@ -584,10 +473,9 @@
 		width: 24.125rem;
 		height: 24.125rem;
 		bottom: 0;
-		// contain: strict;
 		background: var(--url);
 		perspective: var(--perspective);
-		background-size: calc(24.125rem * 4);
+		background-size: cover;
 		background-repeat: no-repeat no-repeat;
 		transition: inherit;
 		transition-delay: 0s;
@@ -597,71 +485,82 @@
 	}
 	@keyframes shooting {
 		0% {
-			background-position-x: -0px;
+			background-position-x: 0; // No need for "-0px"
 		}
 		20% {
-			background-position-x: -369px;
+			background-position-x: -23.0625rem; // Converted from -369px to rem
 		}
 		40% {
-			background-position-x: -768px;
+			background-position-x: -48rem; // Converted from -768px to rem
 		}
 		60% {
-			background-position-x: -1148px;
+			background-position-x: -71.75rem; // Converted from -1148px to rem
 		}
 	}
+
 	.pistol {
 		--url: url(../sprites/PISTOL.png) no-repeat;
 		--shoot-speed-anim: 0.6125s;
 
 		@keyframes shooting {
 			0% {
-				background-position-x: -0px;
+				background-position-x: 0; // No need for "-0px"
 			}
 			20% {
-				background-position-x: -369px;
+				background-position-x: -23.0625rem; // Converted from -369px to rem
 			}
 			40% {
-				background-position-x: -768px;
+				background-position-x: -48rem; // Converted from -768px to rem
 			}
 			60% {
-				background-position-x: -1148px;
+				background-position-x: -71.75rem; // Converted from -1148px to rem
 			}
 		}
 	}
+
 	.smg {
 		--url: url(../sprites/SMG.png) no-repeat;
-		--shoot-speed-anim: 0.125s;
+		--shoot-speed-anim: 0.55s;
+
 		@keyframes shooting {
 			0% {
-				background-position-x: -0px;
+				background-position-x: 0; // No need for "-0px"
 			}
 			20% {
-				background-position-x: -369px;
+				background-position-x: -23.0625rem; // Converted from -369px to rem
 			}
 			40% {
-				background-position-x: -768px;
+				background-position-x: -48rem; // Converted from -768px to rem
 			}
 			60% {
-				background-position-x: -1148px;
+				background-position-x: -71.75rem; // Converted from -1148px to rem
+			}
+
+			80% {
+				background-position-x: -48rem; // Converted from -768px to rem
+			}
+			100% {
+				background-position-x: -23.0625rem; // Converted from -369px to rem
 			}
 		}
 	}
+
 	.attack {
 		&::after {
 			animation: shooting steps(1) var(--shoot-speed-anim);
 
 			@keyframes shooting {
 				0% {
-					background-position-x: -0px;
+					background-position-x: 0; // No need for "-0px"
 				}
 				20% {
-					background-position-x: -369px;
+					background-position-x: -23.0625rem; // Converted from -369px to rem
 				}
 				40% {
-					background-position-x: -768px;
+					background-position-x: -48rem; // Converted from -768px to rem
 				}
 				60% {
-					background-position-x: -1148px;
+					background-position-x: -71.75rem; // Converted from -1148px to rem
 				}
 			}
 		}

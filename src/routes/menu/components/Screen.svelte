@@ -30,7 +30,7 @@
 		width: 100%;
 		margin: 0 auto;
 		aspect-ratio: 4/3;
-		// max-width: 100%;
+
 		max-width: 75rem;
 		height: 100%;
 		min-height: 0;
@@ -43,15 +43,15 @@
 		> :global(img) {
 			min-height: 0;
 			position: absolute;
-			// max-height: 50vh;
+
 			max-width: 100%;
 			aspect-ratio: 1/1;
 			z-index: -1;
 			image-rendering: pixelated;
-			// object-fit: contain;
+
 			user-select: none;
 			pointer-events: none;
-			-webkit-user-drag: none; // object-fit: contain;
+			-webkit-user-drag: none;
 			width: 100%;
 			height: 100%;
 		}

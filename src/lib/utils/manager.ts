@@ -4,7 +4,6 @@ import type Enemy from "$lib/components/Enemy.svelte";
 import type MapObject from "$lib/components/MapObject.svelte";
 import type Pushwall from "$lib/components/Pushwall.svelte";
 import type Wall from "$lib/components/Wall.svelte";
-import { asap } from "./asap";
 
 export type Model = Wall | Door | Enemy | MapObject | Elevator;
 
@@ -72,14 +71,14 @@ class GameObjectStoreManager {
 	set = (value: GameObjectStore) => {
 		for (const v in value) {
 			const items = value[v as keyof GameObjectStore];
-			value[v as keyof GameObjectStore] = items.filter((v) => !!v && !!v.item);
+			value[v as keyof GameObjectStore] = items.filter((v) => !!v && !!v.item) as never;
 		}
 		this.store = value;
 		this.subscribers.forEach((cb) => cb(this.store));
 	};
 	reset = () => {
 		for (const key in this.store) {
-			asap(() => {
+			queueMicrotask(() => {
 				this.store[key as keyof typeof this.store].length = 0;
 				this.subscribers.forEach((cb) =>
 					cb(
@@ -90,7 +89,7 @@ class GameObjectStoreManager {
 				);
 				this.store[key as keyof typeof this.store] = this.store[
 					key as keyof typeof this.store
-				].filter((v) => v != null) as any;
+				].filter((v) => v != null) as never;
 			});
 		}
 		this.subscribers.forEach((cb) =>

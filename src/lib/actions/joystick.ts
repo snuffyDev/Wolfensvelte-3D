@@ -71,24 +71,6 @@ export function joystick(
 			node.dispatchEvent(
 				new CustomEvent("move", { detail: { type: coordinates.type, x: touchX, y: touchY } })
 			);
-			// if ((angleDeg >= 180 && angleDeg < 225) || (angleDeg >= 0 && angleDeg < 45)) {
-
-			// } else if (angleDeg >= 45 && angleDeg < 90) {
-
-			// } else if (angleDeg >= 90 && angleDeg < 135) {
-
-			// } else if (angleDeg >= 135 && angleDeg < 180) {
-
-			// } else if (angleDeg >= 225 && angleDeg < 270) {
-
-			// } else if (angleDeg >= 270 && angleDeg < 315) {
-
-			// } else if (angleDeg >= 315 && angleDeg < 360) {
-
-			// } else if (angleDeg >= 225 && angleDeg < 270) {
-
-			// }
-		} else {
 		}
 	};
 	function handlepointerup(event) {

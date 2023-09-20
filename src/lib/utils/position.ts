@@ -49,13 +49,13 @@ export function diffPositions(a: Position2D, b: Position2D) {
 		x: 0,
 		z: 0
 	};
-	result.x += a.x < b.x ? -1 : 0;
-	result.z += a.z < b.z ? -1 : 0;
+	result.x += a.x < b.x ? -1 : a.x === b.x ? 1 : 0;
+	result.z += a.z < b.z ? -1 : a.z === b.z ? 1 : 0;
 	return result;
 }
 
 export function comparePositions(a: Position2D, b: Position2D): Position2D {
-	const tolerance = 0.001;
+	const tolerance = 0.01;
 
 	const xDiff = Math.abs(a.x - b.x);
 	const zDiff = Math.abs(a.z - b.z);

@@ -5,8 +5,15 @@ type Path = Array<Position2D>;
 
 export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 	const world = CurrentLevel.get();
+	const worldWidth = world[0].length;
+	const worldHeight = world.length;
+
 	function heuristic(a: Position2D, b: Position2D): number {
 		return Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+	}
+
+	function isValidPosition(pos: Position2D): boolean {
+		return pos.x >= 0 && pos.x < worldHeight && pos.z >= 0 && pos.z < worldWidth;
 	}
 
 	function getNeighbors(pos: Position2D): Position2D[] {
@@ -17,15 +24,11 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 			{ x: pos.x, z: pos.z + 1 }
 		];
 
-		return neighbors.filter(
-			(neighbor) =>
-				neighbor.x >= 0 &&
-				neighbor.x < world.length &&
-				neighbor.z >= 0 &&
-				neighbor.z < world[0].length &&
-				world[neighbor.x][neighbor.z].blocking !== true &&
-				world[neighbor.x][neighbor.z].component !== "Object"
-		);
+		return neighbors.filter((neighbor) => isValidPosition(neighbor) && isWalkable(neighbor));
+	}
+	
+	function isWalkable(pos: Position2D): boolean {
+		return !CurrentLevel.checkCollisionWithWorld(pos, true);
 	}
 
 	const openSet: Position2D[] = [start];
@@ -37,14 +40,13 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 		return `${Math.floor(pos.x)},${Math.floor(pos.z)}`;
 	}
 
-	for (let x = 0; x < world.length; x++) {
-		const row = world[x];
-		for (let z = 0; z < row.length; z++) {
+	world.forEach((row, x) => {
+		row.forEach((_, z) => {
 			const posStr = posToStr({ x, z });
 			gScore.set(posStr, Infinity);
 			fScore.set(posStr, Infinity);
-		}
-	}
+		});
+	});
 
 	gScore.set(posToStr(start), 0);
 	fScore.set(posToStr(start), heuristic(start, goal));
@@ -68,15 +70,19 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 
 		openSet.splice(openSet.indexOf(current), 1);
 		getNeighbors(current).forEach((neighbor) => {
-			const tentativeGScore = gScore.get(posToStr(current))! + 1;
 			const neighborKey = posToStr(neighbor);
+			const tentativeGScore = gScore.get(posToStr(current))! + 1;
 
-			if (tentativeGScore < gScore.get(neighborKey)!) {
+			if (
+				isValidPosition(neighbor) &&
+				isWalkable(neighbor) &&
+				tentativeGScore < gScore.get(neighborKey)!
+			) {
 				cameFrom.set(neighborKey, current);
 				gScore.set(neighborKey, tentativeGScore);
 				fScore.set(neighborKey, tentativeGScore + heuristic(neighbor, goal));
 
-				if (!openSet.find((pos) => pos.x === neighbor.x && pos.z === neighbor.z)) {
+				if (!openSet.some((pos) => posToStr(pos) === neighborKey)) {
 					openSet.push(neighbor);
 				}
 			}

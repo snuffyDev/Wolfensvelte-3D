@@ -33,21 +33,19 @@
 	import { PlayerState, playerRotation } from "$lib/stores/player";
 	import type { Position2D } from "$lib/types/position";
 	import {
-		comparePositions,
-		diffPositions,
 		getDistanceFromPoints,
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
-	import { getContext, onMount, tick } from "svelte";
-	import type { ExtendedEntity, ExtendedEntityV2, WallFace } from "$lib/types/core";
+	import { getContext, onMount } from "svelte";
+	import type { ExtendedEntityV2, WallFace } from "$lib/types/core";
 
 	import { enemyState } from "./Guard/state";
 
 	import { AIAudioManager } from "$lib/helpers/audio";
 	import { CurrentLevel } from "./Level.svelte";
-	import { testLineOfSight2 } from "./Player.svelte";
+	import { bresenhamLineSimple } from "./Player.svelte";
 	import { ItemPickups, rand } from "$lib/utils/engine";
 	import { WALL_FACES } from "$lib/utils/validation";
 	import { ctxKey, type WSContext } from "../../routes/key";
@@ -79,7 +77,7 @@
 	let isVisible = false;
 	let hasTakenDamage = false;
 	let willChange: string | false = false;
-	let canPatrol = Math.random() > 0.3;
+	let canPatrol = Math.random() > 0.45;
 	export const setState = state.setState;
 
 	export const getPosition = () => $tween;
@@ -114,9 +112,10 @@
 			}
 
 			state.setState("dead");
-			LevelStatManager.add('kills');
+			LevelStatManager.add("kills");
 		}
 	};
+
 	let previousAnimationState: typeof $state.state;
 
 	let startFrame: number;
@@ -146,8 +145,58 @@
 		}
 		return [CurrentLevel.checkCollisionWithWorld(toPosition, null), toPosition] as const;
 	};
+
+	const moveInDirection = (
+		position: Position2D,
+		direction: WallFace,
+		distance: number
+	): Position2D => {
+		switch (direction) {
+			case "left":
+				return { ...position, x: position.x + distance };
+			case "right":
+				return { ...position, x: position.x - distance };
+			case "back":
+				return { ...position, z: position.z + distance };
+			case "front":
+				return { ...position, z: position.z - distance };
+			default:
+				return position;
+		}
+	};
+
+	const findValidMove = (
+		distance: number,
+		WALL_FACES: readonly WallFace[]
+	): readonly [Position2D[], Position2D, WallFace] | null => {
+		directionLoop: for (const direction of WALL_FACES) {
+			for (let i = 1; i < 4; i++) {
+				const [canMove, toPosition] = findEmptyTile(direction, i);
+				if (!canMove) {
+					continue directionLoop;
+				}
+			}
+			let toPosition: Position2D = getLocalPosition() as Position2D;
+			toPosition = moveInDirection(toPosition, direction, distance);
+			const canMove = findPath(getLocalPosition(), toPosition);
+			if (canMove.length) {
+				return [canMove, toPosition, direction] as const;
+			}
+		}
+		return null;
+	};
+
+	const moveToTile = (distance = 1): readonly [Position2D[], Position2D, WallFace] | null => {
+		const result = findValidMove(distance, WALL_FACES);
+		if (result) {
+			return result;
+		}
+		return null;
+	};
+
 	let timeSinceLastPatrol = 0;
 	let startPatrolTime = 0;
+	let lastKnownPlayerPosition: Position2D = $PlayerState.position;
 	const stateLoop = frameLoop(async (now) => {
 		if ($isLoadingNextLevel) return true;
 		if ($state.state === "dead") {
@@ -165,108 +214,91 @@
 			);
 
 			const playerPosition = getLocalPositionFromRealPosition({
-				x: -$PlayerState.position.x,
-				z: -$PlayerState.position.z
+				x: $PlayerState.position.x,
+				z: $PlayerState.position.z
 			});
 			const ourPosition = getLocalPositionFromRealPosition(getPosition());
 			const [min, preferred, max] = behavior.attackDistance;
-			const hasLineOfSight = testLineOfSight2($CurrentLevel, ourPosition, playerPosition);
-			if (hasLineOfSight && distance < 800) {
+			const hasLineOfSight = bresenhamLineSimple(playerPosition, ourPosition, $CurrentLevel);
+			if (hasLineOfSight && distance < max) {
 				if (!playerJustSeen) {
 					playerJustSeen = true;
 					audioManager.play("playerSeen");
 				}
 				const r = rand.nextInt(distance / 2.25, max);
 
-				if (
-					(distance >= min &&
-						(item.component === "Dog"
-							? distance <= max
-							: preferred(distance) < max * Math.random()) &&
-						r % 3) ||
-					hasTakenDamage
-				) {
+				const canAttackPlayer =
+					distance >= min &&
+					(item.component === "Dog" ? distance <= max : preferred(distance) < max) &&
+					Math.round(r) % 2 === 0;
+				const shouldMoveToPlayer =
+					distance >= max / 2 &&
+					(Math.abs(lastKnownPlayerPosition.x - playerPosition.x) > min ||
+						Math.abs(lastKnownPlayerPosition.z - playerPosition.z) > min);
+
+				if ((canAttackPlayer && !shouldMoveToPlayer) || hasTakenDamage) {
 					if (busy) return true;
 					if (!busy) busy = true;
-					await tick().then(() => {
-						audioManager.play("attack");
-						tween.cancel();
+					audioManager.play("attack");
+					tween.cancel();
 
-						previousAnimationState = "attack";
-						state.setState("attack");
-						busy = false;
-					});
-				} else if (distance > min) {
+					previousAnimationState = "attack";
+					await state.setState("attack");
+					busy = false;
+					state.setState("idle");
+					lastKnownPlayerPosition = playerPosition;
+				} else if (distance >= min && distance < max) {
 					if (busy) return true;
 					if (!busy) busy = true;
 					previousAnimationState = "walk";
 					state.setState("walk");
-					const posDiff = diffPositions($PlayerState.position, ourPosition);
-					const posCmp = comparePositions($PlayerState.position, ourPosition);
-					await state
-						.moveTo(
-							getPositionFromDistance(
-								{
-									x: posCmp.x === 0 ? 0 : $PlayerState.position.x + (posDiff.x < 0 ? -32 : 32),
-									z: posCmp.z === 0 ? 0 : $PlayerState.position.z + (posDiff.z < 0 ? -32 : 32)
-								},
-								$state.position
-							)
+					await Promise.race([
+						new Promise((r) => setTimeout(r, 4000)),
+						await state.moveTo(
+							findPath(getLocalPosition(), getLocalPositionFromRealPosition($PlayerState.position))
 						)
-						.finally(() => {
-							busy = false;
-						});
+					]);
+					busy = false;
+					state.setState("idle");
+					lastKnownPlayerPosition = playerPosition;
 				} else {
 					if (distance > 1000) playerJustSeen = false;
-
+					tween.cancel();
 					state.setState("idle");
 				}
 			} else {
-				if (canPatrol && !busy && $state.state === "idle") {
+				if (!busy && !playerJustSeen && canPatrol && $state.state === "idle") {
 					const timeSinceLastPatrol = now - startPatrolTime;
-					// previousAnimationState = "idle";
 
-					if (timeSinceLastPatrol > Math.min(3200, Math.max(100, (rand.nextByte() * 512) / 4))) {
+					if (timeSinceLastPatrol > Math.max(8000, (rand.nextByte() * 512) / 4)) {
 						startPatrolTime = now;
 						busy = true;
 						state.setState("walk");
 						previousAnimationState = "idle";
-						console.log("WALKING!");
 
-						const directions = [...Array(4).keys()].map((i) => WALL_FACES[rand.nextInt(0, 8) % 4]);
-						const res = [[true, getLocalPosition()] as const];
-						for (let idx = 0; idx < directions.length; idx++) {
-							const dir = directions[idx];
-							if (item.component === "Guard") {
-								const [canMove, pos] = findEmptyTile(dir, ~~rand.nextInt(1, 8));
-								if (canMove) {
-									res.push([canMove, pos] as const);
-								}
-							}
+						const tile = moveToTile(rand.nextInt(1, 4));
+						if (tile) {
+							await state.moveTo(tile[0]);
 						}
-						const [, goToPosition] = res.reduce((acc, curr) => {
-							if (!curr[0]) return acc;
-							const [, accPosition] = acc;
-							const [, currPosition] = curr;
-
-							const diff = comparePositions(currPosition, accPosition);
-							acc[1].x += diff.x;
-							acc[1].z += diff.z;
-							return acc;
-						});
-
-						await Promise.race([
-							new Promise((r) => setTimeout(r, 5000)),
-							state.moveTo(getRealPositionFromLocalPosition(goToPosition))
-						]);
 						busy = false;
 						previousAnimationState = "idle";
 						state.setState("idle");
 					}
 				}
-				playerJustSeen = false;
-				previousAnimationState = "idle";
-				state.setState("idle");
+				if (playerJustSeen) {
+					if (busy) return true;
+					previousAnimationState = "walk";
+					state.setState("walk");
+					await Promise.race([
+						new Promise((r) => setTimeout(r, 2100)),
+						await state.moveTo(
+							findPath(getLocalPosition(), getLocalPositionFromRealPosition($PlayerState.position))
+						)
+					]);
+					busy = false;
+					state.setState("idle");
+					lastKnownPlayerPosition = playerPosition;
+				}
 			}
 		}
 		return true;
@@ -416,7 +448,7 @@
 
 		&.hurt {
 			animation: hurt steps(1) 0.666s;
-			// background-position: -576px;
+
 			@keyframes hurt {
 				50% {
 					background-position: -576px;
@@ -530,7 +562,6 @@
 		&.idle {
 			background-position: 0px;
 		}
-		// background-position: -128px;
 
 		&.idle {
 			background-position: -0px -0px;
@@ -590,19 +621,101 @@
 
 		@keyframes deadAnimation {
 			20% {
-				// background-color: blue;
 				background-position: -64px -192px;
 			}
 			25% {
-				// background-color: transparent;
 				background-position: -128px -0x;
 			}
 			50% {
-				// background-color: red;
 				background-position: -128px -64px;
 			}
 			90% {
-				// background-color: blue;
+				background-position: -128px -128px;
+			}
+		}
+	}
+
+	.hans {
+		position: absolute;
+		width: 64px;
+		height: 64px;
+		background-size: 192px;
+		inset: 0;
+		background-repeat: no-repeat;
+
+		background-image: url(./../sprites/hans/hans.png);
+
+		&.idle {
+			background-position: 0px;
+		}
+
+		&.idle {
+			background-position: -0px -0px;
+		}
+		&.attack {
+			animation: attackAnimation 0.333s steps(1);
+			background-position: -64px -128px;
+		}
+
+		&.dead {
+			background-position: -128px -128px;
+
+			animation: deadAnimation 0.666s steps(1);
+		}
+
+		&.hurt {
+			animation: hurtAnimation 0.5s steps(1);
+		}
+
+		&.walk {
+			animation: runAnimation 0.8s steps(1) infinite;
+		}
+
+		@keyframes runAnimation {
+			0% {
+				background-position: -0px -64px;
+			}
+			25% {
+				background-position: -0px -128px;
+			}
+			50% {
+				background-position: -64px -0px;
+			}
+
+			75% {
+				background-position: -0px -128px;
+			}
+		}
+
+		@keyframes hurtAnimation {
+			25% {
+				background-position: -128px -192px;
+			}
+			50% {
+				background-position: -64px -64px;
+			}
+		}
+
+		@keyframes attackAnimation {
+			0% {
+				background-position: -64px -0px;
+			}
+			99% {
+				background-position: -64px -128px;
+			}
+		}
+
+		@keyframes deadAnimation {
+			20% {
+				background-position: -64px -192px;
+			}
+			25% {
+				background-position: -128px -0x;
+			}
+			50% {
+				background-position: -128px -64px;
+			}
+			90% {
 				background-position: -128px -128px;
 			}
 		}

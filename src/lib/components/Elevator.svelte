@@ -2,7 +2,7 @@
 
 <script lang="ts">
 	import { LevelHandler } from "$lib/stores/stats";
-	import type { ExtendedEntity, Texture, WallFace } from "$lib/types/core";
+	import type { ExtendedEntityV2, Texture, WallFace } from "$lib/types/core";
 	import type { Position2D } from "$lib/types/position";
 	import { getRealPositionFromLocalPosition } from "$lib/utils/position";
 	import { frameLoop } from "$lib/utils/raf";
@@ -13,7 +13,7 @@
 
 	export let offset: number;
 	export let section: number;
-	export let item: ExtendedEntity;
+	export let item: ExtendedEntityV2;
 
 	let visibility: boolean = false;
 	let state: "inactive" | "active" = "inactive";
@@ -35,9 +35,13 @@
 	});
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
-	export const toggleAction = () => {
+	export const toggleAction = (secret?: boolean) => {
 		state = "active";
-		LevelHandler.levelComplete(true);
+		if (item.secret) {
+			LevelHandler.levelCompleteSecret(true);
+		} else {
+			LevelHandler.levelComplete(true);
+		}
 		setTimeout(() => {
 			$isLoadingNextLevel = true;
 		}, 0);

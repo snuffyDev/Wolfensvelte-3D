@@ -1,20 +1,24 @@
-<svelte:options accessors={true} />
+<svelte:options
+	accessors={true}
+	immutable={true}
+/>
 
 <script lang="ts">
 	import type { Position, Position2D } from "$lib/types/position";
-	import type { ExtendedEntity, ExtendedEntityV2, MapItem } from "../types/core";
+	import type { ExtendedEntityV2 } from "../types/core";
 	import {
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
 	import { getContext, onMount } from "svelte";
 	import { tweened } from "svelte/motion";
-	import { CurrentLevel, getTileRegion, getTileRegions, renderVisibleTiles } from "./Level.svelte";
+	import { CurrentLevel, renderVisibleTiles } from "./Level.svelte";
 	import { ctxKey, type WSContext } from "../../routes/key";
 	import { compare } from "../utils/compare";
 	import { AIAudioManager } from "$lib/helpers/audio";
 	import { PlayerState } from "$lib/stores/player";
 	import { GameObjects } from "$lib/utils/manager";
+	import { getCurrentRegion } from "./portal";
 
 	export let item: ExtendedEntityV2;
 	export let offset: number;
@@ -34,7 +38,6 @@
 		open: new URL("../sounds/objects/door/door.WAV", import.meta.url).toString(),
 		close: new URL("../sounds/objects/door/door_close.WAV", import.meta.url).toString()
 	});
-	$: console.log({ item, offset, section });
 	export const getVisibility = () => visibility;
 	export const setVisibility = (visible: boolean, triggeredByPlayer = false) => {
 		willChange = "visibility";
@@ -81,7 +84,6 @@
 				({ x, z }) => $position.x === x && $position.z === z
 			)
 		) {
-			console.log("IF");
 			$position = oldState;
 			state = state === "closed" ? "open" : "closed";
 			clearTimeout(timer);
@@ -93,49 +95,60 @@
 		let currentState = $CurrentLevel[section][offset];
 		if (!currentState.position) currentState.position = {} as Position2D;
 		if (count >= 0) {
-			console.log("COUNT>=0");
-			const regions = getTileRegions(
-				getLocalPositionFromRealPosition(state === "open" ? $position : $PlayerState.position),
-				CurrentLevel.getPortal()
+			const currentRegion = getCurrentRegion(
+				CurrentLevel.getPortal(),
+				getLocalPositionFromRealPosition(
+					state === "open" ? $PlayerState.position : $PlayerState.position
+				)
 			);
-			const visibleTiles = regions.flatMap((regionIndex) => {
-				const region = CurrentLevel.getPortal()[regionIndex];
-				return [
-					region.tiles,
-					...region.connectedRegions.map((v) => {
-						const connectedRegion = CurrentLevel.getPortal()[v];
 
-						return [...connectedRegion.tiles, ...connectedRegion.portals.map((p) => p.position)];
+			if (currentRegion) {
+				const visibleTiles = [
+					...currentRegion.tiles,
+					...currentRegion.portals.map((p) => p.position),
+					currentRegion.connectedRegions.flatMap((regionIndex) => {
+						const region = CurrentLevel.getPortal()[regionIndex];
+						return [
+							...(!!currentRegion
+								? currentRegion.connectedRegions.flatMap((r) => {
+										const reg = CurrentLevel.getPortal()[r];
+
+										return [...reg.tiles, ...reg.portals.map((p) => p.position)];
+								  })
+								: []),
+							region.tiles
+						].flat();
 					})
 				].flat();
-			});
-			renderVisibleTiles(visibleTiles, [...GameObjects], (position, state, isLast) => {
-				const visibility = position.setVisibility(state);
-				queueMicrotask(() => visibility());
-			});
+
+				renderVisibleTiles(visibleTiles, [...GameObjects], (position, state, isLast) => {
+					const visibility = position.setVisibility(state);
+					queueMicrotask(() => visibility());
+				});
+			}
 		}
 
 		if (state === "open") {
 			currentState.position = { x: offset + 1, z: section };
 			if (!currentState.attributes) currentState.attributes = {} as any;
 			currentState.attributes!.state = "open";
+			currentState.blocking = false;
 		} else {
 			currentState.position = { x: offset, z: section };
 			if (!currentState.attributes) currentState.attributes = {} as any;
 			currentState.attributes!.state = "closed";
+			currentState.blocking = true;
 		}
 		state = currentState.attributes!.state;
 		CurrentLevel.updateTileAt(section, offset, currentState);
 
 		if (state === "open" && !shouldMute) {
-			console.log("open");
 			audioPlayer.play("open");
 			clearTimeout(timer);
 			timer = setTimeout(() => {
 				toggleAction();
 			}, 5000);
 		} else if (!shouldMute) {
-			console.log("close");
 			audioPlayer.play("close");
 		}
 	};

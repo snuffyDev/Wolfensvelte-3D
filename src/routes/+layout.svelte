@@ -30,22 +30,21 @@
 			false,
 			true
 		);
-		AudioEngine.loadAudioFile("menu", Soundtrack.menu, true, true);
-		console.time("start - og");
+		if ($page.route.id !== "/[...level]") {
+			AudioEngine.loadAudioFile("menu", Soundtrack.menu, true, true);
+		}
 		await gameData.loadResources();
-		console.warn(new Error($page.url.toString()).stack);
-		gameData.loadLevel(parseInt($page.url.pathname.slice(-1).toString()) - 1 ?? 0);
-		console.log(gameData.get());
-		console.timeEnd("start - og");
+		const level = parseInt($page.url.pathname.slice(-1).toString());
+		if ($page.url.pathname.startsWith("E") && typeof level === "number") {
+			gameData.loadLevel(level > 0 ? level : level);
+		}
+
 		loaded = true;
-		// }
 	});
 
-	// $: if ($textureStore)
-
 	setContext(ctxKey, { textures: textureStore, isLoadingNextLevel: isLoadingNextMap } as WSContext);
+
 	let hasAudioPerms = false;
-	$: console.log($page);
 </script>
 
 <svelte:window
@@ -64,7 +63,6 @@
 		}
 	}}
 />
-<!-- <Noise /> -->
 {#if loaded}
 	{#if !hasAudioPerms}
 		<div
@@ -83,7 +81,7 @@
 			</div>
 		</div>
 	{:else}
-		<slot><!-- optional fallback --></slot>
+		<slot />
 	{/if}
 {/if}
 

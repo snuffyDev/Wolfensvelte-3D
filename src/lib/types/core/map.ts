@@ -8,12 +8,11 @@ export type WallFace = "front" | "left" | "back" | "right";
 // Alias for Texture
 export type Surface = Texture;
 
-
 export type EntityV2 = {
 	secret: boolean;
 	pushwall: boolean;
 	blocking: boolean;
-	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator" | "SS" | "Wall";
+	component: "Guard" | "Dog" | "Door" | "Object" | "Elevator" | "SS" | "Wall" | "Hans";
 
 	rotation: Position2D | null;
 	position: Position2D | undefined;

@@ -6,10 +6,11 @@
 	export let imgUrl: string;
 	export let zIndex: number = 0;
 
-	export let loadPromise: Promise<void> | undefined;
+	export let loadPromise: Promise<any> | undefined;
 
 	let loaded = false;
 	let loading = false;
+
 	onMount(() => {
 		if (!loading) {
 			loading = true;

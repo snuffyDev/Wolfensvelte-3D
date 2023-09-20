@@ -24,7 +24,9 @@ export const ItemPickups = {
 
 	Medkit: 142,
 	Food: 141,
-	DogFood: 123
+	DogFood: 123,
+	GoldKey: 137,
+	BlueKey: 138
 } as const;
 
 export const ItemPickupIds = Object.values<

@@ -1,61 +1,63 @@
+<script
+	context="module"
+	lang="ts"
+>
+	const LEVEL_NUMS = [...Array(10).keys()].map((v) => v + 1) as [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+	type LevelNumber = (typeof LEVEL_NUMS)[number];
+	const MAPS: `E1M${LevelNumber}`[] = LEVEL_NUMS.map((num) => `E1M${num}` as const);
+
+	const getNextMap = (map: `E1M${LevelNumber}`): (typeof MAPS)[number] | null => {
+		const idx = MAPS.indexOf(map);
+		if (idx === -1) return null;
+		return MAPS[idx + 1];
+	};
+</script>
+
 <script lang="ts">
 	import Ui from "$lib/components/UI.svelte";
 	import { getContext, onMount, tick } from "svelte";
 	import { writable } from "svelte/store";
-	import MenuMusic from "$lib/music/menu.mp3?url";
-	import MenuImg from "$lib/sprites/menu/wolf_menu.BMP?url";
 	import GetPsychedImg from "$lib/sprites/menu/get_psyched.BMP?url";
 	import Fizzlefade from "$lib/components/Fizzlefade.svelte";
-	import { PlayerState, createPlayerState, playerHealth, playerState } from "$lib/stores/player";
-	import { clear_loops, frameLoop } from "$lib/utils/raf";
+	import { PlayerState, playerHealth, playerState } from "$lib/stores/player";
 	import { GameObjects } from "$lib/utils/manager";
 	import GetPsyched from "../_menu/GetPsyched.svelte";
-	import { LevelHandler, MapHandler } from "$lib/stores/stats";
-	import { fade } from "svelte/transition";
+	import { LevelHandler } from "$lib/stores/stats";
 	import { AudioEngine } from "$lib/helpers/music";
-	import {
-		getLocalPositionFromRealPosition,
-		getRealPositionFromLocalPosition
-	} from "$lib/utils/position";
 	import Scene from "$lib/components/Scene.svelte";
-	import { afterNavigate, beforeNavigate, goto, invalidate } from "$app/navigation";
+	import { afterNavigate, goto } from "$app/navigation";
 	import { ctxKey, type WSContext } from "../key";
 	import { page as _page } from "$app/stores";
-	import type { Position, Position2D } from "$lib/types/position";
 	import Joystick from "$lib/components/Controls/Joystick.svelte";
-	import Level, { CurrentLevel, type WorldState } from "$lib/components/Level.svelte";
-	import { asap } from "$lib/utils/asap";
+	import { CurrentLevel, type WorldState } from "$lib/components/Level.svelte";
 	import { gameData } from "$lib/helpers/maps";
 	import { Soundtrack } from "$lib/music";
+
 	export let data;
 
+	let page: (typeof MAPS)[number];
+	// @ts-expect-error it's fine
 	$: ({ page } = data);
-	const isPlaying = writable(false);
 
-	let menuMusicPlayer: HTMLAudioElement;
-	let get_psyched_promise: Promise<void> = Promise.resolve();
+	let skipSplashscreen = false;
+
+	let get_psyched_promise: Promise<boolean> = Promise.resolve(false);
 
 	const { isLoadingNextLevel } = getContext(ctxKey) as WSContext;
 
 	let spawn: Partial<WorldState["spawn"]> = {};
 
-	let initialized = false;
-	async function showSplashscreen() {
-		// $CurrentLevel = [];
-		// if (!initialized) initialized = true;
-		// if (initialized) return;
-
-		console.log($MapHandler);
-
-		return (get_psyched_promise = new Promise((r) => {
-			setTimeout(r, 2500);
+	async function showSplashscreen(skip = false) {
+		skipSplashscreen = skip;
+		return (get_psyched_promise = new Promise<boolean>((r) => {
+			setTimeout(() => r(skipSplashscreen), !showSplashscreen ? 0 : 2500);
 		}));
 	}
 
 	const handlePlayerDeath = async (death = true) => {
-		showSplashscreen();
-		gameData.loadLevel(+$_page.url.pathname.slice(-1) - 1);
+		get_psyched_promise = showSplashscreen(true);
 
+		gameData.loadLevel(+$_page.url.pathname.slice(-1) - 1);
 		PlayerState.init(
 			{
 				health: 100,
@@ -88,8 +90,38 @@
 			rotation: { y: 0, x: 0, z: 0 },
 			position: { x: 0, z: 0, y: 0 }
 		});
+		let level = +page.slice(3);
+		const episode = +page.slice(1, 2);
+		switch (episode) {
+			case 1:
+				level += 0;
+				break;
+			case 2:
+				level += 10;
+				break;
+
+			case 3:
+				level += 20;
+				break;
+
+			case 4:
+				level += 30;
+				break;
+
+			case 5:
+				level += 40;
+				break;
+
+			case 6:
+				level += 50;
+				break;
+
+			default:
+				level += 0;
+				break;
+		}
+		gameData.loadLevel(+level - 1);
 		CurrentLevel.set();
-		console.log(page);
 
 		const { rotation, ...rest } = spawn;
 	};
@@ -105,18 +137,19 @@
 		if ($LevelHandler.isComplete === true) {
 			GameObjects.reset();
 			isLoadingNextLevel.set(true);
-			MapHandler.nextMap();
+			const currentIndex = $LevelHandler.level;
 			setTimeout(() => {
 				LevelHandler.reset();
-				tick().then(() => {
+				tick().then(async () => {
 					showSplashscreen();
+					await goto(currentIndex === 10 ? `/E1M10` : `/${getNextMap(page)}` ?? "/E1M1");
 				});
 			}, 4000);
 		}
 	}
 	$: page, onMounted();
+	let showFizzle = false;
 	onMount(async () => {
-		console.log({ page });
 		AudioEngine.loadAudioFile(page, Soundtrack[page], true, true);
 		isLoadingNextLevel.set(false);
 		AudioEngine.play(page, true);
@@ -124,14 +157,19 @@
 	});
 </script>
 
+{#if $playerHealth <= 0}
+	<Fizzlefade />
+{/if}
 {#key get_psyched_promise}
 	{#await get_psyched_promise}
-		<GetPsyched
-			--aspect-ratio="16/9"
-			imgUrl={new URL(GetPsychedImg, import.meta.url).toString()}
-			loadPromise={get_psyched_promise}
-			zIndex={1000}
-		/>
+		{#if skipSplashscreen === false}
+			<GetPsyched
+				--aspect-ratio="16/9"
+				imgUrl={new URL(GetPsychedImg, import.meta.url).toString()}
+				loadPromise={get_psyched_promise}
+				zIndex={1000}
+			/>
+		{/if}
 	{:then _}
 		<div
 			class="game-container"
@@ -141,9 +179,6 @@
 			{#if !$LevelHandler.isComplete}
 				<div class="level-wrapper">
 					<div class="level">
-						{#if $playerHealth <= 0}
-							<Fizzlefade />
-						{/if}
 						<Scene />
 					</div>
 				</div>
@@ -201,7 +236,6 @@
 		img {
 			aspect-ratio: 4/3;
 			width: 100%;
-			// height: 100%;
 		}
 	}
 	button {
@@ -212,17 +246,15 @@
 
 	.game-container {
 		display: grid;
-		// flex-direction: column;
+
 		@media screen and (pointer: fine), screen and (orientation: portrait) and (pointer: coarse) {
 			min-height: 100%;
 		}
 
 		background-color: #003e3e;
-		// max-width: 57vw;
-		// margin: 0 auto;
-		// justify-content: center;
+
 		width: 100%;
-		// margin: 0 auto;
+
 		inset: 0;
 		grid-template-rows: minmax(15rem, 1fr) 0.3fr 1fr;
 		@media screen and (min-width: 720px) {
@@ -235,7 +267,7 @@
 			inset: 0;
 			width: 100vw;
 			height: 100vh;
-			// display: contents;
+
 			pointer-events: none;
 			z-index: 5;
 			transition: background-color ease-out 100ms;
@@ -246,17 +278,14 @@
 		&.pickup::before {
 			background-color: rgba(255, 251, 0, 0.114);
 		}
-		&.hurt {
-		}
 	}
 	.level-wrapper {
-		// height: 100%;
 		display: flex;
 		flex-direction: column;
 		width: 100%;
-		// margin: auto;
+
 		contain: strict;
-		// max-width: 100vw;
+
 		position: relative;
 		aspect-ratio: 1/1;
 		max-width: 95vw;
@@ -265,10 +294,9 @@
 			margin: auto;
 			font-size: 1rem;
 			aspect-ratio: 16/9;
-			// min-height: 100%;
+
 			max-width: 78vw;
 			width: 100%;
-			// max-height: 100vh;
 		}
 		@media screen and (pointer: coarse) and (orientation: landscape) {
 			max-width: 100%;
@@ -277,14 +305,13 @@
 
 	.joystick {
 		padding: 10vw;
-		// gap: calc(33% - 3.5vw);
+
 		width: 80%;
 		display: grid;
 		margin-bottom: 1rem;
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr 1.5fr;
-		// z-index: -1;
-		// isolation: isolate;
+
 		@media screen and (orientation: landscape) and (pointer: coarse) {
 			display: grid !important;
 			position: fixed;
@@ -298,11 +325,6 @@
 		@media screen and (pointer: fine) and (min-width: 720px) {
 			display: none !important;
 		}
-
-		&:nth-child(1) {
-			// margin-left: 3vw;
-			// margin-bottom: 3vw;
-		}
 	}
 
 	.level {
@@ -312,27 +334,24 @@
 		contain: strict;
 
 		backface-visibility: hidden;
-		// display: flex;
+
 		background-color: rgb(52, 52, 52) !important;
 		width: 97%;
 		height: 100%;
-
-		// width: 75vw;
 
 		@media screen and (orientation: landscape) and (pointer: coarse) {
 			height: 100vh;
 			width: 100vw;
 		}
 		position: absolute;
-		// flex-direction: column; // overflow: hidden;
 	}
 	.ui {
 		position: relative;
-		// grid-row: /2;
+
 		height: 8vw;
-		// padding: 1vw;
+
 		display: flex;
-		// flex: 0 1;
+
 		max-width: 75%;
 		margin: 0 auto;
 		width: 100%;

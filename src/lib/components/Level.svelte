@@ -20,7 +20,8 @@
 		Door: Door,
 		Object: MapObject,
 		Elevator: Elevator,
-		SS: Enemy
+		SS: Enemy,
+		Hans: Enemy
 	} as const;
 
 	export function getTileRegion(playerPosition: Position2D, regions: Region[]): number | undefined {
@@ -45,7 +46,7 @@
 
 		for (let i = 0; i < regions.length; i++) {
 			const region = regions[i];
-			const { portals, connectedRegions } = region;
+			const { portals } = region;
 
 			for (let j = 0; j < portals.length; j++) {
 				const portal = portals[j];
@@ -53,7 +54,7 @@
 
 				if (position.x === x && position.z === z) {
 					tileRegions.push(i);
-					tileRegions.push(...connectedRegions, connectedRegion);
+					tileRegions.push(connectedRegion);
 
 					break;
 				}
@@ -75,7 +76,12 @@
 			const model = models[index];
 			if (!model) continue;
 			const position = model?.getLocalPosition?.();
-			if (!position) continue;
+			if (
+				!position ||
+				((model.item as ExtendedEntityV2)?.component === "Door" &&
+					(model.item as ExtendedEntityV2)?.attributes?.state === "closed")
+			)
+				continue;
 
 			if (
 				tilePositions.some(
@@ -150,17 +156,27 @@
 			position: Position | Position2D,
 			isBot: boolean | null = false
 		) => {
-			const { component, surfaces, texture, attributes, blocking } =
-				TILES[position!.z][position!.x];
-			if (!component && (!texture || !surfaces)) return null;
-			if (attributes?.collectable) {
-				return handleNoClipObject(TILES[position.z][position.x], position, isBot);
-				return false;
+			try {
+				const { component, surfaces, texture, attributes, blocking } =
+					TILES[position!.z][position!.x];
+				if (!component && (!texture || !surfaces)) return null;
+				if (attributes?.collectable && !isBot) {
+					return handleNoClipObject(TILES[position.z][position.x], position, isBot);
+					return false;
+				}
+				if (attributes?.state === "open") return false;
+				if (
+					isBot &&
+					(component === "Guard" ||
+						component === "Dog" ||
+						component === "SS" ||
+						component === "Hans")
+				)
+					return true;
+				return component === "Wall" || attributes?.state === "closed" || blocking === true;
+			} catch (er) {
+				return true;
 			}
-
-			if (attributes?.state === "open") return false;
-
-			return component === "Wall" || attributes?.state === "closed" || blocking === true;
 		};
 
 		const handleNoClipObject = (
@@ -170,6 +186,7 @@
 		) => {
 			if (isBot || isBot === null) return false;
 			if (!ArrayUtils.includesUnknown(ItemPickupIds as never, model.texture)) return;
+
 			if (model.texture === ItemPickups.Smg) {
 				PlayerState.giveWeapon("smg");
 
@@ -177,7 +194,16 @@
 				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 			if (model.texture === ItemPickups.Ammo) {
-				PlayerState.giveAmmo("pistol", 4);
+				const result = PlayerState.giveAmmo("pistol", 4);
+
+				if (result) {
+					model.texture = null;
+					updateTileAt(position.z, position.x, { surfaces: null });
+				}
+			}
+
+			if (model.texture === ItemPickups.Chaingun) {
+				PlayerState.giveWeapon("chaingun");
 
 				model.texture = null;
 				updateTileAt(position.z, position.x, { surfaces: null });
@@ -193,37 +219,57 @@
 				updateTileAt(position.z, position.x, { surfaces: null });
 			}
 			if (model.texture === ItemPickups.DogFood) {
-				PlayerState.giveHealth(4);
+				const result = PlayerState.giveHealth(4);
 
-				model.texture = null;
-				updateTileAt(position.z, position.x, { surfaces: null });
+				if (result) {
+					model.texture = null;
+					updateTileAt(position.z, position.x, { surfaces: null });
+				}
 			}
 
 			if (model.texture === ItemPickups.Food) {
-				PlayerState.giveHealth(10);
+				const result = PlayerState.giveHealth(10);
 
-				model.texture = null;
-				updateTileAt(position.z, position.x, { surfaces: null });
+				if (result) {
+					model.texture = null;
+					updateTileAt(position.z, position.x, { surfaces: null });
+				}
 			}
 			if (model.texture === ItemPickups.Medkit) {
-				PlayerState.giveHealth(25);
+				const result = PlayerState.giveHealth(25);
+
+				if (result) {
+					model.texture = null;
+					updateTileAt(position.z, position.x, { surfaces: null });
+				}
+			}
+
+			if (model.texture === ItemPickups.GoldKey) {
+				PlayerState.giveKey("yellow");
 
 				model.texture = null;
 				updateTileAt(position.z, position.x, { surfaces: null });
-			} else {
-				return true;
 			}
+
+			if (model.texture === ItemPickups.BlueKey) {
+				PlayerState.giveKey("blue");
+
+				model.texture = null;
+				updateTileAt(position.z, position.x, { surfaces: null });
+			}
+			return false;
 		};
 
 		const updateTileAt = (row: number, column: number, data: Partial<ExtendedEntityV2>) => {
-			queueMicrotask(() => {
+			Promise.resolve(
 				update((u) => {
 					return [...u.slice(0, row), splice(u[row], column, 1, data), ...u.slice(row + 1)];
-				});
-
+				})
+			).then(() => {
 				TILES[row][column] = data as ExtendedEntityV2;
 			});
 		};
+
 		return {
 			subscribe,
 			get() {
@@ -245,11 +291,10 @@
 				const BASE_TILE_MAP: EntityV2[][] = [...Array(64).keys()].map(() =>
 					[...Array(64).keys()].map(() => baseTile({}))
 				);
-				const BASE_PROP_MAP: EntityV2[][] = [...Array(64).keys()].map(() =>
-					[...Array(64).keys()].map(() => baseTile({}))
-				);
+
 				for (let z = 0; z < 64; z++) {
 					for (let x = 0; x < 64; x++) {
+						// Structural tile information
 						let m0 = gameData.getMap0(x, z)!;
 						if (m0 <= 63) {
 							// wall
@@ -260,37 +305,100 @@
 								component: "Wall"
 							});
 							gameData.plane2[z][x] = true;
-						} else if (89 <= m0 && m0 <= 103) {
+						} else if (m0 === 90 || m0 === 91 || m0 === 100 || m0 === 101) {
 							// door
+							if (m0 < 100) {
+								BASE_TILE_MAP[z][x] = baseTile({
+									component: "Door",
+									position: { z, x },
+									texture: m0 + 9,
+									attributes: { state: "closed" },
+									blocking: true
+								});
+							} else {
+								BASE_TILE_MAP[z][x] = baseTile({
+									component: "Door",
+									position: { z, x },
+									texture: m0 + 3,
+									attributes: { state: "closed" },
+									blocking: true
+								});
+							}
+							gameData.plane2[z][x] = true;
+						} else if (m0 === 92 || m0 === 93) {
+							// Gold doors
+							BASE_TILE_MAP[z][x] = baseTile({
+								component: "Door",
+								position: { z, x },
+								texture: m0 + 13,
+								attributes: { state: "closed", needsKey: "yellow" },
+								blocking: true
+							});
+							gameData.plane2[z][x] = true;
+						} else if (m0 === 94 || m0 === 95) {
+							// Blue doors
 							BASE_TILE_MAP[z][x] = baseTile({
 								component: "Door",
 								position: { z, x },
 								texture: m0 + 9,
-								attributes: { state: "closed" },
+								attributes: { state: "closed", needsKey: "blue" },
 								blocking: true
 							});
 							gameData.plane2[z][x] = true;
 						}
-						let m1 = gameData.getMap1(x, z) as number;
 						if (m0 === 21) {
-							console.warn({ m1 });
-							BASE_TILE_MAP[z][x] = baseTile({
+							// Elevator area
+							BASE_TILE_MAP[z][x] = {
+								...BASE_TILE_MAP[z][x],
 								component: "Elevator",
 								texture: 108,
 								blocking: true
-							});
+							};
 						}
+						if (m0 === 107) {
+							// Secret floor tile (secret level elevator)
+							BASE_TILE_MAP[z][x] = {
+								...BASE_TILE_MAP[z][x],
+								secret: true
+							};
+							const currentPosition = { x, z };
+							for (const direction of WALL_FACES) {
+								let toPosition: Position2D = {} as Position2D;
+								switch (direction) {
+									case "left":
+										toPosition = { ...currentPosition, x: currentPosition.x + 1 };
+										break;
+									case "right":
+										toPosition = { ...currentPosition, x: currentPosition.x - 1 };
+										break;
+									case "back":
+										toPosition = { ...currentPosition, z: currentPosition.z - 1 };
+										break;
+									case "front":
+										toPosition = { ...currentPosition, z: currentPosition.z + 1 };
+										break;
+									default:
+										break;
+								}
+								BASE_TILE_MAP[toPosition.z][toPosition.x] = {
+									...BASE_TILE_MAP[toPosition.z][toPosition.x],
+									secret: true
+								};
+							}
+						}
+
+						// Non-structural tile information
+						let m1 = gameData.getMap1(x, z) as number;
+
 						if (19 <= m1 && m1 <= 22) {
 							// player starting position
 							PlayerState.modify((player) => {
 								player.position.x = x - 0.5;
 
 								player.position.z = z - 0.5;
-								console.log(player.position);
 								player.position = { ...getRealPositionFromLocalPosition(player.position), y: 0 };
 								return player;
 							});
-							// TODO: Player spawn direction
 							PlayerState.modify((player) => {
 								if (m1 === 19) {
 									player.rotation.y = 180;
@@ -305,7 +413,6 @@
 							});
 						} else if (23 <= m1 && m1 <= 70) {
 							// props
-							// TODO: Map these correctly to the correct plane
 							let collectible = false;
 							if ([29, 43, 44, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56].indexOf(m1) >= 0) {
 								// collectible
@@ -358,6 +465,7 @@
 							const guardEnemyRange = (108 <= m1 && m1 < 116) || (144 <= m1 && m1 < 152);
 							const ssEnemyRange = (126 <= m1 && m1 < 134) || (162 <= m1 && m1 < 170);
 							const dogEnemyRange = (134 <= m1 && m1 < 142) || (170 <= m1 && m1 < 178);
+
 							if (guardEnemyRange) {
 								const baseNumber = guardEnemyRange ? 108 : 144;
 								BASE_TILE_MAP[z][x] = {
@@ -374,17 +482,21 @@
 								const baseNumber = dogEnemyRange ? 134 : 170;
 								BASE_TILE_MAP[z][x] = { ...BASE_TILE_MAP[z][x], blocking: false, component: "Dog" };
 								LevelStatManager.addTotalKey("totalKills");
+							} else if (m1 === 214) {
+								BASE_TILE_MAP[z][x] = {
+									...BASE_TILE_MAP[z][x],
+									blocking: false,
+									component: "Hans"
+								};
 							}
 						}
 					}
 				}
 
-				console.log({ BASE_TILE_MAP });
 				const extendedMap = processWorld(BASE_TILE_MAP);
 
 				TILES = extendedMap;
 				PORTAL = Array.from(preprocessLevel(TILES));
-				console.log(PORTAL);
 				set(TILES);
 			},
 			getPortal: () => PORTAL,
@@ -407,7 +519,7 @@
 		getLocalPositionFromRealPosition,
 		getRealPositionFromLocalPosition
 	} from "$lib/utils/position";
-	import { ArrayUtils } from "../utils/validation";
+	import { ArrayUtils, WALL_FACES } from "../utils/validation";
 	import { getContext, onMount } from "svelte";
 	import { PlayerState } from "$lib/stores/player";
 	import { writable, type Updater } from "svelte/store";
@@ -427,7 +539,6 @@
 	import { gameData } from "$lib/helpers/maps";
 	import { LevelStatManager } from "$lib/stores/stats";
 	import { preprocessLevel, isPositionPortal, type Region, getCurrentRegion } from "./portal";
-	import { asap } from "$lib/utils/asap";
 
 	export let mode: "editor" | "generating" | "play" = "play";
 
@@ -452,7 +563,6 @@
 		if (elapsed > 250) {
 			start = now % INTERVAL;
 			const playerLocal = getLocalPositionFromRealPosition({ x, y, z });
-			const { models } = $GameObjects;
 
 			if (isPositionPortal(CurrentLevel.getPortal(), playerLocal)) {
 				const regions = getTileRegions(
@@ -498,25 +608,24 @@
 				(model, state) => {
 					const visibility = model.setVisibility(state);
 					if (schedule) schedule(visibility);
-					else asap(visibility);
+					else queueMicrotask(visibility);
 				}
 			);
 		});
 		return () => {
-			asap(() => {
+			queueMicrotask(() => {
 				gameLoop.abort();
 				GameObjects.reset();
 				gameLoop = null as never;
 			});
 		};
 	});
-	$: console.log($GameObjects, $CurrentLevel);
 </script>
 
 {#if mode !== "generating"}
 	{#each $CurrentLevel as group, section}
 		{#each group as item, offset}
-			{#if item.component === "Guard" || item.component === "Dog" || item.component === "SS"}
+			{#if item.component === "Guard" || item.component === "Dog" || item.component === "SS" || item.component === "Hans"}
 				<svelte:component
 					this={MODEL_MAP[item.component]}
 					{offset}

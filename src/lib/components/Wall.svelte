@@ -71,10 +71,6 @@
 	export const checkCollisionWithWorld = () =>
 		CurrentLevel.checkCollisionWithWorld(getLocalPosition());
 
-	/** Returns an array of each wall face */
-	export const sides: { [dir in WallFace]: Texture } = Object.fromEntries(
-		WALL_FACES.map((dir) => [dir, item.surfaces])
-	) as any;
 	/**
 	 * Just making TS Happy...
 	 */
@@ -123,7 +119,6 @@
 		font-size: 1rem;
 		color: white;
 		backface-visibility: hidden !important;
-		backface-visibility: visible !important;
 		z-index: -1;
 		opacity: 1;
 		/* image-rendering: ; */

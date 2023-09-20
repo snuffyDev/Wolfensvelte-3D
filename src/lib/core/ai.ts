@@ -8,6 +8,11 @@ import GuardShootSound from "$lib/sounds/guard/shoot.WAV?url";
 import GuardDeath1Sound from "$lib/sounds/guard/death_1.WAV?url";
 import GuardDeath2Sound from "$lib/sounds/guard/death_2.WAV?url";
 import GuardDeath3Sound from "$lib/sounds/guard/death_3.WAV?url";
+const hans = Object.fromEntries(
+	Object.entries(import.meta.glob("$lib/sounds/hans/*.wav", { as: "url", eager: true })).map(
+		([k, v]) => [k.replace(/^.+\/(.+)\.wav$/, "$1").replace("HANS_", ""), v]
+	)
+) as Record<string, string>;
 import { ItemPickups, rand } from "$lib/utils/engine";
 
 function getPreferredAttackDistance(distance: number) {
@@ -44,7 +49,7 @@ const DogBehavior: EnemyBehavior = {
 	health: 15,
 	damage: [8, 14],
 	reactionTime: 400,
-	attackDistance: [1, getPreferredAttackDistance, 64],
+	attackDistance: [1, getPreferredAttackDistance, 32],
 	pointValue: 500,
 	sounds: {
 		playerSeen: new URL(DogBarkSound, import.meta.url).toString(),
@@ -55,7 +60,7 @@ const DogBehavior: EnemyBehavior = {
 };
 
 const SSBehavior: EnemyBehavior = {
-	health: 35,
+	health: 45,
 	damage: [12, 21],
 	pointValue: 100,
 	reactionTime: 1100,
@@ -68,4 +73,26 @@ const SSBehavior: EnemyBehavior = {
 	dropOnDeath: "Smg"
 };
 
-export const ENEMY_INIT = { Guard: GuardBehavior, Dog: DogBehavior, SS: SSBehavior } as const;
+const HansBehavior: EnemyBehavior = {
+	health: 900,
+	damage: [1, 32],
+	pointValue: 5000,
+	reactionTime: 800,
+	attackDistance: [55, getPreferredAttackDistance, 900],
+	sounds: {
+		playerSeen: new URL(hans["alert"], import.meta.url).toString(),
+		death: new URL(hans["death"], import.meta.url).toString(),
+		death_1: new URL(hans["death"], import.meta.url).toString(),
+		death_2: new URL(hans["death"], import.meta.url).toString(),
+		death_3: new URL(hans["death"], import.meta.url).toString(),
+		attack: new URL(hans["shoot"], import.meta.url).toString()
+	},
+	dropOnDeath: "GoldKey"
+};
+
+export const ENEMY_INIT = {
+	Guard: GuardBehavior,
+	Dog: DogBehavior,
+	SS: SSBehavior,
+	Hans: HansBehavior
+} as const;

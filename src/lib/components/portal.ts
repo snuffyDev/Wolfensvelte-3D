@@ -16,9 +16,6 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region, void, 
 	const visitedTiles: Set<string> = new Set();
 
 	function findConnectedRegion(position: Position2D, regionIndex: number): void {
-		const { x, z } = position;
-		const key = `${x},${z}`;
-
 		const region: Region = {
 			portals: [],
 			connectedRegions: [],
@@ -61,8 +58,6 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region, void, 
 							position: adjacentTile,
 							connectedRegion
 						});
-
-						region.connectedRegions.push(connectedRegion);
 					} else if (adjacentTileData.blocking && adjacentTileData.component === "Object") {
 						stack.push(adjacentTile);
 
@@ -83,7 +78,6 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region, void, 
 							region.tiles.push(adjacentTile);
 							continue;
 						}
-						// visitedTiles.add(`${adjX},${adjZ}`);
 						region.tiles.push(adjacentTile);
 					}
 				}
@@ -100,6 +94,62 @@ function* preprocessLevel(level: ExtendedEntityV2[][]): Generator<Region, void, 
 			if ((!visitedTiles.has(`${x},${z}`) && !tile.blocking) || tile.pushwall) {
 				const regionIndex = regions.length;
 				findConnectedRegion({ x, z }, regionIndex);
+			}
+		}
+	}
+
+	// iterate over regions and find adjacent regions
+	for (let i = 0; i < regions.length; i++) {
+		const region = regions[i];
+		for (let j = 0; j < regions.length; j++) {
+			if (i === j) {
+				continue;
+			}
+
+			const otherRegion = regions[j];
+			for (const tile of region.tiles) {
+				const { x, z } = tile;
+				const adjacentTiles: Position2D[] = [
+					{ x: x - 1, z }, // left
+					{ x: x + 1, z }, // right
+					{ x, z: z - 1 }, // front
+					{ x, z: z + 1 } // back
+				];
+
+				for (const adjacentTile of adjacentTiles) {
+					const { x, z } = adjacentTile;
+					if (
+						otherRegion.tiles.some((tile) => tile.x === x && tile.z === z) &&
+						!region.connectedRegions.includes(j)
+					) {
+						region.connectedRegions.push(j);
+					}
+				}
+			}
+			for (const portal of region.portals) {
+				const { position } = portal;
+				const { x, z } = position;
+				const adjacentTiles: Position2D[] = [
+					{ x: x - 1, z }, // left
+					{ x: x + 1, z }, // right
+					{ x, z: z - 1 }, // front
+					{ x, z: z + 1 } // back
+				];
+
+				for (const adjacentTile of adjacentTiles) {
+					const { x, z } = adjacentTile;
+					if (
+						otherRegion.tiles.some((tile) => tile.x === x && tile.z === z) &&
+						!region.connectedRegions.includes(j)
+					) {
+						region.connectedRegions.push(j);
+					}
+
+					// assign connected region to portal
+					if (otherRegion.tiles.some((tile) => tile.x === x && tile.z === z)) {
+						portal.connectedRegion = j;
+					}
+				}
 			}
 		}
 	}

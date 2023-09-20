@@ -3,11 +3,12 @@
 	import MenuImg from "$lib/sprites/menu/wolf_menu.BMP?url";
 	import PCImg from "../../lib/sprites/menu/profound_carnage.BMP?url";
 	import OptionsHeaderImg from "../../lib/sprites/menu/Options.BMP?url";
+	import ActiveGun from "../../lib/sprites/menu/gun.bmp?url";
+	import InactiveGun from "../../lib/sprites/menu/gun2.bmp?url";
 	import BackgroundImage from "../../lib/sprites/menu/Background.BMP?url";
 	import Screen from "./components/Screen.svelte";
 	import { onMount } from "svelte";
 	import { AudioEngine } from "$lib/helpers/music";
-	import { skipFirstInvocation } from "$lib/utils/skipFirst";
 
 	let screenIdx = 0;
 	onMount(() => {
@@ -30,6 +31,7 @@
 			backgroundColor="#20a8fc"
 			center={false}
 		>
+			<!-- svelte-ignore a11y-missing-attribute -->
 			<img
 				style="width: 17vw; height: auto; place-self: flex-end; margin: 6.5vw;"
 				src={PCImg}
@@ -38,6 +40,7 @@
 		</Screen>
 	{:else if screenIdx === 1}
 		<Screen fadeInOut>
+			<!-- svelte-ignore a11y-missing-attribute -->
 			<img
 				src={MenuImg}
 				slot="image"
@@ -45,6 +48,7 @@
 		</Screen>
 	{:else}
 		<Screen>
+			<!-- svelte-ignore a11y-missing-attribute -->
 			<img
 				src={BackgroundImage}
 				style="width: 100%; height: 100%; z-index: -2"
@@ -67,10 +71,21 @@
 			>
 				<!-- -->
 				<button
+					style:--hover-img="url({new URL(ActiveGun, import.meta.url).toString()})"
+					style:--inactive-img="url({new URL(InactiveGun, import.meta.url).toString()})"
 					on:click|once={() => {
-						// goto("/E1M1");
+						goto("/E1M1");
 					}}
-					><span>g</span>
+					><span style="position:relative; height:100%;"
+						><span
+							style:background-size="100%"
+							style:background-position="center"
+							style:background-repeat="no-repeat"
+							style:position="absolute"
+							style:inset="0"
+							style:image-rendering="pixelated"
+						/></span
+					>
 					<span>New Game</span></button
 				>
 			</div>
@@ -104,13 +119,19 @@
 		line-height: 1;
 		letter-spacing: 0.01em;
 		font-size: 6rem !important;
-		transition: color 100ms 100ms ease-out;
-		// margin-inline: 8rem;
+		transition: color 50ms 50ms ease-out;
+
+		> span > span {
+			background-image: var(--inactive-img);
+		}
 		&:hover,
 		&:focus-visible,
 		&:focus-within {
 			outline: none;
 			color: #e2e2e2;
+			> span > span {
+				background-image: var(--hover-img);
+			}
 		}
 	}
 	.absolute {
@@ -158,7 +179,6 @@
 		}
 		place-items: center;
 		img {
-			// max-height: 50vh;
 			width: 100%;
 			max-width: 100%;
 			aspect-ratio: 3/2;
@@ -166,7 +186,7 @@
 
 			image-rendering: pixelated;
 			object-fit: contain;
-			// width: 100%;
+
 			user-select: none;
 			pointer-events: none;
 			-webkit-user-drag: none;

@@ -1,8 +1,4 @@
 // Based on https://github.com/sveltejs/svelte/blob/master/packages/svelte/src/runtime/internal/loop.js
-
-import { browser } from "$app/environment";
-import { asap } from "./asap";
-
 export interface Task {
 	abort(): void;
 	promise: Promise<void>;
@@ -21,25 +17,34 @@ const add_to_queue = (cb: () => void) => {
 	prerender_queue.push(cb);
 };
 
-const TARGET_FPS = 1000 / 24;
+const TARGET_FPS = 1000 / 33;
 async function run_async(now: number) {
-	const _tasks: TaskEntry[] = [];
-	for (const task of tasks) {
-		_tasks.push(task);
-	}
-
-	await Promise.all(
-		_tasks.map(async (v) => {
-			try {
-				if (!(await v.c(now, add_to_queue))) {
-					tasks.delete(v);
-					v.f();
+	return new Promise<void>((resolve) => {
+		const q = Array.from(tasks);
+		for (let idx = 0; idx < tasks.size; idx++) {
+			const task = q[idx];
+			const r = task.c(now, add_to_queue);
+			if (typeof (r as Promise<void>)?.then !== "undefined") {
+				Promise.resolve(r)
+					.then((r) => {
+						if (!r) {
+							tasks.delete(task);
+							task.f();
+						}
+					})
+					.catch((r) => console.error(r))
+					.finally(() => {
+						task.f();
+					});
+			} else {
+				if (r === false) {
+					tasks.delete(task);
+					task.f();
 				}
-			} catch (e) {
-				console.error(e);
 			}
-		})
-	);
+			if (idx === tasks.size - 1) resolve();
+		}
+	});
 }
 
 let running = false;
@@ -47,26 +52,24 @@ let running = false;
 async function run_tasks() {
 	let then: number | undefined = undefined;
 	while (running) {
+		const now = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
 		if (tasks.size === 0) {
 			running = false;
 			break;
 		}
-		const now = await new Promise<number>((resolve) => requestAnimationFrame(resolve));
 		if (!then) then = now;
 		const elapsed = (now - then) as number;
 		if (elapsed > TARGET_FPS) {
-			then = now - (elapsed % TARGET_FPS);
+			await run_async(now);
 
-			queueMicrotask(() => {
-				run_async(now);
-			});
 			while (prerender_queue.length) {
 				try {
 					prerender_queue.shift()?.();
 				} catch (e) {
-					console.error(e);
+					// no empty
 				}
 			}
+			then = now - (elapsed % TARGET_FPS);
 		}
 	}
 }
