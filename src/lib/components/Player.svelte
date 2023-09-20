@@ -214,7 +214,9 @@
 		if (shouldAttackEnemy) {
 			if ($PlayerState.weapons.active !== "knife" && $PlayerState.weapons.ammo > 0) {
 				if ($PlayerState.weapons.active !== "pistol" && event.repeat)
-					AudioEngine.play(`player:${$PlayerState.weapons.active}`, false, false);
+					queueMicrotask(() => {
+						AudioEngine.play(`player:${$PlayerState.weapons.active}`, false, false);
+					});
 			}
 			await attackClosestEnemy(position);
 		}
@@ -315,13 +317,16 @@
 
 		switch ($PlayerState.weapons.active) {
 			case "smg":
-				timeout = 325;
+				timeout = 255;
 				break;
 			case "pistol":
 				timeout = 500;
 				break;
+			case "chaingun":
+				timeout = 200;
+				break;
 			case "knife":
-				timeout = 125;
+				timeout = 550;
 				break;
 		}
 
@@ -518,8 +523,55 @@
 		}
 	}
 
+	.chaingun {
+		--url: url(../sprites/CHAINGUN.png) no-repeat;
+		--shoot-speed-anim: 0.11s;
+
+		@keyframes shooting {
+			0% {
+				background-position-x: 0; // No need for "-0px"
+			}
+			20% {
+				background-position-x: -23.0625rem; // Converted from -369px to rem
+			}
+			40% {
+				background-position-x: -48rem; // Converted from -768px to rem
+			}
+			60% {
+				background-position-x: -71.75rem; // Converted from -1148px to rem
+			}
+		}
+	}
+
 	.smg {
 		--url: url(../sprites/SMG.png) no-repeat;
+		--shoot-speed-anim: 0.55s;
+
+		@keyframes shooting {
+			0% {
+				background-position-x: 0; // No need for "-0px"
+			}
+			20% {
+				background-position-x: -23.0625rem; // Converted from -369px to rem
+			}
+			40% {
+				background-position-x: -48rem; // Converted from -768px to rem
+			}
+			60% {
+				background-position-x: -71.75rem; // Converted from -1148px to rem
+			}
+
+			80% {
+				background-position-x: -48rem; // Converted from -768px to rem
+			}
+			100% {
+				background-position-x: -23.0625rem; // Converted from -369px to rem
+			}
+		}
+	}
+
+	.knife {
+		--url: url(../sprites/KNIFE.png) no-repeat;
 		--shoot-speed-anim: 0.55s;
 
 		@keyframes shooting {

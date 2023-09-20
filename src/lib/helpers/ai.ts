@@ -26,7 +26,7 @@ export function findPath(start: Position2D, goal: Position2D): Position2D[] {
 
 		return neighbors.filter((neighbor) => isValidPosition(neighbor) && isWalkable(neighbor));
 	}
-	
+
 	function isWalkable(pos: Position2D): boolean {
 		return !CurrentLevel.checkCollisionWithWorld(pos, true);
 	}

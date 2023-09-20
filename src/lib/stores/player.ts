@@ -359,7 +359,8 @@ function _playerState(initialState: IPlayerState = {} as IPlayerState) {
 					await e.takeDamage(damage);
 				}
 			} finally {
-				state.weapons.ammo = Math.max(0, state.weapons.ammo - 1);
+				if (state.weapons.active !== "knife")
+					state.weapons.ammo = Math.max(0, state.weapons.ammo - 1);
 				update((u) => ({ ...u, weapons: state.weapons }));
 			}
 		}

@@ -63,6 +63,7 @@
 				health: 100,
 				weapons: death
 					? {
+							knife: { acquired: true },
 							pistol: { acquired: true },
 							smg: { acquired: false },
 							ammo: 8,
@@ -132,7 +133,7 @@
 			isLoadingNextLevel.set(true);
 			setTimeout(() => {
 				handlePlayerDeath();
-			}, 4500);
+			}, 2500);
 		}
 		if ($LevelHandler.isComplete === true) {
 			GameObjects.reset();

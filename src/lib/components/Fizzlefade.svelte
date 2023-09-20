@@ -39,7 +39,7 @@
 	class="fizzle"
 	style="{URLS.join(' ')};"
 	in:fizzlefade={{ duration: 5150, delay: 0 }}
-	out:fizzlefade={{ duration: 5150, delay: 2500 }}
+	out:fizzlefade={{ duration: 3100, delay: 3500 }}
 	bind:this={image}
 >
 	{#each Array(progress) as _, idx}
