@@ -50,17 +50,17 @@ The only tech used can be summed up as: Svelte, HTML, (S)CSS, and TypeScript/Jav
 
 ### Features
 
-- Enemies (Guards + Guard Dogs)
+- Enemies (Guards + Guard Dogs + Hans, so far)
 - Weapons and ammo system
-- Secrets (pushwalls)
+- Secrets (pushwalls, secret levels)
 - Item pickups
-- Full E1M1 map
+- Full E1-E6
 - Player Health
 - Basically, everything you'd expect
 
 ### Project's Goals
 
-- Port (nearly) the entirety of Episode 1.
+- ~~Port (nearly) the entirety of Episode 1.~~ Finished: E1-E6 is included, sans the enemies 'cause I havent gotten around to extracting those assets
 - Be accurate to the original, where it makes sense (examples below)
   - Reasonable: _Damage model should be the same as Wolfenstein 3D_
     - A different damage model would make the game feel "wrong".
